@@ -1,0 +1,202 @@
+[
+  {
+    "profile": "phone",
+    "stop": "on",
+    "station": {
+      "x": 335,
+      "y": 238
+    },
+    "ship": {
+      "x": 335,
+      "y": 214
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 316.6,
+        "right": 399.40000000000003,
+        "y": 174
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 316.6,
+        "right": 399.40000000000003,
+        "y": 174
+      }
+    ],
+    "withheld": [],
+    "overlap": {
+      "x": 316.6,
+      "y": 174,
+      "width": 82.80000000000001,
+      "height": 16
+    }
+  },
+  {
+    "profile": "phone",
+    "stop": "across",
+    "station": {
+      "x": 335,
+      "y": 238
+    },
+    "ship": {
+      "x": 361,
+      "y": 208
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 342.6,
+        "right": 425.40000000000003,
+        "y": 168
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 316.6,
+        "right": 399.40000000000003,
+        "y": 174
+      }
+    ],
+    "withheld": [],
+    "overlap": {
+      "x": 342.6,
+      "y": 174,
+      "width": 56.80000000000001,
+      "height": 10
+    }
+  },
+  {
+    "profile": "phone",
+    "stop": "clear",
+    "station": {
+      "x": 335,
+      "y": 238
+    },
+    "ship": {
+      "x": 545,
+      "y": 88
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 526.6,
+        "right": 609.4,
+        "y": 48
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 316.6,
+        "right": 399.40000000000003,
+        "y": 174
+      }
+    ],
+    "withheld": [],
+    "overlap": null
+  },
+  {
+    "profile": "desktop",
+    "stop": "on",
+    "station": {
+      "x": 538,
+      "y": 496
+    },
+    "ship": {
+      "x": 538,
+      "y": 472
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 519.6,
+        "right": 602.4,
+        "y": 432
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 519.6,
+        "right": 602.4,
+        "y": 432
+      }
+    ],
+    "withheld": [],
+    "overlap": {
+      "x": 519.6,
+      "y": 432,
+      "width": 82.79999999999995,
+      "height": 16
+    }
+  },
+  {
+    "profile": "desktop",
+    "stop": "across",
+    "station": {
+      "x": 538,
+      "y": 496
+    },
+    "ship": {
+      "x": 564,
+      "y": 466
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 545.6,
+        "right": 628.4,
+        "y": 426
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 519.6,
+        "right": 602.4,
+        "y": 432
+      }
+    ],
+    "withheld": [],
+    "overlap": {
+      "x": 545.6,
+      "y": 432,
+      "width": 56.799999999999955,
+      "height": 10
+    }
+  },
+  {
+    "profile": "desktop",
+    "stop": "clear",
+    "station": {
+      "x": 538,
+      "y": 496
+    },
+    "ship": {
+      "x": 748,
+      "y": 346
+    },
+    "drawn": [
+      {
+        "kind": "ship",
+        "text": "Rusty (EASY)",
+        "left": 729.6,
+        "right": 812.4,
+        "y": 306
+      },
+      {
+        "kind": "station",
+        "text": "Rusty (EASY)",
+        "left": 519.6,
+        "right": 602.4,
+        "y": 432
+      }
+    ],
+    "withheld": [],
+    "overlap": null
+  }
+]

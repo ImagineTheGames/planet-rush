@@ -76,7 +76,14 @@ import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_LOCAL_HEIGHT } from './healt
 // positions the two are in the same pixels. The rule — who yields, how far, and
 // what happens when yielding is not enough — is stated once in the registry's own
 // vocabulary and applied here; see that module's keep-out section for the argument.
-import { labelYieldsToReadouts } from './layout-exclusions';
+// a0-119: …and a label is not the only thing a label can be drawn on top of. Two
+// plates for the SAME owner — their station's and their ship's — carry the same
+// string by construction, and when a ship sits at its own home the two rows land
+// in the same band. Same keep-out, same pad, one more kind of blocker; the
+// argument is in that module's a0-119 section, and the ordering ruling — which of
+// an owner's two plates keeps its pixels — is {@link NAMEPLATE_KIND_ORDER} below.
+import { labelRepeatsOwner, labelYieldsToReadouts } from './layout-exclusions';
+import type { PlacedLabel } from './layout-exclusions';
 import type { Nameplate, NameplateKind } from './nameplates';
 import { hudTracking } from './instrument';
 import { FONT_BODY } from './typography';
@@ -132,6 +139,66 @@ export const NAMEPLATE_TEAM_GAP = 4;
  * own alpha, so the whole row dims together when a caller dims the layer.
  */
 export const NAMEPLATE_TEAM_ALPHA = 0.85;
+
+// ---------------------------------------------------------------------------
+// One owner, two plates (a0-119 — which of them keeps its pixels)
+// ---------------------------------------------------------------------------
+
+/**
+ * The order an owner's plates are placed in, and therefore which one survives
+ * when they would be drawn on each other: **the station's, then the ship's.**
+ *
+ * A character has a home *and* a hull and the developer asked for both to be
+ * named (field request v0.2.1 — *"I want to see player names over their stations
+ * and their ships"*), so two plates for one owner is not the defect and dropping
+ * one of them wholesale is not the fix. The defect is that they collide: the
+ * developer's own screenshot of 2026-08-19 has `Rusty (EASY)` printed across
+ * `Rusty (EASY)`, and QA failed it on a0-118. The two are only ever in the same
+ * pixels when the ship is at its own home, which is a fraction of the match; the
+ * rest of the time they are labelling two things in two places and both are
+ * wanted. So the answer is conditional, and this list is the condition's tie-break.
+ *
+ * **Why the STATION plate is the one placed first.** Not because it is cheaper to
+ * move — neither is, once you accept that moving is the wrong verb here (the two
+ * rows are the same string, so a step aside yields a duplicate, not a second
+ * reading; see `./layout-exclusions` a0-119). It is about what a player has to be
+ * able to read at the moment the two collide:
+ *
+ *  - A station is a **landmark**. Its label answers *whose home is that* — the
+ *    question behind every attack and every retreat in the game (GDD §2.2), asked
+ *    about a thing that is in the same world position all match. A landmark whose
+ *    name blinks out because someone's hull drifted past it is a landmark you stop
+ *    trusting, and it blinks *for a reason the player cannot see*.
+ *  - A ship is **in motion by definition**, and its plate is already the mark this
+ *    HUD asks to yield: the local player's own ship plate is suppressed outright
+ *    ({@link ./nameplates} `showOwnShipLabel`), and a0-115 already steps a ship's
+ *    plate out of the readouts and stands it down when it cannot. Asking it to
+ *    yield once more is the same mark yielding in the same way, not a new
+ *    exception.
+ *  - And at the moment of the collision **nothing is lost**, which is what makes
+ *    this cheap. The ship is at its own station, so the plate that remains is
+ *    within a hull's width of where the dropped one wanted to be, and it is the
+ *    same word: `Rusty (EASY)` still labels that corner of the screen for both.
+ *    The instant the ship leaves, its own plate is back.
+ *
+ * Written as an order rather than as an `if (kind === 'station')` because it is
+ * the only thing that decides priority: {@link NameplateView.update} places the
+ * kinds in this sequence and each plate yields to what is already down. Add a
+ * third label-bearing kind one day and it takes its place in this list, with its
+ * argument, rather than in a branch somewhere in the draw loop.
+ */
+export const NAMEPLATE_KIND_ORDER = ['station', 'ship'] as const;
+
+/** Compile-time proof that the order above names EVERY label-bearing kind. The
+ *  draw loop walks the list rather than the plates, so a kind missing from it
+ *  would not be mis-ordered — it would silently stop being drawn, which is the
+ *  one failure mode this deliverable must not introduce. Adding a
+ *  {@link NameplateKind} without adding it here is a type error, here. */
+type _EveryKindIsOrdered = NameplateKind extends (typeof NAMEPLATE_KIND_ORDER)[number]
+  ? true
+  : ['missing from NAMEPLATE_KIND_ORDER', NameplateKind];
+const _kindOrderIsTotal: _EveryKindIsOrdered = true;
+void _kindOrderIsTotal;
 
 // ---------------------------------------------------------------------------
 // The row (a0-38 — the side reads first)
@@ -348,8 +415,12 @@ export interface WithheldNameplate {
    *    layer has always applied ("a partial label reads worse than none").
    *  - `readout` — every position that clears the fixed HUD readouts would put
    *    the plate off the ship it names (a0-115).
+   *  - `duplicate` — a plate for this SAME owner is already down in these pixels
+   *    (a0-119), so this one would repeat it word for word rather than add a
+   *    reading. Always the ship's plate, never the station's
+   *    ({@link NAMEPLATE_KIND_ORDER}).
    */
-  reason: 'offscreen' | 'readout';
+  reason: 'offscreen' | 'readout' | 'duplicate';
   /** Where the entity was, screen space CSS px — the centre the row was built on. */
   x: number;
   y: number;
@@ -372,6 +443,18 @@ export class NameplateView extends Container {
   private debugCount = 0;
   private readonly debugHeld: WithheldNameplate[] = [];
   private debugHeldCount = 0;
+
+  // --- a0-119: what is already down, so the next plate can be told about it ---
+  /** Pooled placed-label records, one per plate slot, overwritten in place each
+   *  frame — the rects a later plate has to clear. Pooled for the same reason the
+   *  Texts are (GDD §4.3): this runs every frame of every match. */
+  private readonly placedPool: { owner: PlayerId; rect: { x: number; y: number; width: number; height: number } }[] = [];
+  /** This frame's placed labels, in placement order. Truncated and refilled from
+   *  {@link placedPool} rather than rebuilt, so the array's store is reused too. */
+  private readonly placedFrame: PlacedLabel[] = [];
+  /** One reused rect for the plate currently being tested — the row where it
+   *  WOULD draw, before we know whether it may. Copied into the pool if it does. */
+  private readonly scratchRect = { x: 0, y: 0, width: 0, height: 0 };
 
   /**
    * Draw one frame of labels into the given viewport. `plates` come from
@@ -398,115 +481,146 @@ export class NameplateView extends Container {
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
+    // a0-119: nothing is down yet, so the first plate placed has nothing to clear.
+    this.placedFrame.length = 0;
 
-    for (const plate of plates) {
-      const t = this.slot(drawn);
-      // A Text re-rasterises only when its string changes — cheap in a stable
-      // scene where slot i keeps tracking the same entity across frames.
-      if (t.text !== plate.text) t.text = plate.text;
-      t.tint = plate.color;
-      t.alpha = plate.alpha;
+    // Placed in priority order, not in the order the feed happened to build them
+    // (`main.ts` `feedNameplates` pushes every ship, then every station). An
+    // owner's station plate goes down first and keeps its pixels; their ship plate
+    // yields to it — the ruling, and the argument, are on NAMEPLATE_KIND_ORDER.
+    for (const kind of NAMEPLATE_KIND_ORDER) {
+      for (const plate of plates) {
+        if (plate.kind !== kind) continue;
+        const t = this.slot(drawn);
+        // A Text re-rasterises only when its string changes — cheap in a stable
+        // scene where slot i keeps tracking the same entity across frames.
+        if (t.text !== plate.text) t.text = plate.text;
+        t.tint = plate.color;
+        t.alpha = plate.alpha;
 
-      // The side label (m10 teams, u3 wording) — `FRIENDLY A` / `ENEMY B`, in
-      // words, and since a0-38 it LEADS the row, because that is the fact a player
-      // is scanning for (*"friendly or enemy should be the first thing displayed on
-      // a name"*). Colour cannot say it on its own: identity colour is per-SLOT, so
-      // a side has no hue (style-guide §3.1; "colour alone insufficient", ratified).
-      // Its own tint IS the side colour — blue ally / red rival — but only as
-      // reinforcement over a word that already says it. Empty in FFA, where every
-      // plate would otherwise read a different side and say nothing.
-      const tm = this.teamSlot(drawn);
-      if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
-      const hasTeam = plate.teamLabel.length > 0;
+        // The side label (m10 teams, u3 wording) — `FRIENDLY A` / `ENEMY B`, in
+        // words, and since a0-38 it LEADS the row, because that is the fact a player
+        // is scanning for (*"friendly or enemy should be the first thing displayed on
+        // a name"*). Colour cannot say it on its own: identity colour is per-SLOT, so
+        // a side has no hue (style-guide §3.1; "colour alone insufficient", ratified).
+        // Its own tint IS the side colour — blue ally / red rival — but only as
+        // reinforcement over a word that already says it. Empty in FFA, where every
+        // plate would otherwise read a different side and say nothing.
+        const tm = this.teamSlot(drawn);
+        if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
+        const hasTeam = plate.teamLabel.length > 0;
 
-      // The recessive difficulty suffix (field request v0.2.2), trailing the name
-      // in the owner colour but a step dimmer, so it reads as metadata not identity.
-      const st = this.suffixSlot(drawn);
-      if (st.text !== plate.suffix) st.text = plate.suffix;
-      const hasSuffix = plate.suffix.length > 0;
+        // The recessive difficulty suffix (field request v0.2.2), trailing the name
+        // in the owner colour but a step dimmer, so it reads as metadata not identity.
+        const st = this.suffixSlot(drawn);
+        if (st.text !== plate.suffix) st.text = plate.suffix;
+        const hasSuffix = plate.suffix.length > 0;
 
-      // Bottom anchors: the row's baseline sits just above the entity's status
-      // cluster, so it grows upward and never into the bar/ship. The row itself —
-      // side, name, tag — is laid out and centred by the pure function above, so
-      // its order and its FFA/human-seat gaps are unit-testable without a GPU.
-      const bottom = plate.y - nameplateClusterClearance(plate);
-      const height = t.height;
-      const row = nameplateRowLayout(plate.x, {
-        side: hasTeam ? tm.width : 0,
-        name: t.width,
-        suffix: hasSuffix ? st.width : 0,
-      });
-      const top = bottom - height;
+        // Bottom anchors: the row's baseline sits just above the entity's status
+        // cluster, so it grows upward and never into the bar/ship. The row itself —
+        // side, name, tag — is laid out and centred by the pure function above, so
+        // its order and its FFA/human-seat gaps are unit-testable without a GPU.
+        const bottom = plate.y - nameplateClusterClearance(plate);
+        const height = t.height;
+        const row = nameplateRowLayout(plate.x, {
+          side: hasTeam ? tm.width : 0,
+          name: t.width,
+          suffix: hasSuffix ? st.width : 0,
+        });
+        const top = bottom - height;
 
-      // Cull anything that would spill off the canvas: a partial label reads worse
-      // than none, and a clipped rect would break the `full` contract. The row is
-      // one piece — the side tag is not decoration a ship can be labelled without,
-      // so a row that does not fit takes the whole plate with it.
-      if (row.left < 0 || top < 0 || row.right > viewportWidth || top + height > viewportHeight) {
-        t.visible = false;
-        tm.visible = false;
-        st.visible = false;
-        if (this.debugCapture) this.recordWithheld(held, plate, 'offscreen');
-        held++;
-        continue;
+        // Cull anything that would spill off the canvas: a partial label reads worse
+        // than none, and a clipped rect would break the `full` contract. The row is
+        // one piece — the side tag is not decoration a ship can be labelled without,
+        // so a row that does not fit takes the whole plate with it.
+        if (row.left < 0 || top < 0 || row.right > viewportWidth || top + height > viewportHeight) {
+          t.visible = false;
+          tm.visible = false;
+          st.visible = false;
+          if (this.debugCapture) this.recordWithheld(held, plate, 'offscreen');
+          held++;
+          continue;
+        }
+
+        // a0-115: the readouts are fixed furniture and this label is not, so the
+        // label is the one that moves. `dx` is the smallest sideways step that
+        // clears every readout while the row still stands over its own entity;
+        // `withheld` means there is no such step and the plate stands down for this
+        // frame rather than being drawn through the word ORE.
+        const yielded = labelYieldsToReadouts(
+          { left: row.left, right: row.right, top, bottom },
+          plate.x,
+          plate.radius,
+          readouts,
+          viewportWidth,
+        );
+        if (yielded.withheld) {
+          t.visible = false;
+          tm.visible = false;
+          st.visible = false;
+          if (this.debugCapture) this.recordWithheld(held, plate, 'readout');
+          held++;
+          continue;
+        }
+        const dx = yielded.dx;
+
+        // a0-119: …and the other thing a label must not be drawn inside is another
+        // label for the same owner. Measured where this row would DRAW (post-step),
+        // against the rows already down (also post-step) — a plate that yielded out
+        // of the ore counter blocks the pixels it landed in, and one that stood down
+        // blocks nothing, because it is not in the frame. The answer is to stand
+        // down rather than step aside: the two rows are the same string, so a step
+        // would leave `Rusty (EASY)` beside `Rusty (EASY)`.
+        const drawnRect = this.scratchRect;
+        drawnRect.x = row.left + dx;
+        drawnRect.y = top;
+        drawnRect.width = row.width;
+        drawnRect.height = height;
+        if (labelRepeatsOwner(plate.owner, drawnRect, this.placedFrame)) {
+          t.visible = false;
+          tm.visible = false;
+          st.visible = false;
+          if (this.debugCapture) this.recordWithheld(held, plate, 'duplicate');
+          held++;
+          continue;
+        }
+        this.placedFrame.push(this.placedSlot(this.placedFrame.length, plate.owner, drawnRect));
+
+        t.visible = true;
+        // Centre-anchored, so it is drawn AT the entity — `row.nameX` is that same
+        // point expressed as the name's left edge, which is what the two tags and
+        // the cull are measured from.
+        t.position.set(plate.x + dx, bottom);
+        if (hasTeam) {
+          tm.visible = true;
+          tm.tint = plate.teamColor;
+          tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
+          tm.position.set(row.sideX + dx, bottom);
+        } else {
+          tm.visible = false;
+        }
+        if (hasSuffix) {
+          st.visible = true;
+          st.tint = plate.color;
+          st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
+          // Left-anchored past the name, sharing its baseline.
+          st.position.set(row.suffixX + dx, bottom);
+        } else {
+          st.visible = false;
+        }
+        // Everything downstream — the debug readback and the registered bounds —
+        // reads the row where it was DRAWN, not where it would have been: a rect
+        // that ignored the step would report the plate inside the counter it just
+        // stepped out of.
+        const placed = dx === 0 ? row : shiftRow(row, dx);
+        if (this.debugCapture) this.recordDebug(drawn, plate, top, placed, plate.x + dx);
+        drawn++;
+
+        if (placed.left < minX) minX = placed.left;
+        if (top < minY) minY = top;
+        if (placed.right > maxX) maxX = placed.right;
+        if (top + height > maxY) maxY = top + height;
       }
-
-      // a0-115: the readouts are fixed furniture and this label is not, so the
-      // label is the one that moves. `dx` is the smallest sideways step that
-      // clears every readout while the row still stands over its own entity;
-      // `withheld` means there is no such step and the plate stands down for this
-      // frame rather than being drawn through the word ORE.
-      const yielded = labelYieldsToReadouts(
-        { left: row.left, right: row.right, top, bottom },
-        plate.x,
-        plate.radius,
-        readouts,
-        viewportWidth,
-      );
-      if (yielded.withheld) {
-        t.visible = false;
-        tm.visible = false;
-        st.visible = false;
-        if (this.debugCapture) this.recordWithheld(held, plate, 'readout');
-        held++;
-        continue;
-      }
-      const dx = yielded.dx;
-
-      t.visible = true;
-      // Centre-anchored, so it is drawn AT the entity — `row.nameX` is that same
-      // point expressed as the name's left edge, which is what the two tags and
-      // the cull are measured from.
-      t.position.set(plate.x + dx, bottom);
-      if (hasTeam) {
-        tm.visible = true;
-        tm.tint = plate.teamColor;
-        tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
-        tm.position.set(row.sideX + dx, bottom);
-      } else {
-        tm.visible = false;
-      }
-      if (hasSuffix) {
-        st.visible = true;
-        st.tint = plate.color;
-        st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
-        // Left-anchored past the name, sharing its baseline.
-        st.position.set(row.suffixX + dx, bottom);
-      } else {
-        st.visible = false;
-      }
-      // Everything downstream — the debug readback and the registered bounds —
-      // reads the row where it was DRAWN, not where it would have been: a rect
-      // that ignored the step would report the plate inside the counter it just
-      // stepped out of.
-      const placed = dx === 0 ? row : shiftRow(row, dx);
-      if (this.debugCapture) this.recordDebug(drawn, plate, top, placed, plate.x + dx);
-      drawn++;
-
-      if (placed.left < minX) minX = placed.left;
-      if (top < minY) minY = top;
-      if (placed.right > maxX) maxX = placed.right;
-      if (top + height > maxY) maxY = top + height;
     }
 
     this.hideFrom(drawn);
@@ -558,6 +672,28 @@ export class NameplateView extends Container {
     d.reason = reason;
     d.x = plate.x;
     d.y = plate.y;
+  }
+
+  /** The pooled placed-label record at `i` (grows to fit), overwritten with this
+   *  plate's owner and drawn rect — the a0-119 blocker list, built without
+   *  allocating per plate per frame. */
+  private placedSlot(
+    i: number,
+    owner: PlayerId,
+    rect: { x: number; y: number; width: number; height: number },
+  ): PlacedLabel {
+    let p = this.placedPool[i];
+    if (!p) {
+      p = { owner, rect: { ...rect } };
+      this.placedPool[i] = p;
+      return p;
+    }
+    p.owner = owner;
+    p.rect.x = rect.x;
+    p.rect.y = rect.y;
+    p.rect.width = rect.width;
+    p.rect.height = rect.height;
+    return p;
   }
 
   /** Record one drawn label into the reusable pool at `i` (grows to fit). Only
