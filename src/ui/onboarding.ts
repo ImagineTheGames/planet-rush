@@ -542,7 +542,7 @@ export interface OnboardingSignals {
    *  prompt's trigger (GDD §2.2, §2.10). Optional; absent reads as quiet. */
   readonly underAttack?: boolean;
   /**
-   * The **screen-edge arrow home is on screen this frame** ({@link ../ui/alarm}
+   * The **screen-edge arrow home is being drawn this frame** ({@link ../ui/alarm}
    * `homeArrow`, drawn by {@link ./hud} `drawHomeArrow`). The second half of the
    * UNDER-ATTACK prompt's trigger, and the reason it is a second half (a0-104).
    *
