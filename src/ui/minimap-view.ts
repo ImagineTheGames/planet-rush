@@ -172,6 +172,11 @@ export class MinimapView extends Container {
   /**
    * Draw one frame. `frame` is null before the world exists (the M1 feed) — the
    * whole layer hides then. `tick` drives the content redraw throttle.
+   *
+   * `fireCorner` is whether a touch FIRE button is drawn in the bottom-right this
+   * frame (a0-103); it moves the collapsed square left of the fire column when it
+   * is, and lets it take the true corner when it is not. Defaulted false — the
+   * unreserved corner is the honest default.
    */
   update(
     frame: MinimapFrame | null,
@@ -180,6 +185,7 @@ export class MinimapView extends Container {
     isTouch: boolean,
     insets: MinimapInsets,
     tick: number,
+    fireCorner = false,
   ): void {
     if (!frame) {
       this.visible = false;
@@ -187,7 +193,7 @@ export class MinimapView extends Container {
     }
     this.visible = true;
 
-    const rect = minimapRect(state, viewport, isTouch, insets);
+    const rect = minimapRect(state, viewport, isTouch, insets, fireCorner);
     const rectKey = `${rect.x.toFixed(1)},${rect.y.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)}`;
     const layoutChanged = rectKey !== this.lastRectKey || state !== this.lastState;
 

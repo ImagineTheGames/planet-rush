@@ -47,6 +47,7 @@ import {
   reachViolations,
 } from './anchor-reach';
 import { showControlsStrip } from './controls-strip';
+import { liveOnGlassControls } from './live-controls';
 import { HUD_PAD, TOTAL_LABEL_H, stationHpBounds } from './hud-geometry';
 import { hudMetrics, hudSpace } from './instrument';
 import { contentBox } from './viewport';
@@ -196,19 +197,39 @@ describe('placement — the drawn rect sits inside its declared anchor zone', ()
     expect(rect.x + rect.width).toBeGreaterThan(DESKTOP.width / 2);
   });
 
-  it('touch sits in the bottom-right band, LEFT of the fire column (clear of FIRE)', () => {
-    // The hold-to-FIRE button owns the extreme touch corner (GDD §2.4). The map
-    // wins the bottom-right band but stays clear of the fire column, so its right
-    // edge sits at/inside W − margin − fire column. (PR #147: the map used to
-    // overlap the FIRE button; now it is held left of it.)
+  it('touch sits LEFT of the fire column exactly when FIRE is on the glass', () => {
+    // The hold-to-FIRE button owns the extreme touch corner on the frames it is
+    // drawn (GDD §2.4), and the bottom-right band is too short to stack the map
+    // above it — so with FIRE up the map wins the band but stays clear of the
+    // fire column. (PR #147: the map used to overlap the FIRE button.)
+    //
+    // a0-103 is the other half. Since a0-30 the default scheme on every platform
+    // is Tap Commander, which draws NO fire button, and Manual mode trades it for
+    // an aim stick. On those frames nothing is in the corner, and the map that
+    // declares `bottom-right` takes it.
     for (const vp of [PHONE_WIDE, PHONE_NARROW] as const) {
-      const rect = collapsedRect(vp, true);
+      const withFire = collapsedRect(vp, true, {}, true);
       const fireLeftEdge = vp.width - MINIMAP_MARGIN - MINIMAP_FIRE_COLUMN;
-      expect(rect.x + rect.width, 'right edge clears the fire column').toBeLessThanOrEqual(
+      expect(withFire.x + withFire.width, 'right edge clears the fire column').toBeLessThanOrEqual(
         fireLeftEdge + 0.5,
       );
-      // Still in the RIGHT half — a bottom-RIGHT map, not a centred one.
-      expect(rect.x + rect.width, 'still in the right half').toBeGreaterThan(vp.width / 2);
+
+      // …and with no FIRE drawn, the square hugs the margin like every other
+      // right-hand element on the profile. This is a0-99's finding, as an
+      // assertion: 132 px of empty gap, gone.
+      const noFire = collapsedRect(vp, true, {}, false);
+      expect(noFire.x + noFire.width, 'right edge hugs the margin').toBeCloseTo(
+        vp.width - MINIMAP_MARGIN,
+        5,
+      );
+      expect(noFire.x).toBeGreaterThan(withFire.x);
+      expect(noFire.x - withFire.x).toBeCloseTo(MINIMAP_FIRE_COLUMN, 5);
+
+      // Both still inside the declared zone — reach is added to containment,
+      // never traded for it.
+      const zone = resolveAnchor(COLLAPSED_ANCHOR, vp);
+      expect(rectContains(zone, withFire)).toBe(true);
+      expect(rectContains(zone, noFire)).toBe(true);
     }
   });
 
@@ -1384,8 +1405,15 @@ function reachCatalogue(
     });
   }
 
-  // The collapsed minimap (GDD §2.2) — the element this brief is about.
-  const map = collapsedRect({ width: box.width, height: box.height }, isTouch);
+  // The collapsed minimap (GDD §2.2) — the element this brief is about. The fire
+  // column is held clear only when a FIRE button is drawn there (a0-103), which
+  // is the same rule `./hud` reads off `./live-controls`.
+  const map = collapsedRect(
+    { width: box.width, height: box.height },
+    isTouch,
+    {},
+    liveOnGlassControls(isTouch, scheme, mode).fireButton,
+  );
   entries.push({
     id: 'minimap',
     anchor: COLLAPSED_ANCHOR,
@@ -1476,6 +1504,7 @@ describe('a0-103 — an element declared to an anchor reaches that anchor', () =
         const entries = reachCatalogue(vp, isTouch, scheme, mode);
         const violations = reachViolations(entries, vp, {
           isTouch,
+          fireCorner: liveOnGlassControls(isTouch, scheme, mode).fireButton,
           frameFor: reachFrames(vp),
         });
         for (const v of violations) {
@@ -1523,6 +1552,7 @@ describe('a0-103 — an element declared to an anchor reaches that anchor', () =
       for (const { scheme, mode } of REACH_SCHEMES) {
         for (const v of reachViolations(reachCatalogue(vp, isTouch, scheme, mode), vp, {
           isTouch,
+          fireCorner: liveOnGlassControls(isTouch, scheme, mode).fireButton,
           frameFor: reachFrames(vp),
           reservations: [],
         })) {
@@ -1535,8 +1565,10 @@ describe('a0-103 — an element declared to an anchor reaches that anchor', () =
       'banked-total/top',
       // Declared: `BADGE_STRIP_LIFT` clears the desktop controls strip.
       'build-badge/bottom',
-      // FIXED (a0-103): the FIRE column was reserved on every touch profile,
-      // including the ones where Tap Commander draws no FIRE button at all.
+      // FIXED, then declared (a0-103): the FIRE column used to be taken on every
+      // touch profile, including the ones where Tap Commander draws no FIRE
+      // button at all. It is now taken on the frames the button is drawn — and on
+      // those frames it is a reservation with a reason, not a bare number.
       'minimap/right',
       // Declared: `MINIMAP_STRIP_CLEARANCE` clears the desktop controls strip.
       'minimap/bottom',

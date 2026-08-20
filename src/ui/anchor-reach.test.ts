@@ -23,7 +23,7 @@ import {
 } from './anchor-reach';
 import { stationChromeHeight, TOTAL_LABEL_H } from './hud-geometry';
 import { hudMetrics, hudSpace } from './instrument';
-import { MINIMAP_STRIP_CLEARANCE } from './minimap';
+import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
 
 const ALL_REGIONS: readonly AnchorRegion[] = [
@@ -202,11 +202,23 @@ describe('LAYOUT_RESERVATIONS — every declared gap, and every number it mirror
     expect(reservedPx('minimap', 'bottom', { frame: FRAME, isTouch: false })).toBe(
       MINIMAP_STRIP_CLEARANCE,
     );
-    // Nothing is reserved on the RIGHT edge, on either platform. That is the
-    // whole of a0-103: the FIRE column used to be taken there unconditionally.
-    expect(reservedPx('minimap', 'right', { frame: FRAME, isTouch: true })).toBe(0);
-    expect(reservedPx('minimap', 'right', { frame: FRAME, isTouch: false })).toBe(0);
-    expect(reservationsFor('minimap', 'right')).toEqual([]);
+  });
+
+  it('the fire column is reserved by FIRE being there, not by the build being touch', () => {
+    // The whole of a0-103. `isTouch` buys nothing on the right edge — the button
+    // has to actually be drawn, which under Tap Commander (a0-30's default
+    // everywhere) and in Manual mode it is not.
+    for (const isTouch of [true, false]) {
+      expect(reservedPx('minimap', 'right', { frame: FRAME, isTouch })).toBe(0);
+      expect(reservedPx('minimap', 'right', { frame: FRAME, isTouch, fireCorner: false })).toBe(0);
+    }
+    expect(
+      reservedPx('minimap', 'right', { frame: FRAME, isTouch: true, fireCorner: true }),
+    ).toBe(MINIMAP_FIRE_COLUMN);
+    // …and the row that says so carries the argument, so the 132 px is never a
+    // number nothing explains again.
+    const [row] = reservationsFor('minimap', 'right');
+    expect(row?.why).toContain('FIRE');
   });
 
   it("the zoom control reserves HOME's chrome plus its own air, at any scale", () => {

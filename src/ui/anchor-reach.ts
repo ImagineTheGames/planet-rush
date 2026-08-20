@@ -79,7 +79,7 @@
 import type { AnchorRegion, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { stationChromeHeight, TOTAL_LABEL_H } from './hud-geometry';
 import { hudMetrics, hudSpace } from './instrument';
-import { MINIMAP_STRIP_CLEARANCE } from './minimap';
+import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
 
 // ---------------------------------------------------------------------------
@@ -158,6 +158,15 @@ export interface ReservationContext {
    *  all (`./controls-strip` `showControlsStrip`), which is what two of the rows
    *  below are clearing. */
   readonly isTouch: boolean;
+  /**
+   * Is a touch FIRE button drawn in the bottom-right corner this frame?
+   * (`./live-controls` `liveOnGlassControls`.) Not `isTouch`: since a0-30 the
+   * default scheme on every platform is Tap Commander, which draws no FIRE at
+   * all, and Manual mode trades the button for an aim stick. Default `false` —
+   * an unreserved corner is the honest default, exactly as it is in `./minimap`
+   * `collapsedRect`.
+   */
+  readonly fireCorner?: boolean;
 }
 
 /**
@@ -184,10 +193,10 @@ export interface EdgeReservation {
 /**
  * Every gap in this build that is bigger than its element's margin ON PURPOSE.
  *
- * Five rows, and every one of them was found by running {@link reachViolations}
+ * Six rows, and every one of them was found by running {@link reachViolations}
  * over the registry rather than by being remembered — which is the point.
  *
- * **A row never restates a number it can import.** Three of the five read the
+ * **A row never restates a number it can import.** Four of the six read the
  * drawing constant itself — `MINIMAP_STRIP_CLEARANCE`, `stationChromeHeight`,
  * `ZOOM_CONTROL_GAP` — so a change at the drawing end moves the reservation with
  * it and cannot drift. The two badge lifts live in `@render` and `@net` modules
@@ -207,6 +216,20 @@ export const LAYOUT_RESERVATIONS: readonly EdgeReservation[] = [
       'TOTAL is on the top edge above it (`./hud-geometry` `TOTAL_LABEL_H`, scaled ' +
       'with the frame). Both rows register `top-left`; the eyebrow reaches the ' +
       'corner and the numeral reserves the eyebrow.',
+  },
+  {
+    id: 'minimap',
+    edge: 'right',
+    px: ({ fireCorner }) => (fireCorner ? MINIMAP_FIRE_COLUMN : 0),
+    why:
+      'The hold-to-FIRE button owns the extreme bottom-right corner on the frames ' +
+      'it is drawn (GDD §2.4; `@platform/touch-visuals`), and the bottom-right ' +
+      'band is too short to stack the map above it, so the square sits left of ' +
+      'the fire column — `./minimap` `MINIMAP_FIRE_COLUMN`. **This row is a0-103.** ' +
+      'The column used to be taken on every touch frame off `isTouch` alone, ' +
+      'including under Tap Commander, which draws no FIRE: a 132 px gap on a ' +
+      '798x384 phone with nothing in it. It is reserved when the button is there ' +
+      'and not otherwise, and the registry now says which.',
   },
   {
     id: 'minimap',
@@ -312,6 +335,9 @@ export interface ReachViolation {
 export interface ReachOptions {
   /** Touch build — handed to the reservations (see {@link ReservationContext}). */
   readonly isTouch?: boolean;
+  /** Is a touch FIRE button drawn in the bottom-right this frame? See
+   *  {@link ReservationContext.fireCorner}. */
+  readonly fireCorner?: boolean;
   /** Sub-pixel slop, matching `rectContains`'s own default. */
   readonly tolerance?: number;
   /** The frame an element was laid out in, when it is not the viewport. Return
@@ -340,6 +366,7 @@ export function reachViolations(
 ): ReachViolation[] {
   const tolerance = opts.tolerance ?? 0.5;
   const isTouch = opts.isTouch ?? false;
+  const fireCorner = opts.fireCorner ?? false;
   const table = opts.reservations ?? LAYOUT_RESERVATIONS;
   const viewportRect: Rect = { x: 0, y: 0, width: viewport.width, height: viewport.height };
   const out: ReachViolation[] = [];
@@ -350,7 +377,7 @@ export function reachViolations(
     const frame = opts.frameFor?.(entry.id) ?? viewportRect;
     const margin = Math.max(0, entry.anchor.margin ?? 0);
     for (const edge of edges) {
-      const reserved = reservedPx(entry.id, edge, { frame, isTouch }, table);
+      const reserved = reservedPx(entry.id, edge, { frame, isTouch, fireCorner }, table);
       const allowed = margin + reserved;
       const gap = edgeGap(entry.bounds, frame, edge);
       if (gap > allowed + tolerance) {

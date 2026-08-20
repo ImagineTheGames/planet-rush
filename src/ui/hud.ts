@@ -67,6 +67,7 @@ import type { DrawnLootTell } from './loot-tell';
 import { OreHoldView } from './ore-hold-view';
 import type { DrawnOreHold } from './ore-hold-view';
 import { controlsStripView, showControlsStrip } from './controls-strip';
+import { liveOnGlassControls } from './live-controls';
 import type { StripRow } from './controls-strip';
 import { buildWheelModel, segmentAngle } from './build-wheel';
 import { detentOnSelection } from './wheel-selection';
@@ -787,6 +788,11 @@ export class Hud extends Container {
    *  frames hit-tests the minimap against the geometry it actually drew with. */
   private minimapIsTouch = false;
   private safeInsets: MinimapInsets = {};
+  /** …and the last frame's answer to "is a FIRE button in the bottom-right
+   *  corner", which decides whether the collapsed square holds clear of the fire
+   *  column or takes the corner (a0-103). Stashed for the same reason the other
+   *  two are: `minimapTap` must hit-test the rect that was actually drawn. */
+  private minimapFireCorner = false;
 
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
@@ -1933,6 +1939,17 @@ export class Hud extends Container {
   private updateMinimap(frame: HudFrame): void {
     this.minimapIsTouch = frame.isTouch;
     this.safeInsets = frame.safeInsets ?? {};
+    // Is anything actually in the corner the map wants? a0-103. `./live-controls`
+    // is the one rule that decides whether the FIRE button is drawn — the same
+    // answer `main.ts` hands `@platform/touch-visuals` — so the map reads it
+    // rather than assuming a touch build has one. Under Tap Commander (the
+    // default on every platform since a0-30) and in Manual mode it does not, and
+    // the map takes the corner it declares.
+    this.minimapFireCorner = liveOnGlassControls(
+      frame.isTouch,
+      frame.controlScheme,
+      frame.fireMode,
+    ).fireButton;
     const tick = frame.tick ?? Math.floor(frame.time * 60);
     // Laid out in the content box and shifted onto it (a0-74). The minimap is the
     // element the second report names first — "all that UI goes to the edges" —
@@ -1948,6 +1965,7 @@ export class Hud extends Container {
       this.minimapIsTouch,
       this.safeInsets,
       tick,
+      this.minimapFireCorner,
     );
   }
 
@@ -1978,6 +1996,7 @@ export class Hud extends Container {
       { width: this.content.width, height: this.content.height },
       this.minimapIsTouch,
       this.safeInsets,
+      this.minimapFireCorner,
     );
   }
 

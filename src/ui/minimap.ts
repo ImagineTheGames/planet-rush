@@ -34,7 +34,10 @@
  * **Two states, one gesture (the developer's spec).**
  *   - COLLAPSED — a small corner square, bottom-right (GDD §2.2). On mobile it is
  *     *really* small: a glance object, sized to stay clear of the thumb zones and
- *     kept inside the `bottom-right` layout region.
+ *     kept inside the `bottom-right` layout region. Since a0-103 it **reaches**
+ *     that corner as well as sitting inside it: the fire column is held clear
+ *     only on the frames a FIRE button is actually drawn there
+ *     ({@link MINIMAP_FIRE_COLUMN}, {@link collapsedRect}'s `fireCorner`).
  *   - EXPANDED — a centred overlay at readable scale; the match plays on behind
  *     it. While it is open it is **MODAL: a press anywhere collapses it, on the
  *     overlay or off it, and the press is consumed** rather than falling through
@@ -134,6 +137,23 @@ export const MINIMAP_STRIP_CLEARANCE = 40;
  * the extreme corner and FIRE to shift; shifting FIRE is a platform-lane change,
  * so this PR shifts the *minimap* left of the fire column instead — the honest
  * in-lane way to keep the map both bottom-right and clear of FIRE.)
+ *
+ * ── a0-103: IT IS RESERVED WHEN FIRE IS THERE, AND ONLY THEN ───────────────
+ *
+ * This column used to be taken on every touch frame, off `isTouch` alone. Since
+ * a0-30 the default scheme on every platform is **Tap Commander**, which draws
+ * no sticks and no FIRE at all (`./live-controls` `liveOnGlassControls`,
+ * `@platform/touch-visuals` `writeAffordanceRects`'s `sticksLive`) — so the
+ * reserve was being paid to an empty corner. QA measured the bill on a real
+ * handset: on a 798×384 phone the map ended **132 px** from the right edge
+ * against a declared margin of 12, while every other right-hand element on the
+ * profile hugged 16, and the registry listed no `touch-fire-button` to justify
+ * it. Nothing was drawn in the gap.
+ *
+ * So the column is a **parameter of the frame** now, not a property of the
+ * platform: {@link collapsedRect} takes `fireCorner`, the caller answers it from
+ * the same rule that decides whether the button is drawn, and it defaults to
+ * `false` — nothing is reserved unless something is actually there.
  */
 export const MINIMAP_FIRE_COLUMN = 120;
 
@@ -527,11 +547,19 @@ function inset(v: number | undefined): number {
  * FIRE button:
  *  - **Desktop** — no fire button, so the square hugs the true corner, lifted only
  *    above the real controls strip ({@link MINIMAP_STRIP_CLEARANCE}).
- *  - **Touch** — the hold-to-FIRE button owns the extreme corner (GDD §2.4), so the
- *    square hugs the bottom-right band but sits **left of the fire column**
- *    ({@link MINIMAP_FIRE_COLUMN}) — clear of FIRE, never on it. (The band is too
- *    short to stack it above fire; see the PR for the FIRE-shift follow-up the
- *    field report anticipates.)
+ *  - **Touch with FIRE on the glass** — the hold-to-FIRE button owns the extreme
+ *    corner (GDD §2.4), so the square hugs the bottom-right band but sits **left
+ *    of the fire column** ({@link MINIMAP_FIRE_COLUMN}) — clear of FIRE, never on
+ *    it. (The band is too short to stack it above fire; see the PR for the
+ *    FIRE-shift follow-up the field report anticipates.)
+ *  - **Touch with no FIRE on the glass** — Tap Commander, the default scheme on
+ *    every platform since a0-30, and Manual mode, which trades the button for an
+ *    aim stick. Nothing is in the corner, so nothing is reserved and the square
+ *    takes it, exactly as desktop does. This is a0-103: `fireCorner` is the
+ *    caller's answer about **this frame**, not a guess from `isTouch`.
+ *
+ * `fireCorner` defaults to `false` on purpose — an unreserved corner is the
+ * honest default, and a caller that knows a button is there says so.
  *
  * Its tap surface is the lowest-priority interactive layer (main.ts), so a
  * wheel/button under it still wins the press.
@@ -540,13 +568,15 @@ export function collapsedRect(
   viewport: { width: number; height: number },
   isTouch: boolean,
   insets: MinimapInsets = {},
+  fireCorner = false,
 ): Rect {
   const W = viewport.width;
   const H = viewport.height;
   const m = MINIMAP_MARGIN;
-  // Right edge: hug the right margin, holding clear of the FIRE column on touch
-  // (nothing is there on desktop, so the map takes the true corner).
-  const rightEdge = W - m - inset(insets.right) - (isTouch ? MINIMAP_FIRE_COLUMN : 0);
+  // Right edge: hug the right margin, holding clear of the FIRE column only when
+  // a FIRE button is actually drawn in that corner this frame (a0-103). Desktop
+  // never has one; touch has one only under the sticks scheme in Auto-aim.
+  const rightEdge = W - m - inset(insets.right) - (fireCorner ? MINIMAP_FIRE_COLUMN : 0);
   // Bottom edge: lift above the controls strip on desktop; hug the bottom margin
   // on touch (the map sits in the right column, clear of the strip probe's band).
   const bottomEdge = H - m - inset(insets.bottom) - (isTouch ? 0 : MINIMAP_STRIP_CLEARANCE);
@@ -603,10 +633,11 @@ export function minimapRect(
   viewport: { width: number; height: number },
   isTouch: boolean,
   insets: MinimapInsets = {},
+  fireCorner = false,
 ): Rect {
   return state === 'expanded'
     ? expandedRect(viewport, isTouch, insets)
-    : collapsedRect(viewport, isTouch, insets);
+    : collapsedRect(viewport, isTouch, insets, fireCorner);
 }
 
 /** True when a screen point sits inside a rect (inclusive) — the hit test core. */
@@ -1246,8 +1277,9 @@ export class Minimap {
     viewport: { width: number; height: number },
     isTouch: boolean,
     insets: MinimapInsets = {},
+    fireCorner = false,
   ): boolean {
-    return pointInRect(x, y, minimapRect(this.state, viewport, isTouch, insets));
+    return pointInRect(x, y, minimapRect(this.state, viewport, isTouch, insets, fireCorner));
   }
 
   /**
@@ -1281,13 +1313,14 @@ export class Minimap {
     viewport: { width: number; height: number },
     isTouch: boolean,
     insets: MinimapInsets = {},
+    fireCorner = false,
   ): boolean {
     if (this._expanded) {
       // Modal: dismiss on ANY press, hit or miss, and report it consumed.
       this._expanded = false;
       return true;
     }
-    if (!this.hitTest(x, y, viewport, isTouch, insets)) return false;
+    if (!this.hitTest(x, y, viewport, isTouch, insets, fireCorner)) return false;
     this._expanded = true;
     return true;
   }
