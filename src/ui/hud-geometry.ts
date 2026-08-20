@@ -1595,6 +1595,9 @@ export function arrowClearOfReadouts(
   // `rectOverlap` and this suite have used for every clearance since a0-24.
   const blocked: [number, number][] = [];
   for (const ro of readouts) {
+    // A readout with no extent is a readout that drew nothing — an empty rect
+    // would otherwise block a band the width of the triangle around a point.
+    if (!(ro.width > 0) || !(ro.height > 0)) continue;
     const x0 = ro.x - pad - (local.x + local.width);
     const x1 = ro.x + ro.width + pad - local.x;
     const y0 = ro.y - pad - (local.y + local.height);

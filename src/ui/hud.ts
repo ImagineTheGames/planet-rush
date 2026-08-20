@@ -2360,7 +2360,8 @@ export class Hud extends Container {
     const arrow = { ...clear, x: clear.x + box.x };
     this.arrowDrawn = true;
 
-    // A triangle pointing along `angle`, drawn at the clamped edge position.
+    // A triangle pointing along `angle`, drawn where the two clamps above left
+    // it — the edge, or a little in from it where a readout was standing there.
     // The polygon comes from ./hud-geometry so the rect the registry records is
     // the rect a headless test can measure.
     this.alarmArrow
