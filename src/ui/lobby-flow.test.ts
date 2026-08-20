@@ -1137,16 +1137,18 @@ describe('SETTINGS, the main-menu option this seam deliberately does not carry',
   // a tap handler that folded volumes and REDUCE VFX into it, and not one reader
   // anywhere. The settings a player reaches are the menu's and the pause menu's,
   // and since a0-92 both go through `./settings` `commitSettings` — the one seam
-  // that writes, saves and reaches the mixer. What is left here is the refusal,
-  // asserted so a later hand cannot quietly grow the third copy back.
-
-  it('leaves the door untouched — SETTINGS opens a screen, not a room', () => {
-    const rng = mulberry32(21);
-    const before = createFlow();
-    const tapped = flowTapEntry(before, { kind: 'settings' }, rng);
-    expect(tapped.state).toBe(before); // identical, not merely equal
-    expect(tapped.effects).toEqual([]); // and it owes the wire nothing
-  });
+  // that writes, saves and reaches the mixer.
+  //
+  // This block used to hold a second test — that a `{ kind: 'settings' }` entry
+  // target moved the flow nowhere. It is gone with a0-100c, and could not be
+  // kept: that target no longer EXISTS. The doors screen's SETTINGS button was
+  // deleted (settings opens from the main menu and the pause menu, and nowhere
+  // else), and with it the `EntryTarget` member, so a test naming it would not
+  // compile. That is a stronger guarantee than the refusal it replaced — the
+  // seam cannot decline to carry a target that cannot be constructed — and the
+  // control's absence is now held where it is visible: `lobby-entry.test.ts`
+  // proves the doors' footer beam has ONE live plate on it, and
+  // `menu-nav.test.ts` proves settings has exactly two ways in.
 
   it('holds no settings of its own — only the two that ride a match', () => {
     // The whole of what a player's preferences look like from in here: the fire

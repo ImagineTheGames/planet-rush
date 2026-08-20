@@ -750,7 +750,6 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
       const { footer } = layout;
       for (const [label, rect] of [
         ['back', layout.back],
-        ['settings', layout.settings],
         ['erase', layout.erase],
         ['submit', layout.submit],
       ] as const) {
@@ -760,9 +759,11 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
         );
       }
       // BACK is the exit every screen carries, and it is the SAME rect on both —
-      // it must not move as the screen changes under it (u2 menu-back).
-      expect(layout.back.x, `back is leading on ${name}`).toBeLessThan(layout.settings.x);
-      expect(layout.back.x).toBeLessThan(layout.submit.x);
+      // it must not move as the screen changes under it (u2 menu-back). That is
+      // also why losing the doors' SETTINGS plate (a0-100c) did not re-centre it:
+      // a beam whose one plate slid to the middle on the doors would jump back to
+      // the leading end the moment JOIN drew ERASE beside it.
+      expect(layout.back.x, `back is leading on ${name}`).toBeLessThan(layout.submit.x);
       // ERASE sits inboard of JOIN, never across it.
       expect(layout.erase.x + layout.erase.width, `erase clears submit on ${name}`).toBeLessThanOrEqual(
         layout.submit.x + 0.5,
@@ -846,22 +847,34 @@ describe('a tap hits what it looks like it hits', () => {
         );
       }
 
-      // SETTINGS — the fourth main-menu option — is live on the home screen only.
-      const settings = center(layout.settings);
-      expect(entryHitTest(layout, settings.x, settings.y, 'home'), `settings on ${name}`).toEqual({
-        kind: 'settings',
-      });
+      // …and the doors' footer beam carries BACK and NOTHING ELSE (a0-100c). The
+      // trailing end — where the keypad draws JOIN, and where the doors drew
+      // SETTINGS until the developer ruled settings opens from the main menu and
+      // the pause menu only — answers nothing on the home screen.
+      const trailing = center(layout.submit);
+      expect(entryHitTest(layout, trailing.x, trailing.y, 'home'), `dead trailing end on ${name}`).toBeNull();
     });
   }
 
-  it('keeps SETTINGS off the join screen — it shares the band with the keypad’s row', () => {
-    const layout = entryLayout({ width: 1280, height: 800 });
-    const settings = center(layout.settings);
-    const onJoin = entryHitTest(layout, settings.x, settings.y, 'join');
-    expect(onJoin === null || onJoin.kind !== 'settings').toBe(true);
+  it('gives the doors a footer beam with ONE live control on it: BACK (a0-100c)', () => {
+    // The developer's ruling: settings opens from the main menu and the pause
+    // menu, and nowhere else. The doors screen carried a third route, and it is
+    // gone — so the only thing on this beam that answers a press is the way out.
+    for (const { name, vp, touch } of PROFILES) {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      const live = ([
+        ['back', layout.back],
+        ['erase', layout.erase],
+        ['submit', layout.submit],
+      ] as const).filter(([, rect]) => {
+        const point = center(rect);
+        return entryHitTest(layout, point.x, point.y, 'home') !== null;
+      });
+      expect(live.map(([label]) => label), `the doors' live footer plates on ${name}`).toEqual(['back']);
+    }
   });
 
-  it('gives the home screen a BACK exit that never collides with SETTINGS (u2)', () => {
+  it('gives the home screen a BACK exit, in the keypad’s own BACK rect (u2)', () => {
     for (const { name, vp, touch } of PROFILES) {
       const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
       const back = center(layout.back);
@@ -875,8 +888,10 @@ describe('a tap hits what it looks like it hits', () => {
       expect(entryHitTest(layout, back.x, back.y, 'join'), `join BACK on ${name}`).toEqual({
         kind: 'back',
       });
-      // BACK and SETTINGS split the home action band; they must never overlap.
-      expect(overlaps(layout.back, layout.settings), `back/settings overlap on ${name}`).toBe(false);
+      // BACK is alone on the doors' beam now (a0-100c), so the collision it must
+      // still be clear of is the KEYPAD's pair — the same rect serves both screens.
+      expect(overlaps(layout.back, layout.erase), `back/erase overlap on ${name}`).toBe(false);
+      expect(overlaps(layout.back, layout.submit), `back/submit overlap on ${name}`).toBe(false);
     }
   });
 

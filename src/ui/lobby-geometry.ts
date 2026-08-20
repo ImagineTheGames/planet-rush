@@ -865,13 +865,12 @@ export const KEYPAD_KEY_COUNT = 32;
  * the door heights above: a footer control is a `compact` plate, so its height is
  * `plateHeight('compact', metrics)` — the settings screen's DONE, one dialect.
  * What is left is how WIDE each word's plate is, and they differ because the
- * words do: `SETTINGS` needs more metal than `BACK`.
+ * words do: `ERASE` and `JOIN` need more metal than `BACK`.
  *
  * Read off the handoff's own footer, which draws BACK at 140 and its trailing
- * action a shade wider.
+ * actions a shade wider.
  */
 export const ENTRY_BACK_WIDTH = 140;
-export const ENTRY_SETTINGS_WIDTH = 190;
 export const ENTRY_ERASE_WIDTH = 160;
 export const ENTRY_SUBMIT_WIDTH = 160;
 
@@ -1710,7 +1709,7 @@ export interface EntryLayout {
   readonly content: Rect;
   /** The header beam, full width inside the safe area (u7-04). */
   readonly header: Rect;
-  /** The footer beam, which carries BACK and SETTINGS (or BACK / ERASE / JOIN). */
+  /** The footer beam, which carries BACK (or BACK / ERASE / JOIN on the keypad). */
   readonly footer: Rect;
   /** The wordmark's strip INSIDE the header beam — no longer a slice of the
    *  content box. Same move the title screen made in u7-01: under Gantry the
@@ -1756,11 +1755,6 @@ export interface EntryLayout {
   readonly erase: Rect;
   /** JOIN. */
   readonly submit: Rect;
-  /** SETTINGS — home screen only. Shares the action band with the join controls
-   *  (only one screen is ever drawn), so it costs a rect, not a branch. It gives
-   *  the left slice of the band to {@link back} — the home screen's exit — and
-   *  takes the rest. */
-  readonly settings: Rect;
   readonly isTouch: boolean;
   /** The frame this screen was resolved at — handed to the view so it scales its
    *  type and its plate padding off the same numbers the rects came from. */
@@ -1783,10 +1777,7 @@ export type EntryTarget =
   | { readonly kind: 'row'; readonly index: number }
   | { readonly kind: 'erase' }
   | { readonly kind: 'back' }
-  | { readonly kind: 'submit' }
-  /** The SETTINGS button, home screen only — the fourth way out of the main menu
-   *  (GDD §3.7), and the one that opens a screen rather than a room. */
-  | { readonly kind: 'settings' };
+  | { readonly kind: 'submit' };
 
 /**
  * A stable string naming one entry-screen control — `door:1`, `key:7`, `back`.
@@ -1848,12 +1839,14 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // --- The footer beam ------------------------------------------------------
   // BACK is bolted to the leading end on BOTH screens — the exit every screen
   // carries (u2 menu-back), and it must not move as the screen changes under it.
-  // The trailing end carries the screen's other control: SETTINGS on the doors,
-  // JOIN on the keypad, with ERASE a gutter inboard of it.
+  // The trailing end carries the KEYPAD's controls: JOIN, with ERASE a gutter
+  // inboard of it. On the doors it carries nothing since a0-100c, and BACK stays
+  // exactly where it was: a beam whose one plate slid to the middle when the
+  // screen changed would break the rule the line above states.
   const footerStrip = beamContent(frame.footer, m, 'footer');
-  // Three plates share the beam on the KEYPAD screen and two on the doors, so the
+  // Three plates share the beam on the KEYPAD screen and ONE on the doors, so the
   // three-plate case is what the widths are solved against: a beam that fits BACK
-  // + ERASE + JOIN fits BACK + SETTINGS with room to spare. They shrink together
+  // + ERASE + JOIN fits BACK on its own with room to spare. They shrink together
   // by one factor rather than each clamping itself — clamping each to the strip
   // independently is what let BACK run under ERASE on a 390px phone, where the
   // three reference widths add up to more beam than there is.
@@ -1864,7 +1857,6 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const plateW = (reference: number): number =>
     Math.max(0, Math.min(Math.floor(reference * m.plateScale * squeeze), footerStrip.width));
   const back = beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH));
-  const settings = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SETTINGS_WIDTH));
   const submit = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH));
   const erase = beamPlate(
     footerStrip,
@@ -1921,7 +1913,6 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     back,
     erase,
     submit,
-    settings,
     isTouch,
     metrics: m,
   };
@@ -1950,10 +1941,11 @@ export function entryHitTest(
       const rect = layout.doors[i];
       if (rect && hit(rect, x, y)) return { kind: 'door', index: i };
     }
-    // BACK leaves the online front door for the main menu; it shares the action
-    // band with SETTINGS, so it is tested first (the two never overlap).
+    // BACK is the doors' ONE footer control, and the screen's way out (u2
+    // menu-back). SETTINGS used to share the beam's trailing end with it; the
+    // developer's ruling is that settings opens from the main menu and the pause
+    // menu and nowhere else (a0-100c), so the beam carries one plate now.
     if (hit(layout.back, x, y)) return { kind: 'back' };
-    if (hit(layout.settings, x, y)) return { kind: 'settings' };
     return null;
   }
   // The mode switch is tested first and on BOTH modes: it is the one control the
