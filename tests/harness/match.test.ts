@@ -178,17 +178,32 @@ describe('team lineups (Task D1)', () => {
     expect(() => teamsLineup([Array(5).fill(raider), Array(5).fill(raider)])).toThrow(/ceiling/);
   });
 
-  it('runs a 2v2 to a team result: one team survives, its seats share the winning team', () => {
-    // raiders (team 0) vs turtles (team 1): a decisive composition so the match
-    // ends inside the window rather than timing out.
+  it('runs a 2v2 to a team result, and a mutual extinction is one of them', () => {
+    // raiders (team 0) vs turtles (team 1). This ends in a DRAW — and it always
+    // did (a0-113). The scripted 2v2 grinds to the collapse and all four homes
+    // fall on the same tick: `survived` is `[0,0,0,0]` on seed 7 and on every
+    // other seed tried (1-10, all `seconds === 850.02`). It reported a winning
+    // team anyway, because `resolveWinner` handed the match to the last entry of
+    // the elimination order, which under collapse lockstep is `world.stations`
+    // index. So the old assertions here were passing on an invented winner, and
+    // the `if (slot.survived)` loop below never ran a single iteration.
+    //
+    // What the harness genuinely owes this file is the TEAM ATTRIBUTION, and
+    // that is asserted below in the form that holds either way. **That the
+    // scripted raiders never break two turtles before the collapse is a balance
+    // observation for the harness/QA owner, not something this branch touches.**
     const result = runMatch({ seed: 7, lineup: teamsLineup([[raider, raider], [turtle, turtle]]) });
     expect(result.ok).toBe(true);
-    expect(result.winnerTeam).not.toBeNull();
-    // The reported winner is a real seat on the winning team.
+    // Ended, and ended honestly: nobody outlived anybody, so there is no team.
+    expect(result.slots.some((s) => s.survived)).toBe(false);
+    expect(result.winnerTeam).toBeNull();
+    expect(result.winner).toBeNull();
+    // And the attribution rule itself, stated so it binds a decided match too:
+    // a reported winner is a real seat on the reported winning team, and — with
+    // friendly fire off, a team being out only once BOTH its homes fall — every
+    // surviving home belongs to it.
     const winnerSlot = result.slots.find((s) => s.id === result.winner);
-    expect(winnerSlot?.team).toBe(result.winnerTeam);
-    // Friendly fire is off, so a team is only out once BOTH its homes fall: every
-    // surviving home belongs to the winning team.
+    expect(winnerSlot?.team ?? null).toBe(result.winnerTeam);
     for (const slot of result.slots) {
       if (slot.survived) expect(slot.team).toBe(result.winnerTeam);
     }

@@ -2,8 +2,9 @@
  * src/sim/match.test.ts — the day-2 endgame contract (GDD §1, §2.3, §2.7).
  *
  * The four checks from the brief:
- *   1. last-to-die resolution — one home standing wins, and when the final
- *      cores die in the same tick the *last* one to reach zero does;
+ *   1. win/loss resolution — one home standing wins, and when the final cores
+ *      die in the same tick nobody does: it is a draw (a0-113, and the cases
+ *      themselves live in `./outcome.test.ts`);
  *   2. collapse disables regen and repair;
  *   3. wave radii shrink — every wave lands closer to centre than the last;
  *   4. respawn preserves upgrades.
@@ -142,7 +143,7 @@ function makeWorld(over: Partial<World> = {}): World {
 const oreInWorld = (w: World): number =>
   w.asteroids.reduce((n, a) => n + a.ore, 0) + w.chunks.reduce((n, c) => n + c.amount, 0);
 
-// --- 1. win/loss and the last-to-die rule (GDD §1) -------------------------
+// --- 1. win/loss: last team standing, or a draw (GDD §1) -------------------
 
 describe('win/loss (GDD §1)', () => {
   it('the last surviving core wins the match', () => {
@@ -169,7 +170,7 @@ describe('win/loss (GDD §1)', () => {
     expect(world.match.eliminated).toEqual([2, 0]);
   });
 
-  it('when the final cores die in the same tick, the last to reach zero wins', () => {
+  it('when the final cores die in the same tick, nobody wins — it is a draw', () => {
     const world = makeWorld({
       ships: [makeShip({ id: 0 }), makeShip({ id: 1 })],
       stations: [
@@ -178,19 +179,20 @@ describe('win/loss (GDD §1)', () => {
       ],
     });
 
-    // Slot 1's core reaches zero first, slot 0's second — inside one tick, so
-    // there is no survivor to crown. Whoever dies last, wins (GDD §1): the
-    // answer must be 0, and it must not be "the lowest surviving slot".
+    // Slot 1's core reaches zero first, slot 0's second — but both inside ONE
+    // tick, and a fixed-timestep sim has no time inside a tick. This case used to
+    // crown slot 0 off the elimination order (a0-113); the order is array index,
+    // not a ranking, so there is nobody to crown.
     damageStation(world, world.stations[1]!, CORE_HP);
     damageStation(world, world.stations[0]!, CORE_HP);
     step(world, []);
 
     expect(world.match.eliminated).toEqual([1, 0]);
     expect(world.match.phase).toBe('ended');
-    expect(world.match.winner).toBe(0);
+    expect(world.match.winner).toBeNull();
   });
 
-  it('reversing the death order reverses the winner', () => {
+  it('reversing the death order does not reverse anything — still a draw', () => {
     const world = makeWorld({
       ships: [makeShip({ id: 0 }), makeShip({ id: 1 })],
       stations: [
@@ -203,8 +205,9 @@ describe('win/loss (GDD §1)', () => {
     damageStation(world, world.stations[1]!, CORE_HP);
     step(world, []);
 
+    // The death order is still recorded — it is the wreck order and it is hashed.
     expect(world.match.eliminated).toEqual([0, 1]);
-    expect(world.match.winner).toBe(1);
+    expect(world.match.winner).toBeNull();
   });
 
   it('latches: a winner is decided once and never re-decided', () => {
@@ -290,10 +293,10 @@ describe('team victory (GDD §1, Task D1)', () => {
     expect(world.match.winner).toBeNull();
   });
 
-  it('when the last cores of both teams die in one tick, the last TEAM to die wins', () => {
+  it('when the last cores of both teams die in one tick, neither side wins', () => {
     const world = twoVTwo();
 
-    // Order: team 1 out first (2,3), then team 0 (0,1) — team 0's core dies last.
+    // Order: team 1 out first (2,3), then team 0 (0,1) — all four inside one tick.
     damageStation(world, world.stations[2]!, CORE_HP);
     damageStation(world, world.stations[3]!, CORE_HP);
     damageStation(world, world.stations[0]!, CORE_HP);
@@ -302,11 +305,11 @@ describe('team victory (GDD §1, Task D1)', () => {
 
     expect(world.match.eliminated).toEqual([2, 3, 0, 1]);
     expect(world.match.phase).toBe('ended');
-    expect(world.match.winningTeam).toBe(0);
-    expect(world.match.winner).toBe(1);
+    expect(world.match.winningTeam).toBeNull();
+    expect(world.match.winner).toBeNull();
   });
 
-  it('reversing the death order hands the tie to the other team', () => {
+  it('reversing the death order still hands the tie to nobody', () => {
     const world = twoVTwo();
 
     damageStation(world, world.stations[0]!, CORE_HP);
@@ -316,8 +319,8 @@ describe('team victory (GDD §1, Task D1)', () => {
     step(world, []);
 
     expect(world.match.eliminated).toEqual([0, 1, 2, 3]);
-    expect(world.match.winningTeam).toBe(1);
-    expect(world.match.winner).toBe(3);
+    expect(world.match.winningTeam).toBeNull();
+    expect(world.match.winner).toBeNull();
   });
 
   it('FFA sets winningTeam to the winner (teams-of-one)', () => {
@@ -589,10 +592,16 @@ describe('asteroid waves (GDD §2.3)', () => {
     // New truth (M5, COLLAPSE_CORE_DECAY = 1, GDD §1/§2.3): a full-turtle field
     // no longer stalemates — entropy finishes both idle homes and the match
     // resolves. Were decay ever silently zeroed, these two untouched cores would
-    // never die and this loop would run to the ceiling with no winner declared.
+    // never die and this loop would run to the ceiling, unresolved.
     while (world.match.phase !== 'ended' && world.time < 20 * 60) step(world, [], 1);
     expect(world.match.phase).toBe('ended');
-    expect(world.match.winner).not.toBeNull();
+    // Both cores went in together — two untouched homes at identical HP under
+    // identical entropy reach zero on the same tick — so the ending is a DRAW
+    // (a0-113). This is the unforced, no-debug-queue case QA could not reach:
+    // two idle seats and the collapse.
+    expect(world.match.eliminated).toHaveLength(2);
+    expect(world.stations.every((s) => !s.alive)).toBe(true);
+    expect(world.match.winner).toBeNull();
   });
 
   it('two runs of the whole wave schedule deep-equal (GDD §4.8)', () => {
