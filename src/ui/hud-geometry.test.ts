@@ -54,6 +54,9 @@ import {
   arrowPoly,
   polyBounds,
   ARROW_SIZE,
+  arrowClearOfReadouts,
+  stationChromeHeight,
+  stationChromeWidth,
   PANEL_MAX_WIDTH,
   PANEL_EDGE_PAD,
   HUD_PAD,
@@ -202,6 +205,16 @@ function rectsIntersect(a: Rect, b: Rect): boolean {
     a.y < b.y + b.height &&
     b.y < a.y + a.height
   );
+}
+
+/** How much clear air separates two rects — the largest per-axis gap between
+ *  them, or 0 when they overlap. The measured form of `rectsIntersect` for the
+ *  cases (a0-116) whose rule is a distance rather than a yes/no, and where the
+ *  answer lands exactly on the boundary by construction. */
+function clearAir(a: Rect, b: Rect): number {
+  const x = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width));
+  const y = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height));
+  return Math.max(0, Math.max(x, y));
 }
 
 /** The registry's own verdict, with its own resolver — not a re-implementation. */
@@ -2334,6 +2347,262 @@ describe('an upgrade wedge is a touch target first (GDD §2.4)', () => {
         TOUCH_TARGET_MIN,
       );
     }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// The screen-edge arrow against the readouts it rides past (a0-116)
+// ---------------------------------------------------------------------------
+//
+// a0-111 failed the qa-phone on the very frame that settled a0-104: the alarm
+// was up, the station was off-screen at a bearing that put the arrow on the top
+// edge in the middle of it, and that is where GDD §2.2 puts the wave clock. The
+// red triangle covered the `A` of WAVE and most of the `V`. QA: *"the arrow is
+// doing its job and the words it is standing on are still guessable, so this is a
+// legibility defect and not a broken control."*
+//
+// Both halves of that are the contract, and both are asserted below: the clock is
+// left readable, and the arrow does not move a degree off its bearing to do it.
+// It gives up RADIUS instead — every point on the ray from the ship to the
+// station is the same bearing — which is what `arrowClearOfReadouts` does and
+// what the header over it argues.
+//
+// The sweep is 1° for the whole circle on every profile, because the defect is a
+// *bearing* defect: it fires on the fifth of the circle where a readout happens
+// to be standing on the edge, and a case at one bearing proves nothing about the
+// other 359.
+
+describe('the screen-edge arrow and the readouts it rides past (a0-116)', () => {
+  /** Every 1° of bearing, from a station far enough out that the arrow is always
+   *  clamped rather than drawn in place. */
+  const BEARINGS = Array.from({ length: 360 }, (_, i) => (i * Math.PI * 2) / 360);
+  const FAR = 4000;
+
+  /** The eyebrow / bank / clock type specs, as ./hud styles them — the same three
+   *  `makeText` calls the counter's own cases above measure through. */
+  const eyebrow = (vp: Viewport): TypeSpec => ({
+    face: 'heading',
+    size: hudType(HUD_EYEBROW_TYPE, hudMetrics(vp.width, vp.height)),
+    tracking: TRACKING.eyebrow,
+  });
+  const bank = (vp: Viewport): TypeSpec => ({
+    face: 'bodyBold',
+    size: hudType(ORE_BANK_TYPE, hudMetrics(vp.width, vp.height)),
+    tracking: TRACKING.name,
+  });
+  const box = (text: string, spec: TypeSpec) => ({
+    width: textWidth(text, spec),
+    height: textHeight(text, spec),
+  });
+
+  /** The clock's three lines at their widest, the same over-estimate
+   *  `wave clock placement` uses — a wider clock is the harder case here too. */
+  const clockLines = (vp: Viewport) => {
+    const longest = `WAVE 5/5 · ${WAVE_NAMES.reduce((a, b) => (b.length > a.length ? b : a), '')}`;
+    return (
+      [
+        { chars: longest.length, size: 15 },
+        { chars: 'FINAL WAVE'.length, size: 14 },
+        { chars: 'MATCH 12:00'.length, size: 13 },
+      ] as const
+    ).map(({ chars, size }) => {
+      const px = hudType(size, hudMetrics(vp.width, vp.height));
+      return {
+        width: Math.ceil(chars * px * 0.85),
+        height: Math.ceil(hudType(size, hudMetrics(vp.width, vp.height)) * 1.3),
+      };
+    });
+  };
+
+  /**
+   * The readouts the arrow has to stay off, in CONTENT-BOX space — the four HUD
+   * groups that carry a word or a number the player reads. This is `Hud`'s own
+   * `readoutKeepOut()` list (a0-115's `HUD_READOUT_IDS`), computed here from the
+   * elements' geometry functions instead of measured off the drawn groups,
+   * because a sweep of 360 bearings across nine profiles has no Pixi in it. Two
+   * readings of one list: the view's is the ink that was really laid down, this
+   * one is what the same layout says it should be.
+   *
+   * `banked-total` is the numeral inside the ore counter's ground and needs no
+   * row of its own. The minimap and the peer-presence banner are deliberately
+   * NOT here: the minimap is a picture rather than a readout, and the banner is a
+   * transient that is up on a handful of frames a match — both are noted in the
+   * a0-116 PR as the next things to ask this question about, not answered here.
+   */
+  const readouts = (vp: Viewport, isTouch: boolean): { id: string; r: Rect }[] => {
+    const b = contentBox(vp);
+    const inner: Viewport = { width: b.width, height: b.height };
+    const m = hudMetrics(b.width, b.height);
+    // A single-figure bank — the counter at the width QA's stop was carrying.
+    const ore = oreCounterLayout(box('ORE', eyebrow(inner)), box('3', bank(inner)), m);
+    const out = [
+      // `layout()` pins the ore group at (box.x + HUD_PAD, HUD_PAD) and the
+      // ground's own origin is (0,0) there.
+      {
+        id: 'ore-hud',
+        r: { x: HUD_PAD, y: HUD_PAD, width: ore.ground.width, height: ore.ground.height },
+      },
+      { id: 'wave-clock', r: waveClockLayout(b.width, b.height, clockLines(inner), false).bounds },
+      // The HOME cluster's whole drawn footprint — its chrome, which is wider
+      // and deeper than `stationHpBounds`' ink and is what the group's own
+      // bounds report to `readoutKeepOut`. Not the ink: the cluster's closing
+      // rule is drawn 3px under the bar, so an arrow cleared to the ink is an
+      // arrow standing on the rule. The evidence bench is where that was found
+      // out — see the a0-116 README.
+      {
+        id: 'station-hp',
+        r: {
+          x: b.width - HUD_PAD - stationChromeWidth(m.scale),
+          y: HUD_PAD,
+          width: stationChromeWidth(m.scale),
+          height: stationChromeHeight(m.scale),
+        },
+      },
+    ];
+    const zoom = zoomControlBounds(b.width, b.height, isTouch);
+    if (zoom) out.push({ id: 'zoom-control', r: zoom });
+    return out;
+  };
+
+  /** The arrow as the view draws it: clamped to the content box, then pulled off
+   *  the readouts. Returns both, because the case below is about the difference. */
+  const shot = (vp: Viewport, isTouch: boolean, bearing: number) => {
+    const b = contentBox(vp);
+    const inner: Viewport = { width: b.width, height: b.height };
+    const centre = { x: b.width / 2, y: b.height / 2 };
+    const ro = readouts(vp, isTouch);
+    const home = { x: Math.cos(bearing) * FAR, y: Math.sin(bearing) * FAR };
+    const edge = homeArrow({ x: 0, y: 0 }, home, inner, ARROW_EDGE_INSET);
+    const clear = arrowClearOfReadouts(edge, centre, ro.map((x) => x.r));
+    return { b, inner, centre, ro, edge, clear };
+  };
+
+  it('the home arrow never lands on a readout', () => {
+    for (const { name, vp, isTouch } of PROFILES) {
+      // What it was: the sweep against the arrow as a0-111 photographed it, so
+      // this case can never pass by asserting something that was never true.
+      // These counts are the finding, in numbers, per profile.
+      const before: string[] = [];
+      let pulled = 0;
+
+      for (const bearing of BEARINGS) {
+        const { inner, centre, ro, edge, clear } = shot(vp, isTouch, bearing);
+        const at = `${name} @${((bearing * 180) / Math.PI).toFixed(0)}°`;
+
+        for (const { id, r } of ro) {
+          if (rectsIntersect(polyBounds(arrowPoly(edge, ARROW_SIZE)), r)) before.push(`${id}${at}`);
+        }
+
+        // 1. THE FIX. The triangle the view fills does not touch a readout, and
+        //    keeps READOUT_KEEPOUT_PAD of air from it — two runs of ink that end
+        //    where the next begins read as one mark.
+        const drawn = polyBounds(arrowPoly(clear, ARROW_SIZE));
+        for (const { id, r } of ro) {
+          expect(
+            rectsIntersect(drawn, r),
+            `${at}: the arrow ${fmt(drawn)} is drawn on "${id}" ${fmt(r)} — this is a0-111's ` +
+              `frame, where the triangle covered the A of WAVE`,
+          ).toBe(false);
+          // Measured as AIR rather than as a second overlap test against a grown
+          // rect: the yield lands the arrow exactly on the pad, and a strict
+          // intersection at exactly the boundary is a coin toss in binary
+          // floating point. The gap is the number the rule is about, so the gap
+          // is what is asserted.
+          expect(
+            clearAir(drawn, r),
+            `${at}: the arrow ${fmt(drawn)} is inside "${id}"'s ${READOUT_KEEPOUT_PAD}px of air`,
+          ).toBeGreaterThanOrEqual(READOUT_KEEPOUT_PAD - 1e-9);
+        }
+
+        // 2. …and it did not buy that by lying about where home is. The angle is
+        //    untouched, and the anchor is still ON the ray from the ship to the
+        //    station: same bearing, to the last bit of the arithmetic.
+        expect(clear.angle, `${at}: the arrow's angle moved`).toBe(edge.angle);
+        expect(clear.onScreen, at).toBe(edge.onScreen);
+        expect(clear.distance, at).toBe(edge.distance);
+        const bore = Math.atan2(clear.y - centre.y, clear.x - centre.x);
+        const off = bore - clear.angle;
+        const drift = Math.abs(Math.atan2(Math.sin(off), Math.cos(off)));
+        expect(
+          drift,
+          `${at}: the arrow is ${((drift * 180) / Math.PI).toFixed(3)}° off its bearing`,
+        ).toBeLessThan(1e-9);
+
+        // 3. It yields INWARD, never outward — an arrow pushed the other way
+        //    would leave the screen, which is the promise `full` + 0 makes.
+        const rEdge = Math.hypot(edge.x - centre.x, edge.y - centre.y);
+        const rClear = Math.hypot(clear.x - centre.x, clear.y - centre.y);
+        expect(rClear, `${at}: the arrow moved outward`).toBeLessThanOrEqual(rEdge + 1e-9);
+        expectWithin(drawn, FULL, inner, `alarm-arrow ${at}`);
+        if (rEdge - rClear > 1e-9) pulled++;
+      }
+
+      // The other half of "failing today": on every profile the shipped arrow
+      // really does land on a readout, so the sweep above is a fix and not a
+      // tautology. 111 of 360 bearings on the qa-phone, 66 on the desktop.
+      expect(
+        before.length,
+        `${name}: the unyielded arrow never hit a readout — this suite is asserting nothing`,
+      ).toBeGreaterThan(0);
+      expect(pulled, `${name}: nothing yielded`).toBeGreaterThan(0);
+    }
+  });
+
+  it('the readouts never cover the ship, which is why the ray always has somewhere to go', () => {
+    // The yield walks the arrow back down its own ray, so it terminates on the
+    // near edge of whatever is in the way. That is only true while the ray's
+    // ORIGIN — the ship, which the follow camera holds at the middle of the
+    // content box — is outside every readout. It is: the readouts are corner and
+    // top-edge chrome. `arrowClearOfReadouts` floors the radius at zero anyway,
+    // and this is the case that keeps that floor theoretical rather than reached.
+    for (const { name, vp, isTouch } of PROFILES) {
+      const b = contentBox(vp);
+      const centre = { x: b.width / 2, y: b.height / 2 };
+      for (const { id, r } of readouts(vp, isTouch)) {
+        const covers =
+          centre.x > r.x - READOUT_KEEPOUT_PAD &&
+          centre.x < r.x + r.width + READOUT_KEEPOUT_PAD &&
+          centre.y > r.y - READOUT_KEEPOUT_PAD &&
+          centre.y < r.y + r.height + READOUT_KEEPOUT_PAD;
+        expect(covers, `${name}: "${id}" ${fmt(r)} covers the ship at ${centre.x},${centre.y}`).toBe(
+          false,
+        );
+      }
+    }
+  });
+
+  it('a0-111s own frame: the arrow stood on WAVE 1/5, and now stands under it', () => {
+    // The bearing QA reported: the station off-screen almost straight ahead, so
+    // the arrow lands on the top edge in the middle of it. Straight up is y-down
+    // −90°, and it is the worst case for the clock rather than a lucky one — the
+    // clock is centred on that column.
+    const vp: Viewport = { width: 798, height: 384 };
+    const { ro, edge, clear } = shot(vp, true, -Math.PI / 2);
+    const clock = ro.find((x) => x.id === 'wave-clock')!.r;
+
+    // BEFORE: the triangle is inside the clock's rect, over its first line.
+    const was = polyBounds(arrowPoly(edge, ARROW_SIZE));
+    expect(edge.x).toBeCloseTo(399, 6);
+    expect(edge.y).toBeCloseTo(ARROW_EDGE_INSET, 6);
+    expect(rectsIntersect(was, clock), `the frame a0-111 filed: ${fmt(was)} vs ${fmt(clock)}`).toBe(
+      true,
+    );
+    // …and it is the FIRST line it is standing on, which is what made `WAVE` the
+    // word that lost its A: the clock's lines start at its rect's top.
+    expect(was.y).toBeLessThan(clock.y + 20);
+
+    // AFTER: same column, same angle, pulled down the ray until the triangle
+    // clears the strip by exactly the pad. The clock is not touched.
+    const now = polyBounds(arrowPoly(clear, ARROW_SIZE));
+    expect(clear.x).toBeCloseTo(edge.x, 6);
+    expect(clear.angle).toBe(edge.angle);
+    expect(now.y).toBeCloseTo(clock.y + clock.height + READOUT_KEEPOUT_PAD, 6);
+    expect(rectsIntersect(now, clock)).toBe(false);
+    // It is still an arrow at the top of the screen — 58px further down a 384px
+    // viewport, in the same column, not a mark that has walked off to the ship.
+    expect(clear.y - edge.y).toBeCloseTo(58, 6);
+    expect(now.y).toBeLessThan(vp.height / 4);
   });
 });
 

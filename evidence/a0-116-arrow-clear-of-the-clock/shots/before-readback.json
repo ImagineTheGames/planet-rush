@@ -1,0 +1,94 @@
+[
+  {
+    "profile": "phone",
+    "stop": "clock",
+    "readout": {
+      "id": "wave-clock",
+      "x": 308.45,
+      "y": 16,
+      "width": 181.1,
+      "height": 51
+    },
+    "home": {
+      "x": 0,
+      "y": -6560
+    },
+    "bearingDeg": -90,
+    "arrow": {
+      "x": 388.5,
+      "y": 13,
+      "width": 21,
+      "height": 22.5
+    },
+    "air": 0
+  },
+  {
+    "profile": "phone",
+    "stop": "home",
+    "readout": {
+      "id": "station-hp",
+      "x": 628,
+      "y": 16,
+      "width": 154.5,
+      "height": 39
+    },
+    "home": {
+      "x": 12250,
+      "y": -6560
+    },
+    "bearingDeg": -28.16950378342475,
+    "arrow": {
+      "x": 693.6814816818809,
+      "y": 20.918775761233405,
+      "width": 24.79184102008412,
+      "height": 19.87816224952543
+    },
+    "air": 0
+  },
+  {
+    "profile": "desktop",
+    "stop": "clock",
+    "readout": {
+      "id": "wave-clock",
+      "x": 517.25,
+      "y": 16,
+      "width": 245.5,
+      "height": 67
+    },
+    "home": {
+      "x": 0,
+      "y": -14880
+    },
+    "bearingDeg": -90,
+    "arrow": {
+      "x": 629.5,
+      "y": 13,
+      "width": 21,
+      "height": 22.5
+    },
+    "air": 0
+  },
+  {
+    "profile": "desktop",
+    "stop": "home",
+    "readout": {
+      "id": "station-hp",
+      "x": 1106,
+      "y": 16,
+      "width": 158.5,
+      "height": 42
+    },
+    "home": {
+      "x": 21810,
+      "y": -14880
+    },
+    "bearingDeg": -34.303991872005525,
+    "arrow": {
+      "x": 1173.136929437643,
+      "y": 19.546245956199485,
+      "width": 24.503956025750085,
+      "height": 21.354250890075946
+    },
+    "air": 0
+  }
+]

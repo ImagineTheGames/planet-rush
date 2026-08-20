@@ -257,7 +257,11 @@ export function exclusionViolations(
  *    `./hud` `describeLayout`. Inside `ore-hud`, and listed anyway: the ids are
  *    the contract, and a table that quietly relied on containment would stop
  *    covering the numeral the day the cluster is re-arranged.
- *  - `wave-clock` — top-centre. **a0-116 is this same defect on this element.**
+ *  - `wave-clock` — top-centre. **a0-116 was this same defect on this element**,
+ *    and is now the second consumer of this list: the screen-edge arrow home
+ *    yields to these same rects (`./hud-geometry` `arrowClearOfReadouts`), so
+ *    the table names what a readout is for every mark on the screen and not for
+ *    world labels alone.
  *    Not currently registered by `describeLayout` (argued at length there: its
  *    `top-center` zone is a third of the viewport and the strip is intrinsically
  *    wider, so registering it would turn QA's suite red on a finding nobody has
@@ -283,13 +287,17 @@ export const HUD_READOUT_IDS: readonly string[] = [
 ];
 
 /**
- * Clear air a world label keeps from a readout's rect, CSS px.
+ * Clear air a mark keeps from a readout's rect, CSS px.
  *
  * Not zero, unlike {@link LayoutExclusion.gap}'s default. A bare exclusion is
  * about two rects covering each other, and edge-to-edge is enough for that; this
  * is about two runs of TEXT being told apart, and glyphs that end exactly where
  * the next begins read as one word. Two pixels is the smallest gap that survives
  * antialiasing on a 1× display.
+ *
+ * A world label (a0-115) and the screen-edge arrow home (a0-116) keep the same
+ * two, from here rather than from a constant each: the rule is about what HUD
+ * type needs around it, not about what happened to land on it.
  */
 export const READOUT_KEEPOUT_PAD = 2;
 

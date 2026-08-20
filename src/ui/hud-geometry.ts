@@ -22,10 +22,13 @@
 
 import type { Rect } from '@platform/layout-registry';
 import { WHEEL_HALO } from '../art/materials';
-import type { HomeArrow } from './alarm';
+import type { HomeArrow, Point } from './alarm';
 import { hudMetrics, hudSpace, hudType, hullBarFill, scrimGround } from './instrument';
 import { HEALTHBAR_MIN_FILL } from './healthbar';
 import { collapsedRect } from './minimap';
+// a0-116 keeps the same air off a readout that a0-115's world labels do, from the
+// same constant — see `arrowClearOfReadouts`.
+import { READOUT_KEEPOUT_PAD } from './layout-exclusions';
 import type { MinimapInsets } from './minimap';
 
 /**
@@ -551,6 +554,19 @@ export const HP_BAR_TOP = HP_VALUE_ROW + SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP;
 export function stationChromeHeight(scale: number): number {
   const m = { scale };
   return HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m) + hudSpace(SCRIM_BLEED, m);
+}
+
+/** Scrim width beyond the HOME cluster's bar, reference px (half each side of
+ *  it, like the clock's {@link CLOCK_CHROME_PAD_X}) — except that this cluster is
+ *  right-anchored, so all of it falls to the left of the bar. */
+export const STATION_CHROME_PAD_X = 18;
+
+/** How wide the HOME cluster's chrome runs, CSS px. The companion to
+ *  {@link stationChromeHeight}, extracted for the same reason (a0-116): a second
+ *  caller now needs the cluster's DRAWN width, and `./hud` `drawStationChrome`
+ *  had the only copy of the arithmetic. */
+export function stationChromeWidth(scale: number): number {
+  return HP_BAR_WIDTH + hudSpace(STATION_CHROME_PAD_X, { scale });
 }
 
 export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
@@ -1415,6 +1431,181 @@ export function polyBounds(poly: readonly number[]): Rect {
   }
   if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+// ---------------------------------------------------------------------------
+// The arrow that must not stand on a readout (a0-116)
+// ---------------------------------------------------------------------------
+//
+// ## The frame
+//
+// a0-111, phone 798×384: the alarm was up, the player's station was off-screen
+// almost straight ahead, and the arrow — riding the top edge at
+// {@link ./alarm} `ARROW_EDGE_INSET` — landed in the middle of that edge, which
+// is where GDD §2.2 puts the wave clock. The red triangle was drawn over the
+// clock's first line: `WAVE 1/5 · Outer Drift` with the `A` and most of the `V`
+// under it. QA graded it a legibility defect and not a broken control, and both
+// halves of that are the constraint: the arrow has to keep pointing where it
+// points, and the clock has to stay readable.
+//
+// It is not a rare bearing. Swept at 0.1° over this profile, **75 of every 360**
+// bearings put the arrow's triangle inside the clock's rect, and 111 put it
+// inside some readout — a fifth of the circle for the clock alone, and 66 of 360
+// on the desktop. See `hud-geometry.test.ts` `the home arrow never lands on a
+// readout`.
+//
+// ## Which one yields
+//
+// The mark yields; the readout does not move. That is the same answer a0-115
+// gives a nameplate that lands in the ore counter, and it is worth saying why it
+// is the same answer rather than a coincidence: a readout is the thing the player
+// goes *looking* for at a known place, and a mark that appears because the world
+// did something is the thing that arrived. The clock has nowhere to go anyway —
+// `top-center` is written into GDD §2.2, and a0-24 already spent its one degree
+// of freedom re-flowing it to a single row to clear the open wheel.
+//
+// ## The axis the arrow has free
+//
+// a0-115's nameplate steps SIDEWAYS, because a name means "this ship" and only
+// the horizontal keeps it over its hull. The arrow's meaning is its BEARING, so
+// its free axis is the other one: **the ray**. Every point on the line from the
+// screen centre to the station is at the same bearing — the ship is held at that
+// centre by the follow camera ({@link ./alarm} `homeArrow`), so this is a fact
+// about the geometry and not an approximation. Sliding the arrow inward along its
+// own ray changes its distance from the centre, which carries no meaning (the
+// clamp radius is an artefact of the edge; the *world* distance the view fades
+// and scales on is `HomeArrow.distance`, untouched), and changes nothing about
+// the direction it reports or the angle it is drawn at.
+//
+// So the arrow gives up radius, and only as much as it must: it is pulled to the
+// OUTERMOST radius that clears every readout, which is the smallest move that
+// works. Everywhere no readout is in the way — most of the circle — it is exactly
+// where it was, on the edge.
+//
+// **What this costs, stated rather than buried.** As a bearing sweeps past the
+// end of a readout the arrow hops back out to the edge instead of easing out.
+// Measured at 0.1°, the largest such step is **70px on the qa-phone and 78px on
+// the desktop**, at a constant bearing. Every rule of the "clear this rect" shape
+// has that discontinuity, and the alternatives that do not are worse: a per-edge
+// inset deep enough to clear `station-hp` would push the arrow 166px in from the
+// right edge on the bearings where nothing is in its way at all, and anything
+// smoother than that buys its smoothness by moving the arrow off its bearing,
+// which is the one thing the brief forbids and the one thing that would make the
+// arrow lie.
+//
+// **Rejected: a ground under the arrow.** The third option the brief offers. The
+// collision is ink on ink — the clock already draws its own scrim, so the arrow
+// is not on bare space, it is on TYPE — and a plate dark enough to separate a red
+// triangle from Bone glyphs is a plate that buries the glyphs. That is a0-115's
+// finding about draw order, one layer up: chrome can separate a readout from the
+// WORLD, it cannot separate it from another mark drawn over the same words.
+
+/** The interval of `t` for which `o + t·d` lies strictly inside `[lo, hi]`, or
+ *  `null` when it never does. A ray parallel to the slab is inside for all `t`
+ *  or for none, which is what the `Infinity`s say. */
+function raySlab(o: number, d: number, lo: number, hi: number): [number, number] | null {
+  if (Math.abs(d) < 1e-9) return o > lo && o < hi ? [-Infinity, Infinity] : null;
+  const a = (lo - o) / d;
+  const b = (hi - o) / d;
+  return a < b ? [a, b] : [b, a];
+}
+
+/**
+ * The screen-edge arrow, pulled in along its own ray until its triangle is clear
+ * of every readout rect — the fix for a0-116, argued in the note above.
+ *
+ * The returned arrow has the same `angle`, the same `onScreen`, the same
+ * `distance` and a position on the same ray from `centre`: **the bearing it
+ * reports is bit-identical**, and `hud-geometry.test.ts` asserts that rather than
+ * trusting it. Only the radius changes, and only when a readout is standing where
+ * the arrow wanted to be.
+ *
+ * @param arrow    The arrow as {@link ./alarm} `homeArrow` clamped it.
+ * @param centre   The point the ray runs from — the ship, which the follow camera
+ *                 holds at the middle of the box the arrow was clamped in. Passed
+ *                 in rather than derived so the caller's content box (a0-74) and
+ *                 this computation cannot disagree about where the middle is.
+ * @param readouts The rects to clear, in the same space as `arrow` and `centre`
+ *                 — `Hud.readoutKeepOut()` in the view, a0-115's own list.
+ * @param size     The triangle's tip length ({@link ARROW_SIZE}).
+ * @param pad      Clear air to keep. `READOUT_KEEPOUT_PAD` (a0-115), and the
+ *                 same constant rather than a second 2: a bare non-overlap is
+ *                 enough when the question is "is this rect covered", but a mark
+ *                 whose edge is a glyph's edge reads as part of the word, and
+ *                 that is one rule about HUD type, not one per element that
+ *                 lands on it.
+ */
+export function arrowClearOfReadouts(
+  arrow: HomeArrow,
+  centre: Point,
+  readouts: readonly Rect[],
+  size: number = ARROW_SIZE,
+  pad: number = READOUT_KEEPOUT_PAD,
+): HomeArrow {
+  // An arrow the view is not drawing has nothing to clear: `onScreen` means the
+  // station is visible and `./hud` `drawHomeArrow` returns before it draws.
+  if (arrow.onScreen || readouts.length === 0) return arrow;
+
+  const dx = arrow.x - centre.x;
+  const dy = arrow.y - centre.y;
+  const r = Math.hypot(dx, dy);
+  // Standing on the centre: there is no ray to slide along, and no bearing worth
+  // preserving either (`homeArrow` returns the centre in exactly this case).
+  if (r < 1e-6) return arrow;
+  const ux = dx / r;
+  const uy = dy / r;
+
+  // The triangle's box RELATIVE to its anchor point. `angle` is fixed while the
+  // arrow slides, so this offset box is fixed too, and the whole question becomes
+  // one about a rigid box travelling down a ray.
+  const local = polyBounds(arrowPoly({ ...arrow, x: 0, y: 0 }, size));
+
+  // Each readout becomes the rect of ANCHOR positions that would put that box
+  // inside it: the readout grown by `pad`, then by the box (Minkowski) so the
+  // anchor alone decides. Touching is not landing on it — the same convention
+  // `rectOverlap` and this suite have used for every clearance since a0-24.
+  const blocked: [number, number][] = [];
+  for (const ro of readouts) {
+    // A readout with no extent is a readout that drew nothing — an empty rect
+    // would otherwise block a band the width of the triangle around a point.
+    if (!(ro.width > 0) || !(ro.height > 0)) continue;
+    const x0 = ro.x - pad - (local.x + local.width);
+    const x1 = ro.x + ro.width + pad - local.x;
+    const y0 = ro.y - pad - (local.y + local.height);
+    const y1 = ro.y + ro.height + pad - local.y;
+    const sx = raySlab(centre.x, ux, x0, x1);
+    if (!sx) continue;
+    const sy = raySlab(centre.y, uy, y0, y1);
+    if (!sy) continue;
+    const enter = Math.max(sx[0], sy[0]);
+    const exit = Math.min(sx[1], sy[1]);
+    if (enter < exit) blocked.push([enter, exit]);
+  }
+  if (blocked.length === 0) return arrow;
+
+  // The outermost clear radius at or below the one the edge gave it. Each pass
+  // drops the radius to the near boundary of whatever interval still contains it;
+  // one pass per interval is enough, because each pass either finishes or steps
+  // past a whole interval.
+  let out = r;
+  for (let pass = 0; pass <= blocked.length; pass++) {
+    let moved = false;
+    for (const [enter, exit] of blocked) {
+      if (out > enter && out < exit) {
+        out = enter;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  // A readout that covered the centre would push the arrow onto — or behind — the
+  // ship it points from, so the radius is floored at zero rather than allowed to
+  // go negative. No profile has such a readout: the HUD's readouts are corner and
+  // top-edge chrome, and `the home arrow never lands on a readout` asserts the
+  // centre is outside all of them so this floor stays theoretical.
+  out = Math.max(0, out);
+
+  return { ...arrow, x: centre.x + ux * out, y: centre.y + uy * out };
 }
 
 // ---------------------------------------------------------------------------

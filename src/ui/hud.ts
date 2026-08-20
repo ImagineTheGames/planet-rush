@@ -127,6 +127,8 @@ import type { HudMetrics } from './instrument';
 import {
   ARROW_SIZE,
   arrowPoly,
+  arrowClearOfReadouts,
+  stationChromeWidth,
   ALARM_FRAME_INSET,
   ALARM_FRAME_STROKE,
   HUD_PAD,
@@ -1250,7 +1252,12 @@ export class Hud extends Container {
    *  the readout's right edge, so the cluster runs leftward from 0. */
   private drawStationChrome(): void {
     const m = this.metrics;
-    const width = HP_BAR_WIDTH + hudSpace(18, m);
+    // One arithmetic for the cluster's width, in `./hud-geometry` beside the
+    // depth it already owned: `readoutKeepOut` reports this rect off the drawn
+    // group and `hud-geometry.test.ts` recomputes it headless, so the number had
+    // to stop living only here (a0-74's note about the depth, now true of the
+    // width as well).
+    const width = stationChromeWidth(m.scale);
     const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
     g.clear();
@@ -2163,6 +2170,30 @@ export class Hud extends Container {
     return this.alarm.cause;
   }
 
+  /**
+   * The wave clock's drawn rect in SCREEN space, or null before the first
+   * `update()` places it.
+   *
+   * The clock is the one M2-adjacent element that does not register with the
+   * layout registry — `top-center` is a third of the viewport wide and the strip
+   * is intrinsically wider, and answering that with `full` would discard the one
+   * placement claim GDD §2.2 actually makes (the argument is in full over
+   * {@link describeLayout}). So there is no seam that reports where it went, and
+   * a0-116 needs one: the whole claim of that fix is that the screen-edge arrow
+   * no longer shares pixels with this rect, and a claim about two rects can only
+   * be evidenced by reading both off the same frame. `alarm-arrow` comes out of
+   * `describeLayout`; this is the other half.
+   *
+   * The rect is `waveClockLayout`'s own — the strip is laid out in content-box
+   * space and drawn from that layout, so this is the scrim that was filled and
+   * not a second measurement of it.
+   */
+  debugWaveClock(): Rect | null {
+    const clock = this.clockLayout;
+    if (!clock) return null;
+    return { ...clock.bounds, x: clock.bounds.x + this.content.x };
+  }
+
   // --- Build/Upgrade wheel ?debug=1 live-stage seam (field report v0.2) ------
 
   /** Whether the wheel view accepts input this frame — read by the cycle
@@ -2394,10 +2425,26 @@ export class Hud extends Container {
     const inBox = homeArrow(ship, home, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
     // Content-space → screen space. The box is centred, so the ship sits at its
     // middle exactly as it sits at the screen's, and the shift is the one offset.
-    const arrow = { ...inBox, x: inBox.x + box.x };
+    const onEdge = { ...inBox, x: inBox.x + box.x };
+    // …and then off the readouts (a0-116). The edge it rides is the edge the HUD
+    // hangs its instruments from, so on a fifth of the bearings on a landscape
+    // phone the triangle was drawn through the wave clock's first line. It gives
+    // up RADIUS to get clear — never bearing: the pulled-in arrow is still on the
+    // ray from the ship to the station, still at the same angle
+    // (./hud-geometry `arrowClearOfReadouts`).
+    //
+    // The rects are {@link readoutKeepOut}'s — a0-115's list, measured off the
+    // drawn groups, in this container's screen space. One keep-out for both
+    // collisions: a world label may not be drawn in a readout, and neither may
+    // the mark that points home. The ray runs from the ship, which the follow
+    // camera holds at the middle of the box (and the box is centred, so that is
+    // the screen's middle too).
+    const centre = { x: box.x + box.width / 2, y: box.height / 2 };
+    const arrow = arrowClearOfReadouts(onEdge, centre, this.readoutKeepOut());
     this.arrowDrawn = true;
 
-    // A triangle pointing along `angle`, drawn at the clamped edge position.
+    // A triangle pointing along `angle`, drawn where the two clamps above left
+    // it — the edge, or a little in from it where a readout was standing there.
     // The polygon comes from ./hud-geometry so the rect the registry records is
     // the rect a headless test can measure.
     this.alarmArrow
