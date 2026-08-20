@@ -260,7 +260,7 @@ class Component extends DCLogic {
     };
     // ONE ANSWERED QUESTION, with its consequence. Shared by the review list
     // (where the other questions are still open) and the decided shelf.
-    const answerCard = (board, spec, qid, answer, heading, multi) => {
+    const answerCard = (board, spec, qid, answer, { heading = '', multi = false, nameBoard = true } = {}) => {
       const denied = answer.verdict === 'DENY ALL';
       const label = optionLabel(spec, qid, answer.verdict);
       const briefs = briefsFor(board, denied ? null : answer.verdict);
@@ -285,7 +285,7 @@ class Component extends DCLogic {
       return {
         verdictLabel: denied
           ? ('✗ YOU DENIED' + (heading ? ' ' + heading : '') + ' — "' + (answer.reason ?? 'new round requested') + '"')
-          : ('✓ YOU PICKED ' + label + (heading ? '' : ' — ' + board)),
+          : ('✓ YOU PICKED ' + label + (heading || !nameBoard ? '' : ' — ' + board)),
         when: answer.at ? new Date(answer.at).toLocaleString() : '',
         statusLine, statusColor: briefs.length === 0 ? '#F2D24B' : '#9fb2c6',
         briefs, hasBriefs: briefs.length > 0, denied,
@@ -313,7 +313,7 @@ class Component extends DCLogic {
           // per row is noise on a board that only asks one thing.
           const prose = q.question && q.question !== spec.question ? q.question : '';
           if (answer) {
-            const card = answerCard(name, spec, q.id, answer, heading, multi);
+            const card = answerCard(name, spec, q.id, answer, { heading, multi });
             return { ...card, id: q.id, settled: true, asking: false, hasHead: true,
               heading: heading || 'Your answer', headColor: '#7fe0c4',
               stateLabel: 'SETTLED', stateColor: '#4FA08B',
@@ -354,8 +354,11 @@ class Component extends DCLogic {
         // DECIDED — surfaced with its consequence, not filed away as history.
         const rows = (state.answered ?? Object.keys(answers)).map(qid => {
           const q = questions.find(x => x.id === qid);
-          return answerCard(name, spec, qid, answers[qid], q?.title || (questions.length > 1 ? qid.toUpperCase() : ''),
-            questions.length > 1);
+          // The card's title already names the board, so the row does not.
+          return answerCard(name, spec, qid, answers[qid], {
+            heading: q?.title || (questions.length > 1 ? qid.toUpperCase() : ''),
+            multi: questions.length > 1, nameBoard: false,
+          });
         });
         decided.push({
           name, href, answers: rows,
