@@ -42,7 +42,7 @@
  *     had rather than letting the sort reshuffle it away.
  *  4. **An empty list is a sentence, not a void** (LESSONS §20) — and it is not
  *     the same sentence as *we have not looked yet*, which is why
- *     {@link BrowseState.everReceived} exists. `NO OPEN CLAIMS` before the first
+ *     {@link BrowseState.everReceived} exists. `NO OPEN ROOMS` before the first
  *     answer has landed would be a screen lying about a question it never asked.
  *  5. **A tap on a row the list no longer offers is refused with a sentence**,
  *     and refusing it asks for an immediate refresh — so a room that came back is
@@ -102,12 +102,12 @@ export const JOIN_MODES: readonly JoinMode[] = ['browse', 'code'];
  * The words on the two segments — the developer's own, verbatim: *"join gives you
  * both options BROWSE and ENTER ROOM CODE"*.
  *
- * `ROOM` rather than the fiction's `CLAIM` is deliberate and is the same
- * exception the four door labels take (a0-15, recorded in
- * `docs/copy-sweep-industrial-voice.md` §0): the entry screen says what the button
- * does, in the words the person who asked for it used. The keypad's own heading
- * (`./lobby-entry` `ENTRY_STATUS.join`) is untouched — the plan pins the CODE
- * segment as *today's join screen, unchanged*.
+ * `ROOM` is the word for it on every screen now (a0-108): the entry screen says
+ * what the button does, in the words the person who asked for it used. This
+ * segment had it first, as the exception the four door labels take (a0-15,
+ * recorded in `docs/copy-sweep-industrial-voice.md` §0) — the fiction noun that
+ * used to sit two lines above it, on the keypad's own heading, is gone, so one
+ * screen no longer holds two vocabularies.
  */
 export const JOIN_MODE_LABELS: Readonly<Record<JoinMode, string>> = {
   browse: 'BROWSE',
@@ -150,7 +150,7 @@ export interface BrowseRow {
   /** The join handle. Opaque here; it is `joinListing`'s argument and nothing
    *  else, and it is never drawn. */
   readonly id: string;
-  /** The claim owner's tag — what the row shows in a code's place. */
+  /** The host's tag — what the row shows in a code's place. */
   readonly owner: string;
   readonly region: string;
   /** Humans in the room. */
@@ -304,7 +304,7 @@ export function pressBrowseRow(state: BrowseState, id: string, now: number): Bro
  *
  * The screen comes back to life with the reason on it, and — only for the two
  * refusals that are actually ABOUT THE ROOM — the row is marked with what was
- * learned: 409 means the seat went to somebody else (`full`), 404 means the claim
+ * learned: 409 means the seat went to somebody else (`full`), 404 means the room
  * is gone or has gone private (`closed`).
  *
  * A `network` failure marks nothing. `fetch` never reached the allocator, which
@@ -396,9 +396,9 @@ export const BROWSE_NO_PING = '—';
  */
 export const BROWSE_COPY = {
   /** Before the first answer: we are looking, and we have not concluded anything. */
-  looking: 'Looking for open claims…',
+  looking: 'Looking for open rooms…',
   /** …and after one that came back with nothing in it. */
-  emptyHeadline: 'NO OPEN CLAIMS RIGHT NOW',
+  emptyHeadline: 'NO OPEN ROOMS RIGHT NOW',
   emptyDetail: 'Press ENTER ROOM CODE, or go BACK to HOST one.',
   /**
    * The row filled up while the player was looking at it (409 from
@@ -406,9 +406,9 @@ export const BROWSE_COPY = {
    * Duplicated verbatim in {@link ./online-copy} `listingFailureMessage` — the two
    * must agree, and `lobby-browser.test.ts` pins that they do.
    */
-  full: 'That claim filled up while you were looking. Pick another.',
+  full: 'That room filled up while you were looking. Pick another.',
   /** …and the room that is simply gone (404, or a row that left the listing). */
-  closed: 'That claim has closed. Pick another, or press SOLO.',
+  closed: 'That room has closed. Pick another, or press SOLO.',
 } as const;
 
 /** The sentence a row that is no longer on offer says when it is pressed. */
@@ -424,7 +424,7 @@ function refusalFor(state: BrowseRowState): string {
  *  here needs a rect, and nothing here is a code. */
 export interface BrowseRowModel {
   readonly id: string;
-  /** The claim owner's tag: what this row is called. */
+  /** The host's tag: what this row is called. */
   readonly owner: string;
   /** `2 PLAYERS · 4 SEATS OPEN · TEAMS` — humans, then seats, then the mode when
    *  the ad carried one. Never a denominator (Trap 2). */

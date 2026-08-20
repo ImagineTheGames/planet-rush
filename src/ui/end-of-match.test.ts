@@ -208,9 +208,9 @@ describe('reading an outcome', () => {
 describe('the frame model', () => {
   it('headlines each end and marks Rematch primary', () => {
     const victory = endOfMatchModel(over(1, 1));
-    expect(victory.headline).toBe('CLAIM HELD');
-    expect(endOfMatchModel(over(2, 5)).headline).toBe('CLAIM LOST');
-    expect(endOfMatchModel(over(2, null)).headline).toBe('NO CLAIMANT');
+    expect(victory.headline).toBe('VICTORY');
+    expect(endOfMatchModel(over(2, 5)).headline).toBe('DEFEAT');
+    expect(endOfMatchModel(over(2, null)).headline).toBe('DRAW');
     expect(victory.buttons[0]).toMatchObject({ id: 'rematch', primary: true });
 
     const elim = endOfMatchModel(eliminated(1));
@@ -247,57 +247,74 @@ describe('the frame model', () => {
 
   /**
    * The other half of the developer's screenshot. DEFEAT was the wrong headline,
-   * and *"Player 7 took the claim."* was the wrong sentence under it — that is an
-   * opponent's line, printed about a friend. An ally's win gets its own: your
-   * side took the claim, and here is who held it.
+   * and the line under it named Player 7 the way it names an opponent — printed
+   * about a friend. An ally's win gets its own sentence: who won, and that they
+   * were on your side.
    */
-  it('reads an ally’s win as YOUR SIDE taking the claim, and names who held it', () => {
+  it('reads an ally’s win as YOUR SIDE winning, and names who won it', () => {
     const allyWon = endOfMatchModel(teamOver(0, 7, MY_SIDE));
-    expect(allyWon.headline).toBe('CLAIM HELD');
-    expect(allyWon.subhead).toBe('Your side took the claim — Player 8 held it.');
+    expect(allyWon.headline).toBe('VICTORY');
+    expect(allyWon.subhead).toBe('Player 8 won it for your side.');
     // It is never the opponent's sentence…
-    expect(allyWon.subhead).not.toBe('Player 8 took the claim.');
-    // …and never claims YOU held a claim your teammate held.
-    expect(allyWon.subhead).not.toBe('You took the claim.');
+    expect(allyWon.subhead).not.toBe('Player 8 won.');
+    // …and never says YOU won a match your teammate won.
+    expect(allyWon.subhead).not.toBe('You won.');
 
-    // Your own win is untouched — no "your side" hedge on a solo hold.
-    expect(endOfMatchModel(teamOver(0, 0, MY_SIDE)).subhead).toBe('You took the claim.');
+    // Your own win is untouched — no "your side" hedge when you did it yourself.
+    expect(endOfMatchModel(teamOver(0, 0, MY_SIDE)).subhead).toBe('You won.');
     // And an enemy's win keeps the line it always had.
-    expect(endOfMatchModel(teamOver(0, 1, MY_SIDE)).subhead).toBe('Player 2 took the claim.');
+    expect(endOfMatchModel(teamOver(0, 1, MY_SIDE)).subhead).toBe('Player 2 won.');
   });
 
   /**
-   * The condition on the in-register headlines, not a nicety. GDD §4.7's
-   * accessibility clause permits `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
-   * **only** while the line underneath states the outcome plainly — the headline
-   * may never be the sole statement of who won. If a refactor empties
-   * `subheadFor()`, this fails and the headlines must revert to plain words
-   * rather than the screen shipping an outcome the player has to infer.
+   * ---------------------------------------------------------------------------
+   * THE §4.7 GUARD, REWRITTEN RATHER THAN RETIRED (a0-108)
+   * ---------------------------------------------------------------------------
+   * This test used to assert the *condition* on the old headlines: GDD §4.7's
+   * accessibility clause permitted `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
+   * **only** while a plain line sat underneath, so if a refactor emptied
+   * `subheadFor()` the headlines had to revert to plain words.
+   *
+   * a0-108 made the headlines plain, so that condition no longer has anything to
+   * hold — but the thing the clause was *protecting* is untouched, and it is the
+   * only reason the subhead exists at all: **`VICTORY` does not say who won.**
+   * Four of the five outcomes here have a winner and three of those are somebody
+   * other than the reader, which is exactly the confusion the developer's
+   * screenshot caught (a0-09). Deleting the guard because its old trigger went
+   * away would drop the protection with it.
+   *
+   * So it now asserts the thing itself: the headline states the *outcome*, the
+   * line under it states *who*, and neither is ever asked to do the other's job.
    */
-  it('never lets an in-register headline be the only statement of the outcome', () => {
+  it('never lets the headline be the only statement of who won', () => {
+    // A win of your own: the headline says what happened, the line says who.
     const victory = endOfMatchModel(over(1, 1));
-    expect(victory.headline).toBe('CLAIM HELD');
-    expect(victory.subhead).toBe('You took the claim.');
+    expect(victory.headline).toBe('VICTORY');
+    expect(victory.subhead).toBe('You won.');
 
+    // A loss names the winner — never left to the headline's colour to carry.
     const defeat = endOfMatchModel(over(1, 4));
-    expect(defeat.headline).toBe('CLAIM LOST');
-    // Says who took it — the loss is stated, not left to the headline's colour.
-    expect(defeat.subhead).toContain('took the claim');
+    expect(defeat.headline).toBe('DEFEAT');
     expect(defeat.subhead).toContain('Player 5');
+    expect(defeat.subhead).toContain('won');
 
-    // An ally's win is the newest headline/line pair (a0-09) and it obeys the
-    // same clause: strip `CLAIM HELD` and the sentence still says who won and
-    // that they were on your side.
+    // An ally's win is the pair that made this matter (a0-09): the headline is
+    // the same `VICTORY` a solo win gets, so the line beneath is the ONLY place
+    // the reader learns it was a teammate who did it, and which teammate.
     const allied = endOfMatchModel(teamOver(0, 7, MY_SIDE));
-    expect(allied.headline).toBe('CLAIM HELD');
-    expect(allied.subhead).toContain('Your side');
-    expect(allied.subhead).toContain('took the claim');
+    expect(allied.headline).toBe('VICTORY');
     expect(allied.subhead).toContain('Player 8');
+    expect(allied.subhead).toContain('your side');
 
-    // The draw's plain line names the outcome without the fiction word, which is
-    // the clause working as written: strip "NO CLAIMANT" and the meaning survives.
+    // Cover the whole map: every outcome with a winner names one, in words.
+    for (const outcome of [over(1, 1), over(1, 4), teamOver(0, 7, MY_SIDE)]) {
+      expect(endOfMatchModel(outcome).subhead).not.toBe('');
+    }
+
+    // The draw has no winner to name, so its line states the outcome instead —
+    // and still says something `DRAW` does not: why there was nobody left.
     const draw = endOfMatchModel(over(1, null));
-    expect(draw.headline).toBe('NO CLAIMANT');
+    expect(draw.headline).toBe('DRAW');
     expect(draw.subhead).toBe('No reactor survived the collapse.');
   });
 
@@ -426,16 +443,16 @@ describe('the Gantry/Bone summary', () => {
     // The re-skin is not allowed to change a word or a button. Pinned here so a
     // later material pass cannot quietly edit the screen's content.
     //
-    // l2-02: the three in-register headlines were re-worded by the ratified voice
-    // sweep (§4.7) — a deliberate copy change, which is the one thing this pin does
-    // NOT guard against. Its intent is intact and re-pinned on the new words: a
-    // material pass still cannot touch them, and the accessibility condition that
-    // makes them legal is asserted above, on `subheadFor()`.
-    expect(endOfMatchModel(over(1, 1)).headline).toBe('CLAIM HELD');
-    expect(endOfMatchModel(over(1, 2)).headline).toBe('CLAIM LOST');
-    expect(endOfMatchModel(over(1, null)).headline).toBe('NO CLAIMANT');
+    // l2-02, then a0-108: these words have been deliberately re-worded twice by
+    // copy rulings, which is the one thing this pin does NOT guard against. Its
+    // intent survives both and is re-pinned on the shipped words — a material
+    // pass still cannot touch them, and what the subhead has to carry is
+    // asserted above, on `subheadFor()`.
+    expect(endOfMatchModel(over(1, 1)).headline).toBe('VICTORY');
+    expect(endOfMatchModel(over(1, 2)).headline).toBe('DEFEAT');
+    expect(endOfMatchModel(over(1, null)).headline).toBe('DRAW');
     expect(endOfMatchModel(eliminated(1)).headline).toBe('ELIMINATED');
-    expect(endOfMatchModel(over(1, 2)).subhead).toBe('Player 3 took the claim.');
+    expect(endOfMatchModel(over(1, 2)).subhead).toBe('Player 3 won.');
   });
 
   it('signs the beam with the front door\'s own tag rather than new copy', () => {

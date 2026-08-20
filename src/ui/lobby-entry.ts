@@ -152,7 +152,7 @@ export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
     // screen, and it is still the only door drawn as the affirmative action.
     door: 'campaign',
     label: 'CAMPAIGN',
-    hint: 'A run of linked contracts, one claim after another.',
+    hint: 'A run of linked contracts.',
     needsNetwork: false,
     comingSoon: true,
   },
@@ -312,18 +312,18 @@ export interface EntryResult {
  *  never as an error code — a player who cannot read the message cannot act. */
 export const ENTRY_ERRORS = {
   /** A submit with fewer than {@link ROOM_CODE_LENGTH} characters. */
-  short: `A claim code is ${ROOM_CODE_LENGTH} characters.`,
-  /** The server has no such claim (it creates unknown codes, so this is a typo
-   *  the server declined rather than a claim that vanished).
+  short: `A room code is ${ROOM_CODE_LENGTH} characters.`,
+  /** The server has no such room (it creates unknown codes, so this is a typo
+   *  the server declined rather than a room that vanished).
    *
    *  Duplicated verbatim in `./online-copy` `ONLINE_COPY.notFound` — the two must
    *  agree, and `lobby-entry.test.ts` pins that they do. */
-  unknown: 'No claim with that code. Check it and try again.',
+  unknown: 'No room with that code. Check it and try again.',
   /** Eight seats, all taken (`./lobby` LOBBY_SLOTS). Names the door it sends the
    *  player to, because that door is on the screen this line is drawn over —
    *  "take a solo contract" was the sweep's way of saying it, and it named the
    *  old label in lower case (a0-15). */
-  full: 'That claim is full. Ask for a rematch, or press SOLO.',
+  full: 'That room is full. Ask for a rematch, or press SOLO.',
   /** No server, or no internet. Names the door that still works — so it moves
    *  whenever {@link DOOR_OPTIONS} does (`voice-door-labels.test.ts`). */
   offline: 'Cannot reach the server. SOLO still works.',
@@ -668,24 +668,22 @@ export interface EntryModel {
 export const ENTRY_EYEBROW = 'DEEP FIELD MINING AUTHORITY';
 
 /**
- * …and its second line, which is this screen's own state. The handoff labels that
- * panel `ROOM CODE`; l2-02 files it as `CLAIM CODE`, because this string landed
- * (u7-04's header beam) after the sweep had already read this file, and left the
- * keypad saying `ROOM CODE` two lines above its own `ENTER THE CLAIM CODE`. One
- * screen cannot hold both vocabularies. It invents nothing: `CLAIM` is the
- * ratified fiction word and `CODE` stays `CODE`, which is the sweep's hard limit —
- * a player types four characters read off somebody else's screen. The doors carry
+ * …and its second line, which is this screen's own state. l2-02 filed this as
+ * `CLAIM CODE`, and left the keypad saying `ROOM CODE` two lines above its own
+ * `ENTER THE CLAIM CODE` — one screen holding two vocabularies. a0-108 settles it
+ * on `ROOM`, the word the handoff, the join segment and the network layer were
+ * already using, and the one a player would say out loud. `CODE` stays `CODE`: a
+ * player types four characters read off somebody else's screen. The doors carry
  * the title screen's standing contract line unchanged, because the doors screen is
  * where that contract is taken up.
  */
 export const ENTRY_STATUS = {
   home: 'CONTRACT OPEN · SECTOR 04',
-  join: 'CLAIM CODE',
-  /** …and the same line for the join screen's other half (u17-01). The keypad's
-   *  own heading is untouched — the plan pins the CODE segment as today's join
-   *  screen, unchanged — so BROWSE gets its own word rather than borrowing one
-   *  about a code the player is deliberately not typing. */
-  browse: 'OPEN CLAIMS',
+  join: 'ROOM CODE',
+  /** …and the same line for the join screen's other half (u17-01). BROWSE gets
+   *  its own word rather than borrowing one about a code the player is
+   *  deliberately not typing. */
+  browse: 'OPEN ROOMS',
 } as const;
 
 /** The header beam's status line for the screen (and mode) that is up. */
@@ -788,11 +786,11 @@ function entryPrompt(state: EntryState): string {
   // player looking at a list is picking, not typing, and a line telling them to
   // enter a code they were not given is the keypad-first failure one line higher
   // up the screen.
-  return state.mode === 'browse' ? ENTRY_BROWSE_PROMPT : 'ENTER THE CLAIM CODE';
+  return state.mode === 'browse' ? ENTRY_BROWSE_PROMPT : 'ENTER THE ROOM CODE';
 }
 
 /**
- * The browse half's standing line — the parallel of `ENTER THE CLAIM CODE`, and
+ * The browse half's standing line — the parallel of `ENTER THE ROOM CODE`, and
  * as short.
  *
  * It deliberately does **not** say "nearest first" or anything else about the
@@ -800,4 +798,4 @@ function entryPrompt(state: EntryState): string {
  * measure (the offline build, a fleet that is down) there is no distance to be
  * nearest by. A line that would be a lie in one honest state is not a line.
  */
-export const ENTRY_BROWSE_PROMPT = 'PICK A CLAIM';
+export const ENTRY_BROWSE_PROMPT = 'PICK A ROOM';
