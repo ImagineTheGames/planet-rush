@@ -17,7 +17,14 @@ npx vite-node harness/cli.ts smoke                 # one 8-slot match, enforced 
 npx vite-node harness/cli.ts determinism [seconds] # record a match, replay it, compare hashes
 npx vite-node harness/cli.ts perf [ticks]          # the GDD §4.3 stress scene, frame-time capture
 npx vite-node harness/cli.ts balance [seeds] [--out FILE]   # the sweep + markdown report
+npx vite-node harness/cli.ts soak [matches] [--rotations n] # the shipped trees: hangs, length, both 55% contests
+npx vite-node harness/cli.ts mirrors <section> [--seeds n]  # one a0-112 section -> tests/reports/a0-112-data/
+npx vite-node harness/cli.ts mirrors report [--out FILE]    # render tests/reports/a0-112-balance.md
 ```
+
+`mirrors` sections are `mirror`, `roster`, `tier`, `class`, `cast`, `slice` and
+`a0107`. They are separate commands because they are independent and a full set is
+~1150 whole matches: five processes for ten minutes instead of one for an hour.
 
 Every command exits non-zero when the thing it measured failed a target, so the
 CLI is a gate as well as an instrument. `balance` writes its report to
@@ -42,17 +49,22 @@ The merge gate runs the fast half of the harness on every push:
 |---|---|
 | `match.ts` | the match loop and its three ceilings (sim-time, wall-clock, ticks); record & replay; lineups & sweeps |
 | `hash.ts` | the **full**-state hash the determinism contract compares, plus a per-subsystem digest so a desync says *where* |
-| `strategies.ts` | five QA probe strategies — measuring instruments, not game AI; they exist because every shipped bot tier still runs the do-nothing baseline |
+| `strategies.ts` | five QA probe strategies — measuring instruments, not game AI; the fixed reference the shipped trees are read against |
 | `balance.ts` | sweeps, statistics, and the markdown report generator (every number generated, only the *reading* is hand-written) |
+| `soak.ts` | the same three targets against the **shipped trees** rather than the probes, plus the release soak and the a0-112 per-match telemetry |
+| `mirrors.ts` | the a0-112 sweep: full character mirrors (length, deaths, decision mix, per character and per tier) and the rotated contests that answer the win rates a mirror cannot |
 | `perf.ts` | the GDD §4.3 entity-count stress scene and per-tick frame-time capture |
 | `cli.ts` | the command line above |
 
 ## The probes are not the bots
 
-Every difficulty tier on `main` still runs the do-nothing baseline
-(`src/bots/bot.ts`); the real Easy/Medium/Hard trees are not merged. The strategy
-probes here are the smallest honest expression of each corner of the triangle
-(mine / defend / attack), written to *measure* the ruleset, not to be good at the
-game. When the trees land, the harness measures those instead — the swap is one
-line in `match.ts` (`seatLineup`) — with the probes kept as the fixed reference
-the trees are compared against.
+The strategy probes here are the smallest honest expression of each corner of the
+triangle (mine / defend / attack), written to *measure* the ruleset, not to be
+good at the game.
+
+**The Easy/Medium/Hard trees are merged**, and `soak.ts` and `mirrors.ts` measure
+*those* — the shipped product. `balance.ts` still measures the probes, and that is
+the division of labour rather than an oversight: the probes are a fixed reference
+that does not move when a bot lane changes a tree, so a ruleset change and a tree
+change can be told apart. Read a probe number as "what the rules do" and a
+`soak`/`mirrors` number as "what the game does".
