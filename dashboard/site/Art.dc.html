@@ -63,13 +63,15 @@
       </div>
       <sc-for list="{{ b.questions }}" as="q" hint-placeholder-count="3">
         <div style="margin-top:12px;border-top:1px solid #161c28;padding-top:11px">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <span style="font-size:13px;font-weight:600;color:{{ q.headColor }}">{{ q.heading }}</span>
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ q.stateColor }};letter-spacing:.08em">{{ q.stateLabel }}</span>
-            <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ q.clear }}" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #3a2b3f;background:transparent;color:#c79ad6;font-size:11px;font-family:'IBM Plex Mono',monospace">TAKE IT BACK</button>
-            </sc-if>
-          </div>
+          <sc-if value="{{ q.hasHead }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:600;color:{{ q.headColor }}">{{ q.heading }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ q.stateColor }};letter-spacing:.08em">{{ q.stateLabel }}</span>
+              <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ q.clear }}" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #3a2b3f;background:transparent;color:#c79ad6;font-size:11px;font-family:'IBM Plex Mono',monospace">TAKE IT BACK</button>
+              </sc-if>
+            </div>
+          </sc-if>
           <sc-if value="{{ q.hasProse }}" hint-placeholder-val="{{ false }}">
             <div style="margin-top:6px;font-size:12px;line-height:1.5;color:#8aa0b6">{{ q.prose }}</div>
           </sc-if>
@@ -305,11 +307,14 @@ class Component extends DCLogic {
         // ones still asking, and the board stays here until nothing is open.
         const qs = questions.map(q => {
           const answer = answers[q.id];
-          const heading = q.title || (questions.length > 1 ? q.id.toUpperCase() : '');
-          const prose = q.question && q.question !== heading ? q.question : '';
+          const multi = questions.length > 1;
+          const heading = q.title || (multi ? q.id.toUpperCase() : '');
+          // The board's own question is already the card's headline: repeating it
+          // per row is noise on a board that only asks one thing.
+          const prose = q.question && q.question !== spec.question ? q.question : '';
           if (answer) {
-            const card = answerCard(name, spec, q.id, answer, heading, questions.length > 1);
-            return { ...card, id: q.id, settled: true, asking: false,
+            const card = answerCard(name, spec, q.id, answer, heading, multi);
+            return { ...card, id: q.id, settled: true, asking: false, hasHead: true,
               heading: heading || 'Your answer', headColor: '#7fe0c4',
               stateLabel: 'SETTLED', stateColor: '#4FA08B',
               prose, hasProse: false, picks: [] };
@@ -317,8 +322,8 @@ class Component extends DCLogic {
           const opts = (q.options ?? []).map(o => ({ id: o.id, label: o.label }));
           opts.push({ id: 'DENY ALL', label: 'DENY ALL' });
           return {
-            id: q.id, settled: false, asking: true, briefs: [],
-            heading: heading || 'Pick one', headColor: '#e7ecf3',
+            id: q.id, settled: false, asking: true, briefs: [], hasHead: multi,
+            heading, headColor: '#e7ecf3',
             stateLabel: 'OPEN', stateColor: '#F2D24B',
             prose, hasProse: prose.length > 0,
             picks: opts.map(o => ({
