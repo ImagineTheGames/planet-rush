@@ -14,8 +14,8 @@
     },
     "drawn": {
       "text": "Rusty",
-      "left": 47.86666666666668,
-      "right": 130.66666666666669,
+      "left": 70.86666666666667,
+      "right": 153.66666666666669,
       "y": 36.756
     },
     "withheld": null
@@ -33,13 +33,11 @@
       "x": 52.90333333333333,
       "y": 76.756
     },
-    "drawn": {
+    "drawn": null,
+    "withheld": {
       "text": "Rusty",
-      "left": 34.50333333333333,
-      "right": 117.30333333333333,
-      "y": 36.756
-    },
-    "withheld": null
+      "reason": "readout"
+    }
   },
   {
     "profile": "desktop",
@@ -56,8 +54,8 @@
     },
     "drawn": {
       "text": "Rusty",
-      "left": 47.86666666666668,
-      "right": 130.66666666666669,
+      "left": 70.86666666666667,
+      "right": 153.66666666666669,
       "y": 44.256
     },
     "withheld": null
@@ -75,12 +73,10 @@
       "x": 52.90333333333333,
       "y": 84.256
     },
-    "drawn": {
+    "drawn": null,
+    "withheld": {
       "text": "Rusty",
-      "left": 34.50333333333333,
-      "right": 117.30333333333333,
-      "y": 44.256
-    },
-    "withheld": null
+      "reason": "readout"
+    }
   }
 ]
