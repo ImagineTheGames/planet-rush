@@ -63,7 +63,6 @@ import {
   ORE_LABEL_LEADING,
   ORE_RULE_GAP,
   oreCounterLayout,
-  oreCounterBounds,
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
@@ -2434,6 +2433,17 @@ describe('the fixed readouts and the world labels that pass over them', () => {
     height: r.height + 2 * READOUT_KEEPOUT_PAD,
   });
 
+  /** The counter's group-space layout pinned where `./hud` `layout()` pins the
+   *  group — `(contentBox.x + HUD_PAD, HUD_PAD)`, the content box's top-left corner
+   *  and never the screen's (a0-74). This is the rect the registry records as
+   *  `ore-hud`, and QA measured it at 16,16 by 52.9×75 on the frame they failed. */
+  const oreScreenRect = (layout: OreCounterLayout, contentX: number): Rect => ({
+    x: contentX + HUD_PAD,
+    y: HUD_PAD,
+    width: layout.ground.width,
+    height: layout.ground.height,
+  });
+
   /** The clock's three readouts at their longest, the same estimate the a0-24
    *  clearance test uses — generous on purpose, since a wider strip is the harder
    *  keep-out and cannot make this pass by accident. */
@@ -2477,7 +2487,7 @@ describe('the fixed readouts and the world labels that pass over them', () => {
     );
     const zoom = zoomControlBounds(box.width, box.height, isTouch);
     const entries: LayoutEntry[] = [
-      { id: 'ore-hud', anchor: { region: 'top-left', margin: HUD_PAD }, bounds: oreCounterBounds(ore, box.x) },
+      { id: 'ore-hud', anchor: { region: 'top-left', margin: HUD_PAD }, bounds: oreScreenRect(ore, box.x) },
       { id: 'wave-clock', anchor: { region: 'top-center', margin: HUD_PAD }, bounds: clock.bounds },
       { id: 'station-hp', anchor: { region: 'top-right', margin: HUD_PAD }, bounds: stationHpBounds(vp.width, 40) },
     ];
@@ -2661,7 +2671,7 @@ describe('the fixed readouts and the world labels that pass over them', () => {
     // largest nameplate intersection measured inside it was 20.3 × 16.
     const counter: Rect = { x: 16, y: 16, width: 52.9, height: 75 };
     const vp: Viewport = { width: 798, height: 384 };
-    expect(oreCounterBounds(
+    expect(oreScreenRect(
       oreCounterLayout(
         { width: textWidth('ORE', { face: 'heading', size: hudType(HUD_EYEBROW_TYPE, hudMetrics(vp.width, vp.height)), tracking: TRACKING.eyebrow }), height: 11 },
         { width: textWidth('3', { face: 'bodyBold', size: hudType(ORE_BANK_TYPE, hudMetrics(vp.width, vp.height)), tracking: TRACKING.name }), height: 22 },

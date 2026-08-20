@@ -53,7 +53,11 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { DeviceKind, FireMode } from '@platform/actions';
-import type { LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+// a0-115: which HUD elements a world-anchored label may not be drawn inside, and
+// the rule for what it does about it. The table is the contract; this file only
+// offers the drawn rects to it.
+import { readoutRects } from './layout-exclusions';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
 import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
@@ -1944,17 +1948,36 @@ export class Hud extends Container {
    *
    * Local bounds plus the group's own origin rather than `getBounds()`: the labels
    * are laid out in this container's space, and `getBounds()` is global/physical
-   * (PR #93's rotation trap). Same space in, same space out.
+   * (PR #93's rotation trap). Same space in, same space out. The `anchor` on each
+   * entry is a placeholder — `readoutRects` reads ids and bounds, and a keep-out
+   * makes no claim about where an element is *supposed* to be.
    */
+  /** The anchor on a keep-out candidate. A keep-out is a claim about pixels, not
+   *  about where an element is supposed to be — {@link describeLayout} is where
+   *  each of these elements makes its real anchor claim (and argues it). */
+  private static readonly KEEPOUT_ANCHOR: AnchorSpec = { region: 'full' };
+
   private readoutKeepOut(): Rect[] {
-    const out: Rect[] = [];
-    for (const group of [this.oreGroup, this.waveGroup, this.stationGroup, this.zoomGroup]) {
-      if (!group.visible) continue;
+    const entries: LayoutEntry[] = [];
+    const offer = (id: string, group: Container): void => {
+      if (!group.visible) return;
       const b = group.getLocalBounds();
-      if (b.width <= 0 || b.height <= 0) continue;
-      out.push({ x: group.x + b.x, y: group.y + b.y, width: b.width, height: b.height });
-    }
-    return out;
+      if (b.width <= 0 || b.height <= 0) return;
+      entries.push({
+        id,
+        anchor: Hud.KEEPOUT_ANCHOR,
+        bounds: { x: group.x + b.x, y: group.y + b.y, width: b.width, height: b.height },
+      });
+    };
+    offer('ore-hud', this.oreGroup);
+    offer('wave-clock', this.waveGroup);
+    offer('station-hp', this.stationGroup);
+    offer(ZOOM_CONTROL_ID, this.zoomGroup);
+    // The id table decides, not this list: `offer` puts every candidate forward
+    // and `./layout-exclusions` `HUD_READOUT_IDS` picks the ones a world label may
+    // not enter. Take a row out of that table and the element stops being a
+    // keep-out here, which is what makes it the contract rather than a comment.
+    return readoutRects(entries);
   }
 
   /** ?debug=1 live-stage seam: arm the nameplate layer's drawn-label capture so
