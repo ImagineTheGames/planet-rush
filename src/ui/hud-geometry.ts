@@ -553,6 +553,46 @@ export function stationChromeHeight(scale: number): number {
   return HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m) + hudSpace(SCRIM_BLEED, m);
 }
 
+/** Scrim width beyond the HOME cluster's bar, reference px (half each side of
+ *  it, like the clock's {@link CLOCK_CHROME_PAD_X}) — except that this cluster is
+ *  right-anchored, so all of it falls to the left of the bar. */
+export const STATION_CHROME_PAD_X = 18;
+
+/** How wide the HOME cluster's chrome runs, CSS px. The companion to
+ *  {@link stationChromeHeight}, extracted for the same reason (a0-116): a second
+ *  caller now needs the cluster's DRAWN width, and `./hud` `drawStationChrome`
+ *  had the only copy of the arithmetic. */
+export function stationChromeWidth(scale: number): number {
+  return HP_BAR_WIDTH + hudSpace(STATION_CHROME_PAD_X, { scale });
+}
+
+/**
+ * The HOME cluster's whole DRAWN footprint — the scrim, the rule that closes it
+ * and everything inside them. This is the rect `station-hp` registers
+ * (`Hud.describeLayout` reads the group's bounds, and the group's widest, deepest
+ * child is its chrome), which makes it the rect anything else on screen has to
+ * clear.
+ *
+ * Distinct from {@link stationHpBounds}, which is the *ink* — the label and the
+ * bars — and answers the anchor question ("does own-station HP stay in the
+ * top-right zone"). a0-116 needs the other one: the closing rule is drawn 3px
+ * under the bar, so a mark cleared to the ink's edge is a mark standing on the
+ * rule.
+ *
+ * `labelWidth` is `HOME` / `HOME LOST` as measured; the chrome is wider than
+ * either at every size the HUD draws, but the union is taken rather than assumed
+ * for the same reason `stationHpBounds` takes it.
+ */
+export function stationHpFootprint(viewportWidth: number, scale: number, labelWidth = 0): Rect {
+  const width = Math.max(stationChromeWidth(scale), labelWidth);
+  return {
+    x: viewportWidth - HUD_PAD - width,
+    y: HUD_PAD,
+    width,
+    height: stationChromeHeight(scale),
+  };
+}
+
 export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
   const width = Math.max(HP_BAR_WIDTH, labelWidth);
   return {

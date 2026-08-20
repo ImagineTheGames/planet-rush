@@ -56,6 +56,7 @@ import {
   ARROW_SIZE,
   arrowClearOfReadouts,
   ARROW_READOUT_PAD,
+  stationHpFootprint,
   PANEL_MAX_WIDTH,
   PANEL_EDGE_PAD,
   HUD_PAD,
@@ -2425,10 +2426,14 @@ describe('the screen-edge arrow and the readouts it rides past (a0-116)', () => 
         r: { x: HUD_PAD, y: HUD_PAD, width: ore.ground.width, height: ore.ground.height },
       },
       { id: 'wave-clock', r: waveClockLayout(b.width, b.height, clockLines(inner), false).bounds },
-      // The HOME cluster's INK — label plus bars. Its scrim runs deeper, down to
-      // the zoom control, but darkness is not something a mark can make
-      // illegible; the yield should cost only what the words cost.
-      { id: 'station-hp', r: stationHpBounds(b.width, textWidth('HOME', eyebrow(inner))) },
+      // The HOME cluster's whole drawn footprint, not `stationHpBounds`' ink:
+      // the cluster's closing rule is drawn 3px under the bar, so an arrow
+      // cleared to the ink is an arrow standing on the rule. The evidence bench
+      // is where that was found out — see the a0-116 README.
+      {
+        id: 'station-hp',
+        r: stationHpFootprint(b.width, m.scale, textWidth('HOME', eyebrow(inner))),
+      },
     ];
     const zoom = zoomControlBounds(b.width, b.height, isTouch);
     if (zoom) out.push({ id: 'zoom-control', r: zoom });

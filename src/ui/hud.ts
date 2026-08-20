@@ -124,7 +124,8 @@ import {
   ARROW_SIZE,
   arrowPoly,
   arrowClearOfReadouts,
-  stationHpBounds,
+  stationChromeWidth,
+  stationHpFootprint,
   ALARM_FRAME_INSET,
   ALARM_FRAME_STROKE,
   HUD_PAD,
@@ -1239,7 +1240,10 @@ export class Hud extends Container {
    *  the readout's right edge, so the cluster runs leftward from 0. */
   private drawStationChrome(): void {
     const m = this.metrics;
-    const width = HP_BAR_WIDTH + hudSpace(18, m);
+    // One arithmetic for the cluster's width: `stationHpFootprint` reports the
+    // rect this draws, and a0-116's arrow yields to that rect (a0-74's note about
+    // the depth, now true of the width as well).
+    const width = stationChromeWidth(m.scale);
     const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
     g.clear();
@@ -2377,7 +2381,7 @@ export class Hud extends Container {
    *
    * **From the layouts, not from `getBounds()`.** Each rect is the one the
    * element's own geometry function returned when `layout()`/`update()` placed it
-   * — `oreCounterLayout`'s ground, `waveClockLayout`'s bounds, `stationHpBounds`,
+   * — `oreCounterLayout`'s ground, `waveClockLayout`'s bounds, `stationHpFootprint`,
    * `zoomControlBounds` — so the rect the arrow yields to is the rect the view
    * drew, and a headless test can compute both from the same functions. (a0-115
    * measures its keep-out off the live display objects instead, because a
@@ -2385,10 +2389,14 @@ export class Hud extends Container {
    * the two want to become one call; noted in that PR and this one.)
    *
    * Hidden groups are left out: an element that is not drawn is not in the way.
-   * The station's rect is its INK — the `HOME` label and the bars — and not the
-   * scrim's full depth, which runs on down to the zoom control: darkness is not
-   * something the arrow can make illegible, and the yield should cost only what
-   * the words cost.
+   *
+   * Each rect is the element's whole drawn footprint — the scrim and the rule as
+   * well as the type. It is tempting to yield only to the ink, since darkness is
+   * not something a mark can make illegible, and on the first cut this did
+   * exactly that for the HOME cluster. The specimen said no: `stationHpBounds`
+   * stops at the bar, the cluster's closing rule is drawn 3px below it, and an
+   * arrow cleared to the ink lands on that rule. A readout's footprint is what it
+   * draws, and the three that carry chrome all draw a rule inside it.
    */
   private arrowKeepOut(): Rect[] {
     const box = this.content;
@@ -2407,7 +2415,9 @@ export class Hud extends Container {
     const clock = this.clockLayout;
     // Already content space — `updateWave` lays the strip out on the box.
     if (clock) out.push(clock.bounds);
-    if (this.stationGroup.visible) out.push(stationHpBounds(box.width, this.stationLabel.width));
+    if (this.stationGroup.visible) {
+      out.push(stationHpFootprint(box.width, this.metrics.scale, this.stationLabel.width));
+    }
     // …and back out of screen space, the one offset `updateZoomControl` added.
     const zoom = this.zoomRect;
     if (zoom && this.zoomGroup.visible) out.push({ ...zoom, x: zoom.x - box.x });
