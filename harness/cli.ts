@@ -456,8 +456,19 @@ const A0112_DATA = 'tests/reports/a0-112-data';
 const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice', 'cast', 'a0107'] as const;
 type A0112Section = (typeof A0112_SECTIONS)[number];
 
+/**
+ * Where section artifacts land, overridable with `--data DIR` (a0-117).
+ *
+ * a0-112's artifacts are committed evidence for a published report, and a tuning
+ * pass runs the same sections twice — once before it moves a constant and once
+ * after. Writing both into `a0-112-data/` would overwrite the very numbers the
+ * after-run has to be compared against, so a run says where its artifacts go and
+ * the default is unchanged: a bare `mirrors <section>` still files a0-112's.
+ */
+let dataDir: string = A0112_DATA;
+
 function a0112Path(section: string): string {
-  return resolve(ROOT, A0112_DATA, `${section}.json`);
+  return resolve(ROOT, dataDir, `${section}.json`);
 }
 
 function writeJson(path: string, value: unknown): void {
@@ -1172,8 +1183,8 @@ function pay(seedCount: number): number {
 
 function usage(): number {
   log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay|mirrors> [args]');
-  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n]   # run one a0-112 section');
-  log('  mirrors report [--out FILE]                            # render the a0-112 report');
+  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n] [--data DIR]  # run one section');
+  log('  mirrors report [--out FILE] [--data DIR]               # render the report from artifacts');
   return 2;
 }
 
@@ -1201,6 +1212,8 @@ function main(argv: readonly string[]): number {
     case 'mirrors': {
       const sub = rest[0] ?? '';
       const outFlag = rest.indexOf('--out');
+      const dataFlag = rest.indexOf('--data');
+      if (dataFlag >= 0) dataDir = rest[dataFlag + 1] ?? A0112_DATA;
       if (sub === 'report') return mirrorsReport(outFlag >= 0 ? (rest[outFlag + 1] ?? null) : null);
       if (!(A0112_SECTIONS as readonly string[]).includes(sub)) return usage();
       const seedsFlag = rest.indexOf('--seeds');
