@@ -1086,6 +1086,19 @@ export type {
   SessionLinkState,
 } from './log-offer';
 
+// Where a REFUSAL's own buttons may stand on the entry screen (a0-114) — the same
+// rule again, one screen further out: a0-97 took it off DONE, a0-98 took it off the
+// minimap, and this takes it off the door the player pressed.
+export {
+  NO_STRIP,
+  REFUSAL_MAX_BAND_SHARE,
+  contentTopBelow,
+  overlaps,
+  refusalCovers,
+  refusalStrip,
+} from './refusal-strip';
+export type { RefusalStripInput } from './refusal-strip';
+
 export {
   CONNECTION_STATUS_ID,
   connectionStatusHitTest,
