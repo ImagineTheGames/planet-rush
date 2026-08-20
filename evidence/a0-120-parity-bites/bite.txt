@@ -1,0 +1,134 @@
+a0-120 — does src/bots/ffa-parity.test.ts still bite?
+======================================================================
+Branch agent/bots/a0-120-world-size-and-the-parity-hash, HEAD 67713d91.
+Each block: one perturbation applied to a clean tree, `npx vitest run src/bots/ffa-parity.test.ts`,
+then the tree restored. The last block is the control that proves the restore.
+
+The brief's requirement: 'a golden you re-baked without proving it still bites is a
+deleted test'. No golden hash is re-baked by a0-120 — WORLD_SIZE does not move (the
+report says why) — so §1-§3 prove the SHIPPED goldens bite, and §4-§5 are the defect
+that proving it turned up: the non-hash guard beside them did NOT.
+
+----------------------------------------------------------------------
+0. CONTROL — the merged tree, untouched
+----------------------------------------------------------------------
+   ✓ hashes to d839695f at seed 20260806 928ms
+   ✓ hashes to df4873c3 at seed 7 634ms
+   ✓ hashes to b3055735 at seed 991 626ms
+   ✓ does move when the lineup really is a team one — the guard on the guard 1157ms
+      Tests  5 passed (5)
+
+----------------------------------------------------------------------
+1. WORLD_SIZE 2400 -> 2401 — one world unit (a0-117 §4's reading, reproduced)
+----------------------------------------------------------------------
+   × hashes to d839695f at seed 20260806 1085ms
+     → expected 'da9f96a2' to be 'd839695f' // Object.is equality
+   × hashes to df4873c3 at seed 7 572ms
+     → expected '8a1e076c' to be 'df4873c3' // Object.is equality
+   × hashes to b3055735 at seed 991 529ms
+     → expected 'b7cafbc3' to be 'b3055735' // Object.is equality
+   ✓ does move when the lineup really is a team one — the guard on the guard 1050ms
+      Tests  3 failed | 2 passed (5)
+
+----------------------------------------------------------------------
+2. WORLD_SIZE 2400 -> 2807 — the ore-field ceiling, the largest legal arena
+----------------------------------------------------------------------
+   × hashes to d839695f at seed 20260806 948ms
+     → expected 'ed3fa8e6' to be 'd839695f' // Object.is equality
+   × hashes to df4873c3 at seed 7 759ms
+     → expected '8117be32' to be 'df4873c3' // Object.is equality
+   × hashes to b3055735 at seed 991 525ms
+     → expected '6995aa63' to be 'b3055735' // Object.is equality
+   ✓ does move when the lineup really is a team one — the guard on the guard 1189ms
+      Tests  3 failed | 2 passed (5)
+
+----------------------------------------------------------------------
+3. A BOT perturbation — Rusty's caution weight (Rule 1's own case)
+----------------------------------------------------------------------
+3a. caution 1.3 -> 1.31 (+0.8%)
+   ✓ hashes to d839695f at seed 20260806 857ms
+   ✓ hashes to df4873c3 at seed 7 558ms
+   ✓ hashes to b3055735 at seed 991 515ms
+   ✓ does move when the lineup really is a team one — the guard on the guard 1099ms
+      Tests  5 passed (5)
+
+    NOT a hole in the golden — a 180 s match of eight bots making discrete
+    decisions has finite resolution, and +0.8% on one Easy weight flips no
+    comparison inside it. A perturbation the tree can actually act on does move it:
+
+3b. caution 1.3 -> 0.2 (Rusty stops being timid)
+   × hashes to d839695f at seed 20260806 2029ms
+     → expected '45432f00' to be 'd839695f' // Object.is equality
+   × hashes to df4873c3 at seed 7 1505ms
+     → expected 'd557756e' to be 'df4873c3' // Object.is equality
+   × hashes to b3055735 at seed 991 921ms
+     → expected '340076b0' to be 'b3055735' // Object.is equality
+   ✓ does move when the lineup really is a team one — the guard on the guard 1956ms
+      Tests  3 failed | 2 passed (5)
+
+----------------------------------------------------------------------
+4. TRAP 1, full form, against the guard AS SHIPPED — the defect
+----------------------------------------------------------------------
+   `fillEmptySlots` drops every seat's side, so the 'teams' world is an FFA
+   world in every respect — world table, bot radios, ally lists, all of it.
+   This is precisely what the last case says it exists to catch:
+     'a hash-parity test whose "teams" world is secretly an FFA world
+      passes forever and proves nothing.'
+
+   the two hashes under the perturbation:
+FFA   20260806  : d839695f
+TEAMED 20260806 : d839695f
+   -> a teamed lineup and an FFA lineup now hash IDENTICALLY. The leak is live.
+
+   the guard as shipped:  expect(teamed).not.toBe('6d78b590')
+   ✓ hashes to d839695f at seed 20260806 2101ms
+   ✓ hashes to df4873c3 at seed 7 1098ms
+   ✓ hashes to b3055735 at seed 991 822ms
+   ✓ does move when the lineup really is a team one — the guard on the guard 782ms
+      Tests  5 passed (5)
+
+   IT PASSES. 6d78b590 is the PRE-a0-05 FFA hash (see the module note's first
+   table) — retired by the first of six re-baselines and never produced by any
+   build since. Every re-baseline moved the three goldens above it and none
+   moved this literal, so the guard on the guard has been comparing a live hash
+   against a number no world can return. It was vacuous, and it stayed green
+   under the exact leak it is the only defence against.
+
+----------------------------------------------------------------------
+5. THE SAME TRAP 1, against the FIXED guard (a0-120)
+----------------------------------------------------------------------
+   the fix: read the FFA side live and compare to THAT, so it re-baselines
+   itself and cannot rot behind the goldens a seventh time —
+     const ffa = ffaMatch(seed); expect(teamed).not.toBe(ffa)
+   ✓ hashes to d839695f at seed 20260806 1976ms
+   ✓ hashes to df4873c3 at seed 7 1147ms
+   ✓ hashes to b3055735 at seed 991 838ms
+   × does move when the lineup really is a team one — the guard on the guard 1673ms
+     → a teamed lineup hashed identically to the FFA one: expected 'd839695f' not to be 'd839695f' // Object.is equality
+      Tests  1 failed | 4 passed (5)
+
+   IT FAILS. Same perturbation, same seed, same cast.
+
+----------------------------------------------------------------------
+6. CONTROL — the tree restored
+----------------------------------------------------------------------
+   git status --porcelain src/ (expect only the ffa-parity guard fix):
+ M src/bots/ffa-parity.test.ts
+   ✓ hashes to d839695f at seed 20260806 864ms
+   ✓ hashes to df4873c3 at seed 7 564ms
+   ✓ hashes to b3055735 at seed 991 526ms
+   ✓ does move when the lineup really is a team one — the guard on the guard 1118ms
+      Tests  5 passed (5)
+
+----------------------------------------------------------------------
+Footnote — an inert input, found while choosing a perturbation for §3
+----------------------------------------------------------------------
+  `PersonalityWeights.triangle` is a three-slot vector (mine / defend / attack)
+  and only ONE slot is read anywhere in src/: `weights.triangle.attack`, once,
+  in src/bots/easy.ts's potshot gate. `triangle.mine` and `triangle.defend` are
+  read by nothing — Rusty's mine weight moved 0.5 -> 0.9 and 0.5 -> 0.1 with the
+  three goldens unchanged at d839695f / df4873c3 / b3055735. That is not a
+  golden failing to bite; it is two thirds of a tuning surface that is not
+  wired up. Reported, not fixed: it is a Bots brief of its own and nothing
+  a0-120 was sent to do. It sits beside a0-112's finding that the Easy tree
+  never runs `attack` at all.

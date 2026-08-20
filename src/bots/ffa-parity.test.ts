@@ -225,6 +225,42 @@
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
  * team again would sail through every assertion above.
+ *
+ * ### NOT re-baselined, 2026-08-20 (a0-120) — and the guard above was repaired
+ *
+ * a0-120 was sent to turn `WORLD_SIZE` — the one constant a0-117 measured that
+ * brings the `excavator` back inside GDD §2.11's 55% band — and to re-baseline
+ * these three goldens for it, because a changed arena legitimately changes a
+ * state hash. **The goldens did not move, because the constant did not.** The
+ * arena that lands the hull at 55% is larger than the arena in which a player
+ * parked on their own berth can still see their own ore field, so there is no
+ * value that satisfies both and nothing was shipped. The measurement, both
+ * ceilings, and the reasoning are in `tests/reports/a0-120-world-size.md`; the
+ * tripwire that will catch the next attempt is `./berth-ore-visibility.test.ts`.
+ *
+ * **What it did move is the last case, and that is the part worth reading.** The
+ * brief's rule for a re-baseline is *"a golden you re-baked without proving it
+ * still bites is a deleted test"*, so before touching anything a0-120 went and
+ * proved it — five perturbations, each applied to a clean tree, in
+ * `evidence/a0-120-parity-bites/bite.txt`. The three hashes bite exactly as
+ * advertised: `WORLD_SIZE` +1 unit fails all three, and so does one Easy
+ * personality weight moved far enough for a 180-second match to act on it.
+ *
+ * The guard on the guard did **not**. It read `expect(teamed).not.toBe(
+ * '6d78b590')`, and `6d78b590` is the *pre-a0-05* FFA hash from the first table
+ * in this note — retired by the first of the six re-baselines above and never
+ * produced by any build since. Each subsequent re-baseline moved the three
+ * goldens and left this literal where it was, so the assertion had been
+ * comparing a live hash against a number no world could return. Staged against
+ * Trap 1 in its full form — every seat's side dropped, so the "teams" world is
+ * an FFA world in world table, radios and ally lists alike, and `teamed` comes
+ * back as `d839695f`, the FFA golden itself — **it passed** (§4 of the evidence).
+ * The one defence against the failure this whole file exists to prevent had been
+ * green through it for four days short of two weeks.
+ *
+ * It now reads the FFA side live and compares against that, which fails on the
+ * same perturbation (§5) and — the point — re-baselines itself, so it cannot rot
+ * behind these goldens a seventh time. No hash moved to fix it.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -304,7 +340,24 @@ describe('FFA is byte-identical to the pre-Stage-1 build (Task 1.6)', () => {
     // that notices: same seed, same cast, same seats, one side table, and the
     // match must diverge. A hash-parity test whose "teams" world is secretly an
     // FFA world passes forever and proves nothing.
-    const teamed = ffaMatch(20260806, [0, 0, 0, 0, 1, 1, 1, 1]);
-    expect(teamed).not.toBe('6d78b590');
+    //
+    // **Compared against the FFA hash measured HERE, not a literal** (a0-120).
+    // This case used to read `.not.toBe('6d78b590')`, and 6d78b590 is the
+    // *pre-a0-05* FFA hash — a value nothing on this tree has produced since the
+    // first re-baseline in the module note above. Six re-baselines moved the
+    // goldens and none of them moved this literal, so the guard had been
+    // comparing against a number no world could return: with `botLobby`
+    // dropping the team, `teamed` degenerates to the current FFA hash
+    // (d839695f), which is still not 6d78b590, and the case passed. It was
+    // measured going green under exactly the leak it exists to catch
+    // (`evidence/a0-120-parity-bites/bite.txt` §4).
+    //
+    // Reading the FFA side live fixes that for good: the comparison is now to
+    // whatever this build's FFA is, so it re-baselines itself and cannot rot
+    // out of date behind the goldens a seventh time.
+    const seed = GOLDEN[0]![0];
+    const ffa = ffaMatch(seed);
+    const teamed = ffaMatch(seed, [0, 0, 0, 0, 1, 1, 1, 1]);
+    expect(teamed, 'a teamed lineup hashed identically to the FFA one').not.toBe(ffa);
   });
 });
