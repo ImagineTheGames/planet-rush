@@ -46,6 +46,8 @@ import {
 } from './mirrors';
 import { A0105_DEATH_SEEDS, A0107_SLICE_SEEDS } from './mirrors';
 import type { MatchRow, PriorNumber, SectionRun } from './mirrors';
+import type { Change, Lever, Pair } from './tuning';
+import { renderTuningReport } from './tuning';
 import { digestDiff, stateDigest } from './hash';
 import { mirrorLineup, recordMatch, replay, roundRobinLineup, runMatch, seedRange } from './match';
 import type { MatchResult } from './match';
@@ -456,8 +458,19 @@ const A0112_DATA = 'tests/reports/a0-112-data';
 const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice', 'cast', 'a0107'] as const;
 type A0112Section = (typeof A0112_SECTIONS)[number];
 
+/**
+ * Where section artifacts land, overridable with `--data DIR` (a0-117).
+ *
+ * a0-112's artifacts are committed evidence for a published report, and a tuning
+ * pass runs the same sections twice — once before it moves a constant and once
+ * after. Writing both into `a0-112-data/` would overwrite the very numbers the
+ * after-run has to be compared against, so a run says where its artifacts go and
+ * the default is unchanged: a bare `mirrors <section>` still files a0-112's.
+ */
+let dataDir: string = A0112_DATA;
+
 function a0112Path(section: string): string {
-  return resolve(ROOT, A0112_DATA, `${section}.json`);
+  return resolve(ROOT, dataDir, `${section}.json`);
 }
 
 function writeJson(path: string, value: unknown): void {
@@ -805,6 +818,316 @@ function mirrorsReport(outPath: string | null): number {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, md, 'utf8');
   log(`mirrors report: wrote ${path} (${md.split('\n').length} lines)`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// tuning — the a0-117 before/candidate report
+// ---------------------------------------------------------------------------
+
+/** Where a0-117 files its two artifact sets. Committed, same reasoning as
+ *  a0-112's: a reader who distrusts a table can recompute it without a run. */
+const A0117_BEFORE = 'tests/reports/a0-117-data/before';
+const A0117_AFTER = 'tests/reports/a0-117-data/candidate-w3400';
+
+/** The label the report gives the right-hand column of every table. It is a
+ *  CANDIDATE, not an after: nothing under `src/` moved (see `A0117_CHANGED`). */
+const A0117_CANDIDATE = '`WORLD_SIZE` 3400 (candidate — NOT shipped)';
+
+function a0117Pair(dir: string, other: string, section: A0112Section): Pair {
+  const read = (d: string): SectionRun =>
+    JSON.parse(readFileSync(resolve(ROOT, d, `${section}.json`), 'utf8')) as SectionRun;
+  return { before: read(dir), after: read(other) };
+}
+
+/** The brief asks for "every constant you changed, its before and after value,
+ *  and the reason". The answer is none, and the reason is one sentence per row. */
+const A0117_CHANGED: readonly Change[] = [
+  {
+    name: '(none)',
+    before: '—',
+    after: '—',
+    why:
+      'No value in `src/sim/constants.ts` moved. Every value that moves the `excavator` ' +
+      'fails a test in a file this lane does not own — §4 prices each one and names what ' +
+      'stops it, and §5 says what it would take.',
+  },
+];
+
+const A0117_VERDICT =
+  '**NONE of the three is inside the band, because this pass shipped no tuning at all: the ' +
+  '`excavator` is still 77.3% of the ship-class contest and 88.3% of the cast contest, Warden ' +
+  '73.1%, Bolt 83.3% of a pool that now mostly draws.** Not for want of a dial — `WORLD_SIZE` ' +
+  '2400 → 3400 puts the hull at **51.8%** and drags Warden to **30.5%** with it, measured on ' +
+  'a0-112’s own seeds — but **every constant that moves the hull fails a test in a file this ' +
+  'lane may not edit**, and the bluntest of them, `src/bots/ffa-parity.test.ts`, fails on ' +
+  '`WORLD_SIZE` 2400 → **2401**. §4 prices every lever, §5 says what it would take.';
+
+const A0117_HEADLINE =
+  '**The lever exists, was found, and was measured: `WORLD_SIZE` 2400 → 3400 takes the ' +
+  '`excavator` from 77.3% to 51.8% on the same seeds, with the median match unmoved at 13:41 ' +
+  'and 100% of matches still inside 10–15 minutes.** It is not shipped, because a state-hash ' +
+  'golden owned by another lane fails on a one-unit change to the same constant, and because ' +
+  'past ~3150 a ship parked on its own berth can no longer see its own ore field. Both are ' +
+  'measured below. The right-hand column of every table is therefore a **candidate**, run on ' +
+  'a0-112’s own seeds so the size of the prize is on the record for whoever gets to take it.';
+
+const A0117_LEVERS: readonly Lever[] = [
+  { constant: 'WORLD_SIZE', from: '2400', to: '3400', excavator: '**51.8%**', matches: 253,
+    blockedBy: '`src/bots/ffa-parity.test.ts` (3 goldens) **and** `src/sim/radar-fog.test.ts` — see §5' },
+  { constant: 'WORLD_SIZE', from: '2400', to: '3200', excavator: '56.6%', matches: 256,
+    blockedBy: 'same two — still over 55% in any case' },
+  { constant: 'WORLD_SIZE', from: '2400', to: '3100', excavator: '63.0%', matches: 254,
+    blockedBy: '`src/bots/ffa-parity.test.ts`, `src/bots/defender-role.test.ts`, `src/bots/team-winning.test.ts`' },
+  { constant: 'WORLD_SIZE', from: '2400', to: '3000', excavator: '71.9%', matches: 64, blockedBy: '`src/bots/ffa-parity.test.ts`' },
+  { constant: 'WORLD_SIZE', from: '2400', to: '2401', excavator: 'not measured', matches: 0,
+    blockedBy: '**`src/bots/ffa-parity.test.ts` — 3 of 3 goldens fail on ONE world unit**' },
+  { constant: 'BASE_TURN_RATE', from: '6.5', to: '2.6', excavator: '65.6%', matches: 64,
+    blockedBy: '`src/sim/step.test.ts` — the slowest hull gets 40 ticks to cover π, so the floor is **5.89**' },
+  { constant: 'BASE_TURN_RATE', from: '6.5', to: '5.9', excavator: '75.0%', matches: 64,
+    blockedBy: '`src/bots/ffa-parity.test.ts` (the whole legal move is worth 4.7 pts)' },
+  { constant: 'SHIP_WEAPON.projectileSpeed', from: '520', to: '380', excavator: '67.2%', matches: 64,
+    blockedBy: '`src/net/snapshot.test.ts` — `× max(SHOT_SPEED_STEPS)` must be **exactly 676**' },
+  { constant: 'WEAPON_RANGE', from: '260', to: '400', excavator: '65.6%', matches: 64,
+    blockedBy: '`src/bots/commitment.test.ts`, `src/bots/field-division.test.ts`, `src/sim/blockade.test.ts`' },
+  { constant: 'RESOURCE_FIELD.commonsShare', from: '0.6', to: '0.45', excavator: '68.8%', matches: 64,
+    blockedBy: '`commonsMinShare` = 0.5 is the stated floor; and `src/bots/team-winning.test.ts`' },
+  { constant: 'RESOURCE_FIELD.commonsShare', from: '0.6', to: '0.5', excavator: '62.7%', matches: 255,
+    blockedBy: '`src/bots/ffa-parity.test.ts` (and worth ~0 on its own — see §4’s note)' },
+  { constant: 'MINING_RATE', from: '0.5', to: '0.35', excavator: '75.0%', matches: 64,
+    blockedBy: '`content/codex/codex-systems.json` pins the value — another lane’s file (`tests/codex/codex-constants.test.ts`)' },
+  { constant: 'REPAIR_HP_PER_ORE', from: '15', to: '8', excavator: '84.4% (**worse**)', matches: 64,
+    blockedBy: 'codex-pinned — and it moves the wrong way' },
+  { constant: 'UPGRADES[Power].steps', from: '[1, 1.25, 1.5, 1.8]', to: '[1, 1.12, 1.24, 1.36]', excavator: '79.7% (**no move**)', matches: 64,
+    blockedBy: '`src/ui/upgrade-wheel.test.ts` pins the first step’s readout at `13` — and it buys nothing anyway' },
+  { constant: 'UPGRADES[Power].costs', from: '[4, 8, 14]', to: '[8, 16, 28]', excavator: '81.3% (**worse**)', matches: 64,
+    blockedBy: '`src/sim/upgrades.test.ts` — the first tier must cost ≤ a shield (5)' },
+  { constant: 'SHIP_WEAPON.fireInterval', from: '0.35', to: '0.7', excavator: '76.6%', matches: 64,
+    blockedBy: '`src/sim/projectiles.test.ts` — a 0.35-ore chip against `CHUNK.ore` = 1 **loses ore**; conservation is a CI invariant' },
+  { constant: 'SHIP_RADIUS', from: '16', to: '10', excavator: '78.1%', matches: 64,
+    blockedBy: 'style-guide §5.3 — silhouette at 24 px is load-bearing; and it buys 1.6 pts' },
+  { constant: 'BASE_ACCEL', from: '900', to: '400', excavator: '74.6%', matches: 63,
+    blockedBy: '11 tests across `src/sim`, `src/bots`, `src/net`' },
+  { constant: 'DRAG', from: '3.0', to: '6.0', excavator: '81.3% (**worse**)', matches: 64, blockedBy: 'moves the wrong way' },
+  { constant: 'COLLAPSE_GRACE_S', from: '150', to: '45', excavator: '75.0%', matches: 64,
+    blockedBy: '**nothing** — the only lever measured that clears every pin. It buys 4.7 pts and costs two minutes of median match length.' },
+  { constant: 'SHIP_STATS.excavator.*', from: 'the §2.11 row', to: 'anything', excavator: 'not measured', matches: 0,
+    blockedBy: '`src/sim/upgrades.test.ts` transcribes GDD §2.11 by hand and compares — the class table is the DESIGN, not a QA dial' },
+];
+
+/**
+ * The hand-written half — QA's reading of the tables. It lives here for the same
+ * reason a0-112's does: regenerating the report must reproduce the whole file,
+ * not the half of it a script can compute.
+ */
+const A0117_READING: readonly string[] = [
+  '*Hand-written. Every number it quotes is in a table above or below.*',
+  '',
+  '### The baseline reproduces — with one correction to a0-112 that changes a headline number',
+  '',
+  'Re-running a0-112\u2019s seven sections on a0-112\u2019s own seeds, on today\u2019s tree, every one of',
+  'the 1164 matches ends at the **identical sim second**: the simulation has not drifted.',
+  'But **129 matches a0-112 credited to a winner are now DRAWS** \u2014 62 in the mirrors, 66 in',
+  'the equal-skill contests, 1 in the cast \u2014 because **a0-113 retired the `lastToDie`',
+  'tiebreak** after a0-112 was written. Read that before reading anything else here:',
+  '',
+  '- the **ship-class contest is untouched**: 0 matches changed, and the `excavator`\u2019s',
+  '  198/256 = **77.3%** reproduces digit for digit;',
+  '- the **cast contest** moved by one match: Warden **73.1%** against a0-112\u2019s 73.2%;',
+  '- the **easy pool did not survive**. 52 of its 64 matches are now draws, so a0-112\u2019s',
+  '  "Bolt 47/64 = 73.4%" is **not reproducible and must not be quoted as a before-number**.',
+  '  Bolt is now 10 of the 12 that still decide \u2014 **83.3%**, on a denominator small enough',
+  '  that \u00b11 SE is 10.8 points. It is over the band either way; how far over is no longer',
+  '  a number anyone should lean on.',
+  '',
+  '### Why the `excavator` wins, measured rather than assumed (`harness/hull-diag.ts`)',
+  '',
+  'A win rate names a winner and nothing else, and the dial that closes an economy lead is',
+  'not the dial that closes a combat lead \u2014 so the first job was to find out which this is.',
+  'Six seeds \u00d7 four rotations of the ship-class lineup, reading the world after each tick',
+  'and writing nothing back:',
+  '',
+  '| hull | win% | ore acquired | upgrade tiers | defences | core HP at collapse | deaths |',
+  '|---|---|---|---|---|---|---|',
+  '| interceptor | 12.5 | 32.0 | 1.4 | 0.3 | 16.2 | 18.4 |',
+  '| vanguard | 4.2 | 38.7 | 1.9 | 0.4 | 16.3 | 16.6 |',
+  '| **excavator** | **83.3** | **88.6** | **6.2** | **1.7** | **59.9** | 20.4 |',
+  '| hauler | 0.0 | 23.5 | 1.2 | 0.2 | 11.0 | 11.3 |',
+  '',
+  '**A 1.3\u00d7 mining stat becomes a 2.3\u20133.8\u00d7 share of a finite field**, six upgrade tiers',
+  'against everyone else\u2019s one and a half, and **3.7\u00d7 the core HP at the moment collapse',
+  'opens** \u2014 and the last home standing is the winner. The excavator does not out-shoot the',
+  'field. It out-*earns* it and then out-lasts it.',
+  '',
+  '### And yet the economy dials do nothing \u2014 the movement is all in the movement stats',
+  '',
+  'That reading predicts an economy fix, and the economy fix does not work. `MINING_RATE`',
+  '\u221230% is worth 4.7 points; flattening the DAMAGE ladder is worth **zero**; raising its',
+  'cost, and cutting what a repair buys, both make it **worse** (\u00a74). What moves the number',
+  'is anything that makes a hull\u2019s speed and turn columns cost something \u2014 turn rate,',
+  'shot speed, weapon range, arena size.',
+  '',
+  '**The mechanism is that bots aim manually.** `src/bots/steering.ts` emits `aim` +',
+  '`fire{auto:false}`, so a bot\u2019s shot goes down its barrel and its turn rate decides',
+  'whether it can hit at all. At `BASE_TURN_RATE` 6.5 a hull flips 180\u00b0 in 0.48 s, so the',
+  'excavator\u2019s ratified 90%/80% speed-and-turn cost is **inert**, and GDD \u00a72.11\u2019s',
+  '*"out-earns everyone but can\u2019t run"* is a sentence with no mechanism behind it. The ore',
+  'lead is the *consequence* of winning at the rock face for free, not the cause.',
+  '',
+  '### `WORLD_SIZE` is the dial, and it is the one the design already implies',
+  '',
+  'Everything the arena *contains* is a fraction of `WORLD_SIZE` \u2014 the station ring, the home',
+  'fields, the commons \u2014 so its shape is unchanged. What does **not** scale with it is',
+  '`BASE_SPEED`, `WEAPON_RANGE` and the sensor radii. A bigger arena is therefore exactly',
+  'where "can\u2019t run" starts to cost something, and the spread it produces is healthy rather',
+  'than inverted: at 3400 the excavator is still the best hull at 51.8%, the hauler reads',
+  '20.6%, the vanguard 17.4%, and the interceptor \u2014 "catches miners in the open" \u2014 goes',
+  '2.7% \u2192 10.3%. **Nothing was over-corrected into a hull nobody picks.** The match-length',
+  'target is untouched: median 13:41 against 13:33, 100% of matches inside 10\u201315 minutes,',
+  'zero hangs, because the ending is anchored to the wave schedule and not to travel.',
+  '',
+  '### The brief\u2019s order was right: fix the hull and the cast contest follows it',
+  '',
+  'The brief said do the hull first and re-measure the characters afterwards, because the',
+  'two character numbers are measured on a cast that can pick the excavator. Run on the',
+  'candidate, on the same seeds, that is exactly what happens \u2014 and nothing about a',
+  'character\u2019s tree was touched to make it happen:',
+  '',
+  '- **Warden falls from 73.1% to 30.5% and is INSIDE the band** (\u00a72.3). No character nerf',
+  '  was applied, considered, or needed; the number was a hull number wearing a name.',
+  '- **Foreman \u2014 the other excavator \u2014 becomes the top of the cast at 32.7%**, also inside.',
+  '  The cast contest goes from one character taking three matches in four to a seven-way',
+  '  spread of 32.7 / 30.5 / 10.0 / 9.1 / 6.8 / 6.4 / 4.5. Every tier lands inside too',
+  '  (\u00a72.4): medium 42.7%, hard 41.8%, easy 15.5%, against 76.7% for hard before.',
+  '- **The `excavator` silhouette still takes 63.2% of the cast contest** (\u00a72.2) against',
+  '  51.8% of the ship-class contest, and that gap is the honest residue: the cast seats two',
+  '  excavators out of eight, so the hull\u2019s share of a cast board is structurally higher',
+  '  than its share of an equal-hull board. One dial does not close both.',
+  '- **Bolt cannot be measured at all on the candidate.** All 64 easy-pool matches end in a',
+  '  DRAW (they were 52 of 64 already on the shipped tree \u2014 a0-113). Two Easy bots on one',
+  '  hull in a bigger arena simply never finish each other, and collapse takes the last two',
+  '  cores in the same tick. That is not a balance reading and must not be reported as one:',
+  '  **the Easy pool is a Bots question about two trees that cannot close a match**, and it',
+  '  is the one of the three targets that a constant was never going to reach.',
+  '',
+  '### Why it is not shipped',
+  '',
+  '**`src/bots/ffa-parity.test.ts` hashes a 180-second eight-bot FFA match of the shipped',
+  'cast to three literal `hashState` goldens**, and its header says in terms: *"Do not',
+  're-baseline these. The only thing that has ever earned it is a ratified amendment in',
+  '`docs/design-amendments.md`."* It is the Bot Engineer\u2019s file. Measured on the clean tree,',
+  'one constant at a time:',
+  '',
+  '| one-line change | `ffa-parity` |',
+  '|---|---|',
+  '| `WORLD_SIZE` 2400 \u2192 **2401** \u2014 one world unit | **3 of 3 goldens FAIL** |',
+  '| `BASE_TURN_RATE` 6.5 \u2192 6.4 | **3 of 3 goldens FAIL** |',
+  '| `COLLAPSE_GRACE_S` 150 \u2192 45 | 5 passed \u2014 the golden match is 180 s long and collapse cannot open before wave 5 at 600 s |',
+  '',
+  '**So the tuning surface this lane can actually reach is: values the simulation does not',
+  'read in the first three minutes of an FFA match.** In practice that is the collapse',
+  'constants and nothing else. The one that clears every pin, `COLLAPSE_GRACE_S` 150 \u2192 45,',
+  'buys 4.7 points and takes **two minutes off the median match** \u2014 trading one target for',
+  'another to get a fifth of the way to a third. It is not taken, and \u00a74 records it so that',
+  'the next pass does not have to re-derive it.',
+  '',
+  '**There is a second, independent ceiling, and it is a real invariant rather than a stale',
+  'assertion.** The home field is placed as a fraction of the station ring, which is a',
+  'fraction of `WORLD_SIZE`; `SHIP_SENSOR_RANGE` (520) and `STATION_SENSOR_RANGE` (300) are',
+  'absolute. Past ~3150 a ship parked on its own berth senses **no ore at all** and its own',
+  'field goes dark on the minimap \u2014 `src/sim/radar-fog.test.ts` passes at 3100 and fails at',
+  '3200. Both radii are `content/codex/*.json` facts, so they cannot be scaled to match from',
+  'inside this lane either.',
+  '',
+  '**The full suite, on the real tree, is the receipt.** The best four-lever candidate',
+  '(`WORLD_SIZE` 3100 + `BASE_TURN_RATE` 5.9 + `SHIP_WEAPON.fireInterval` 0.7 +',
+  '`commonsShare` 0.5), which lands the hull at 51.4% of 255, failed **17 tests across 13',
+  'files** against 5949/5949 green on the clean tree. It is reverted. Nothing under `src/`',
+  'changes on this branch.',
+  '',
+  '### One thing that is a defect and not a pin',
+  '',
+  '`SHIP_WEAPON.fireInterval` 0.35 \u2192 0.7 fails `src/sim/projectiles.test.ts` "conserves',
+  'total ore: a rock chipped out yields exactly its ore, no more" with `expected 4 to be',
+  'close to 5`. That is not a golden being precious \u2014 the per-hit chip is derived',
+  '(`MINING_YIELD_PER_HIT` = `MINING_RATE \u00d7 fireInterval`), and a coarser chip against the',
+  'indivisible `CHUNK.ore` = 1 **rounds ore out of existence**. Ore is conserved exactly,',
+  'every tick, in CI (GDD \u00a72.7, \u00a74.8). The value is wrong on its merits and is off the list',
+  'for that reason, not for a pin.',
+  '',
+];
+
+/** What the fix costs, stated for whoever owns it. */
+const A0117_WOULD_TAKE: readonly string[] = [
+  '*Hand-written.*',
+  '',
+  '**The hull.** `WORLD_SIZE` 2400 \u2192 3400 closes it: **51.8% of 253 decided**, on a0-112\u2019s',
+  'seeds, match length unmoved, zero hangs. Three things have to move with it, and not one',
+  'of them is in this lane:',
+  '',
+  '1. **`src/bots/ffa-parity.test.ts`** \u2014 three `hashState` goldens, OWNER Bot Engineer. Its',
+  '   own header names the only thing that has ever earned a re-baseline: *a ratified',
+  '   amendment in `docs/design-amendments.md`*. A ship-class rebalance either is one or is',
+  '   not; that is the Director\u2019s call, not QA\u2019s. Note the same file blocks **every** value',
+  '   in this table, including a one-unit change, so this is the gate on the whole idea of a',
+  '   QA tuning pass, not on this candidate.',
+  '2. **`SHIP_SENSOR_RANGE` (520) and `STATION_SENSOR_RANGE` (300)** must scale with the',
+  '   arena or a player stops seeing their own ore field (`src/sim/radar-fog.test.ts`). Both',
+  '   are `content/codex/*.json` facts \u2014 Gameplay/content, enforced by',
+  '   `tests/codex/codex-constants.test.ts`. At 3400 they want roughly \u00d71.42: **740** and',
+  '   **425**. Unmeasured; the arena number is what was measured.',
+  '3. **`src/bots/defender-role.test.ts` and `src/bots/team-winning.test.ts`** carry',
+  '   travel-time budgets that a bigger board exceeds (measured at 3100: "seed 11: expected',
+  '   207 to be less than 145.68"). Bot Engineer\u2019s.',
+  '',
+  '**Warden \u2014 nothing.** On the candidate it reads **30.5%**, inside the band, with no',
+  'character dial touched. It comes for free with the hull, exactly as the brief predicted,',
+  'and a Warden nerf applied before the hull would have been tuning against a symptom.',
+  '',
+  '**Bolt \u2014 not a constant, and not this lane.** All 64 easy-pool matches on the candidate',
+  'are DRAWS, and 52 of 64 already are on the shipped tree. Two Easy bots on one hull do not',
+  'finish each other, and collapse then takes the last two cores in the same tick. Until',
+  'that changes there is no win rate to bring inside anything. It is a **Bots** brief about',
+  'the Easy tree \u2014 a0-112 already flagged that the Easy tree never runs `attack` at all \u2014',
+  'and possibly an a0-113 follow-up about a draw rule meeting a stalemate. QA can measure it',
+  'the day it decides again.',
+  '',
+  '**And the honest alternative.** If the Director would rather not re-baseline a golden for',
+  'a balance pass, then the `excavator` cannot be brought inside the band from',
+  '`src/sim/constants.ts` at all, and the fix is structural: GDD \u00a72.11\u2019s class table gives',
+  'one hull the best power stat **and** the second-best hull, against a speed and turn',
+  'penalty that the simulation currently charges nothing for. Making that penalty real is a',
+  'gameplay change \u2014 a firing arc, a turn-gated weapon, or a re-costed class row \u2014 and it',
+  'needs its own brief. This report is the evidence either way.',
+  '',
+];
+
+/** Render `tests/reports/a0-117-tuning.md`. */
+function tuningReport(outPath: string | null): number {
+  const pair = (section: A0112Section): Pair => a0117Pair(A0117_BEFORE, A0117_AFTER, section);
+  const md = renderTuningReport({
+    title: 'a0-117 — three contestants over the band, and the one dial that closes the hull',
+    context:
+      'the ship-class and cast contests re-run on a0-112’s own seeds, branch ' +
+      'agent/qa/a0-117-back-inside-the-band',
+    verdictLine: A0117_VERDICT,
+    headline: A0117_HEADLINE,
+    changed: A0117_CHANGED,
+    reading: A0117_READING.join('\n'),
+    levers: A0117_LEVERS,
+    whatItWouldTake: A0117_WOULD_TAKE.join('\n'),
+    klass: pair('class'),
+    roster: pair('roster'),
+    tier: pair('tier'),
+    mirror: pair('mirror'),
+    cast: pair('cast'),
+    a0107: pair('a0107'),
+    candidateLabel: A0117_CANDIDATE,
+  });
+  const path = resolve(ROOT, outPath ?? 'tests/reports/a0-117-tuning.md');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, md, 'utf8');
+  log(`tuning report: wrote ${path} (${md.split('\n').length} lines)`);
   return 0;
 }
 
@@ -1172,8 +1495,9 @@ function pay(seedCount: number): number {
 
 function usage(): number {
   log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay|mirrors> [args]');
-  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n]   # run one a0-112 section');
-  log('  mirrors report [--out FILE]                            # render the a0-112 report');
+  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n] [--data DIR]  # run one section');
+  log('  mirrors report [--out FILE] [--data DIR]               # render the report from artifacts');
+  log('  tuning report [--out FILE]                             # render the a0-117 before/candidate report');
   return 2;
 }
 
@@ -1201,10 +1525,18 @@ function main(argv: readonly string[]): number {
     case 'mirrors': {
       const sub = rest[0] ?? '';
       const outFlag = rest.indexOf('--out');
+      const dataFlag = rest.indexOf('--data');
+      if (dataFlag >= 0) dataDir = rest[dataFlag + 1] ?? A0112_DATA;
       if (sub === 'report') return mirrorsReport(outFlag >= 0 ? (rest[outFlag + 1] ?? null) : null);
       if (!(A0112_SECTIONS as readonly string[]).includes(sub)) return usage();
       const seedsFlag = rest.indexOf('--seeds');
       return mirrors(sub as A0112Section, seedsFlag >= 0 ? Number(rest[seedsFlag + 1] ?? 24) : 24);
+    }
+    case 'tuning': {
+      const sub = rest[0] ?? '';
+      if (sub !== 'report') return usage();
+      const outFlag = rest.indexOf('--out');
+      return tuningReport(outFlag >= 0 ? (rest[outFlag + 1] ?? null) : null);
     }
     case 'pay': {
       const seedsFlag = rest.indexOf('--seeds');
