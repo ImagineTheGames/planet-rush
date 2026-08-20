@@ -73,7 +73,7 @@ Branch `agent/gameplay/a0-113-a-draw-that-can-occur`, three commits:
    PR for the Bots owner. It is the ONLY file outside `src/sim/` the change
    touches.
 
-4. `dcdbae67` **test(a0-113) [CROSS-LANE: src/bots, tests/harness].** Two 2v2
+4. `2bae6e5f` **test(a0-113) [CROSS-LANE: src/bots, tests/harness].** Two 2v2
    suites asserted "there is always a winner" and met real draws. See below —
    this is the strongest evidence on the branch.
 
@@ -139,7 +139,7 @@ anybody" — and it would have preserved the exact artefact QA photographed.
 - Nothing outstanding on the sim.
 - For the Director: GDD §1 line 49 + line 690 need amending to the draw
   rule. The sim is now the odd one out until they are.
-- For the Bots owner: review commits 3 and 4 (`50198413`, `dcdbae67`).
+- For the Bots owner: review commits 3 and 4 (`50198413`, `2bae6e5f`).
 - For the QA/harness owner: commit 4's second half, and the balance question it
   exposes — the scripted 2v2 never produces a survivor on any seed 1-10.
 - For the writer/UI: the draw subhead names the collapse only.
