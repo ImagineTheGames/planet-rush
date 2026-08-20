@@ -42,6 +42,28 @@ A fourth gap has no fix and is recorded rather than closed: **`messageBounds` is
 a control**, so no sweep of controls will ever look at it, and on the desk it is
 what the panel lands on. This capture probes it explicitly.
 
+### The gap closed for the next state too
+
+a0-98's own `1-offline-screens.spec.ts`, unchanged in scope, re-run with the extended
+probe against the fixed build — eleven states across two profiles, tables at
+`../a0-98-corner-collisions-everywhere-else/shots/a0-114-rerun/`:
+
+```
+boot-failure … menu … doors-idle … doors-error … join-browse …
+join-keypad-idle … join-keypad-error … lobby … match-live-offline … match-pause-menu
+                                          collisions=0   covered=0     (both profiles)
+```
+
+`doors-error` read `covered: 2` on the before build. The two JOIN refusals matter as
+much: on the phone the mode switch (`mode:browse` `{x:23,y:102,w:144,h:48}`,
+`mode:code` `{x:171,y:102,w:144,h:48}`) sits inside the same `y92-161` band, with
+`mode:code` running under RETRY — and a0-98's centre probe missed that one too,
+because `mode:code`'s centre is `(243,126)` and RETRY starts at `x=249.6`. The strip
+is reserved on every entry-screen layout rather than on the doors specifically, so
+the join screens came clean without being aimed at.
+
+Only the two JSON tables are committed; the frames are 13 MB and one command away.
+
 ## The fork, answered by pressing it
 
 The brief asks which is true: the doors are live behind the refusal, so it must get
