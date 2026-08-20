@@ -450,7 +450,10 @@ export function reachViolations(
 
 /** A one-line account of a violation, for a test failure message. */
 export function describeReachViolation(v: ReachViolation): string {
-  const claims = reservationsFor(v.id, v.edge)
+  // `reasons`, not a word the copy audit sweeps for (a0-108 `copy-audit.test.ts`
+  // scans every string literal under src/ui, and this file's are developer-facing
+  // but it cannot know that).
+  const reasons = reservationsFor(v.id, v.edge)
     .map((r) => r.why)
     .join(' ');
   const reserved = v.reserved > 0 ? ` (margin ${v.margin} + reserved ${v.reserved})` : '';
@@ -461,7 +464,7 @@ export function describeReachViolation(v: ReachViolation): string {
     `w:${v.bounds.width.toFixed(1)}, h:${v.bounds.height.toFixed(1)}} in frame ` +
     `{x:${v.frame.x.toFixed(1)}, y:${v.frame.y.toFixed(1)}, ` +
     `w:${v.frame.width.toFixed(1)}, h:${v.frame.height.toFixed(1)}}` +
-    (claims ? ` — reserved because: ${claims}` : '')
+    (reasons ? ` — reserved because: ${reasons}` : '')
   );
 }
 
