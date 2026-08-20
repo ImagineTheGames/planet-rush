@@ -97,8 +97,7 @@ import { count, decode, type Img, type Pred } from './pixels';
 // hand-copied rect or a hand-copied side rule is a second source of truth that
 // can drift away from the client while this file keeps passing.
 import { minimapRect } from '../../src/ui/minimap';
-import { defaultTeamForSlot } from '../../src/ui/lobby';
-import { PLAYER_ROSTER } from '../../src/art/tokens';
+import { defaultTeamForSlot, SIDE_COLORS } from '../../src/ui/lobby';
 
 // ---------------------------------------------------------------------------
 // The seams this spec reads (all read-back; the presses are real)
@@ -323,22 +322,48 @@ function comparePair(teams: Img, ffa: Img): {
   return { ffaRevealed, teamsRevealed, allyOnly, ffaOnly, oreInAllyOnly };
 }
 
-/** How many pixels of player `slot`'s identity colour are drawn on this minimap,
- *  and how many of those sit where the CONTROL frame is fog. */
-function identityPixels(img: Img, control: Img, slot: number): { drawn: number; inAllyOnly: number } {
-  const colour = PLAYER_ROSTER[slot % PLAYER_ROSTER.length]!;
+/**
+ * How many pixels of a given SIDE's colour are drawn on this minimap, and how many
+ * of those sit where the CONTROL frame is fog.
+ *
+ * ── WHY THIS IS A SIDE AND NOT A SLOT (a0-110, ratified 2026-08-20) ─────────
+ * This was `identityPixels(…, slot)` and it counted one player's ROSTER colour,
+ * because colour on the minimap used to be roster identity. The developer
+ * overruled that for this surface: *"i feel like on minimap friendlies should all
+ * be blue, and enemies all red"*. Every friendly mark — the human and all three
+ * allies — is now `SIDE_COLORS.friendly`, and every hostile is `SIDE_COLORS.enemy`
+ * (`src/ui/minimap.ts` `MINIMAP_SIDE_COLORS`). A per-slot pixel census is no
+ * longer possible on this surface, by design, and that is the ratified trade.
+ *
+ * **Nothing this file proves is weakened by that, with one honest exception.**
+ * Every fog claim below is a claim about WHERE a mark is drawn relative to the
+ * human's own coverage, and the CONTROL frame still decides that pixel by pixel.
+ * What is lost is only the ability to name WHICH ally: "P2, P4 and P6 are each
+ * individually on the map" becomes "ally-side ink is on the map, in ally-only
+ * territory, and none of it is in FFA". The slot list is still asserted against
+ * the lobby's own `defaultTeamForSlot`, so the side table is still checked — just
+ * from the table rather than from the pixels.
+ */
+function sidePixels(
+  img: Img,
+  control: Img,
+  side: 'friendly' | 'enemy',
+): { drawn: number; inAllyOnly: number; inOwnCoverage: number } {
+  const colour = SIDE_COLORS[side];
   let drawn = 0;
   let inAllyOnly = 0;
+  let inOwnCoverage = 0;
   for (let y = MAP.y; y < MAP.y + MAP.height; y++) {
     for (let x = MAP.x; x < MAP.x + MAP.width; x++) {
       const p = px(img, x, y);
       if (!nearColour(p, colour, 26)) continue;
       drawn++;
       const c = px(control, x, y);
-      if (!isRevealed(c[0], c[1], c[2], 255)) inAllyOnly++;
+      if (isRevealed(c[0], c[1], c[2], 255)) inOwnCoverage++;
+      else inAllyOnly++;
     }
   }
-  return { drawn, inAllyOnly };
+  return { drawn, inAllyOnly, inOwnCoverage };
 }
 
 // ---------------------------------------------------------------------------
@@ -597,27 +622,31 @@ test('offline TEAMS through the real lobby: the human sees what only a bot ally 
   ).toBeGreaterThan(40_000);
   expect(pair.teamsRevealed, 'TEAMS reveals strictly more of the arena than FFA').toBeGreaterThan(pair.ffaRevealed);
 
-  // ── 3. The three bot ALLIES are on the human's map, and only in ally-only
-  //       territory. Their dots are drawn in their own identity colours
-  //       (src/ui/minimap.ts `playerColor(owner)`), so this reads the side table
-  //       the LOBBY authored straight off the pixels: slots 2, 4 and 6 —
-  //       `defaultTeamForSlot(i) === defaultTeamForSlot(0)` — and nobody else.
+  // ── 3. The bot ALLIES are on the human's map, and only in ally-only territory.
+  //       Since a0-110 their dots are the FRIENDLY SIDE colour rather than each
+  //       bot's own (`src/ui/minimap.ts` MINIMAP_SIDE_COLORS) — see `sidePixels`
+  //       for what that costs this assertion and what it does not. The side table
+  //       the LOBBY authored is still checked, from the table itself: slots 2, 4
+  //       and 6 are `defaultTeamForSlot(i) === defaultTeamForSlot(0)`.
   expect(ALLIES, 'a default TEAMS lobby gives the human three bot allies at eight seats').toEqual([2, 4, 6]);
-  for (const slot of ALLIES) {
-    const inTeams = identityPixels(frames.teams, frames.ffa, slot);
-    const inFfa = identityPixels(frames.ffa, frames.ffa, slot);
-    expect(inTeams.drawn, `ally P${slot} is drawn on the human's minimap in TEAMS`).toBeGreaterThan(300);
-    expect(
-      inTeams.inAllyOnly,
-      `every pixel of ally P${slot} sits where the human's own coverage does not reach`,
-    ).toBe(inTeams.drawn);
-    expect(inFfa.drawn, `ally P${slot} is drawn NOWHERE on the same minimap in FFA`).toBe(0);
-  }
+  const alliesTeams = sidePixels(frames.teams, frames.ffa, 'friendly');
+  const alliesFfa = sidePixels(frames.ffa, frames.ffa, 'friendly');
+  expect(
+    alliesTeams.inAllyOnly,
+    'ally marks are drawn on the human\'s minimap in TEAMS, out where their own coverage does not reach',
+  ).toBeGreaterThan(300);
+  expect(
+    alliesFfa.inAllyOnly,
+    'in the identical FFA match there is no ally ink out there at all',
+  ).toBe(0);
 
   // ── 4. The human's own dot is on both maps — the control that says the
   //       comparison is between two live minimaps and not against a blank one.
-  expect(identityPixels(frames.ffa, frames.ffa, YOU).drawn, 'the human is on their own FFA map').toBeGreaterThan(300);
-  expect(identityPixels(frames.teams, frames.ffa, YOU).drawn, 'the human is on their own TEAMS map').toBeGreaterThan(300);
+  //       The human wears the friendly colour too (a0-110), so what separates
+  //       them from their allies here is exactly what separates them on screen:
+  //       theirs is the friendly ink INSIDE their own coverage.
+  expect(alliesFfa.inOwnCoverage, 'the human is on their own FFA map').toBeGreaterThan(300);
+  expect(alliesTeams.inOwnCoverage, 'the human is on their own TEAMS map').toBeGreaterThan(300);
 
   // ── 5. Whatever the human can see of the OTHER side, they see it through a
   //       teammate and nowhere else.
@@ -633,13 +662,14 @@ test('offline TEAMS through the real lobby: the human sees what only a bot ally 
   //       appears on the human's minimap"*, in the form that cannot flake; Act 2
   //       proves the same thing with the enemy parked deliberately.
   expect(ENEMIES, 'the other side is slots 1, 3, 5, 7').toEqual([1, 3, 5, 7]);
-  for (const slot of ENEMIES) {
-    const seen = identityPixels(frames.teams, frames.ffa, slot);
-    expect(
-      seen.inAllyOnly,
-      `every pixel of enemy P${slot} the human can see is one a teammate's coverage bought them`,
-    ).toBe(seen.drawn);
-  }
+  const enemiesSeen = sidePixels(frames.teams, frames.ffa, 'enemy');
+  expect(
+    enemiesSeen.inOwnCoverage,
+    "every pixel of the enemy side the human can see is one a teammate's coverage bought them",
+  ).toBe(0);
+  expect(enemiesSeen.inAllyOnly, 'stated the other way round, for the same population').toBe(
+    enemiesSeen.drawn,
+  );
 
   // …and the union widened the VIEWER'S SIDE, not the world: most of the arena is
   // still fog. A read that had quietly become "reveal everything" passes 1–4 and
@@ -669,12 +699,17 @@ test('offline TEAMS through the real lobby: the human sees what only a bot ally 
     shotTicks,
     allies: ALLIES,
     enemies: ENEMIES,
-    identity: [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => ({
-      slot,
-      side: defaultTeamForSlot(slot),
-      teams: identityPixels(frames.teams, frames.ffa, slot),
-      ffa: identityPixels(frames.ffa, frames.ffa, slot),
+    // Per-SIDE since a0-110 — see `sidePixels`. The per-slot census this used to
+    // carry is not recoverable from the pixels any more, by ratified design.
+    sides: (['friendly', 'enemy'] as const).map((side) => ({
+      side,
+      teams: sidePixels(frames.teams, frames.ffa, side),
+      ffa: sidePixels(frames.ffa, frames.ffa, side),
     })),
+    // The slot->side table itself still travels in the summary; what no longer
+    // does is a per-slot PIXEL census, which a0-110 made unrecoverable from this
+    // surface on purpose.
+    slots: [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => ({ slot, side: defaultTeamForSlot(slot) })),
     ...pair,
     oreInFfa: oreInFfa.matched,
     oreInTeams: oreInTeams.matched,
