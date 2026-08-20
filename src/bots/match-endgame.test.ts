@@ -99,17 +99,26 @@ describe('an eight-slot bot match reaches a win state', () => {
     expect(world.ships.map((s) => ({ ...s.pos }))).toEqual(spawn);
   });
 
-  it('resolves a mutual extinction by last-to-die (GDD §1)', () => {
+  it('resolves a mutual extinction as a draw (GDD §1, a0-113)', () => {
     const { world, bots } = accelerated(7);
     const result = runHeadlessMatch(world, bots, { maxSeconds: 120 });
 
     expect(result.ended).toBe(true);
     expect(result.timedOut).toBe(false);
     // Eight identical cores under identical entropy die in the same tick, so
-    // there is no survivor to crown and the tiebreak decides.
+    // there is no survivor to crown — and, since a0-113, nobody to crown at all.
+    //
+    // This assertion read `expect(result.winner).toBe(order[order.length - 1])`:
+    // the last-to-die tiebreak, which handed the match to the final entry of the
+    // elimination order. Inside one tick that order is station-array index, so
+    // the "winner" was slot 7 for no reason a player could see — the screen QA
+    // photographed in a0-111 (DEFEAT, subhead "Player 8 won.", over eight dead
+    // reactors). The ending is still STRUCTURAL, which is all this file claims:
+    // the match resolves, every seat is out, and nothing hangs.
     const order = result.world.match.eliminated;
     expect(order).toHaveLength(8);
-    expect(result.winner).toBe(order[order.length - 1]);
+    expect(result.winner).toBeNull();
+    expect(result.world.match.phase).toBe('ended');
     expect(world.ships.every((s) => s.eliminated)).toBe(true);
   });
 
