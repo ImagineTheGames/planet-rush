@@ -1,0 +1,1439 @@
+{
+  "stage": "before",
+  "profile": "phone-798x384",
+  "findings": [
+    {
+      "what": "doors at rest",
+      "doors": [
+        {
+          "kind": "campaign",
+          "physicalCenter": {
+            "x": 209,
+            "y": 172.5
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "solo",
+          "physicalCenter": {
+            "x": 209,
+            "y": 246
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 211.5,
+            "width": 372,
+            "height": 69
+          }
+        },
+        {
+          "kind": "create",
+          "physicalCenter": {
+            "x": 589,
+            "y": 172.5
+          },
+          "physicalBounds": {
+            "x": 403,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "join",
+          "physicalCenter": {
+            "x": 589,
+            "y": 242.5
+          },
+          "physicalBounds": {
+            "x": 403,
+            "y": 211.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "back",
+          "physicalCenter": {
+            "x": 83,
+            "y": 359.5
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          }
+        }
+      ],
+      "panel": {
+        "mounted": false,
+        "hidden": null,
+        "box": null,
+        "retry": null,
+        "download": null,
+        "hint": ""
+      },
+      "entryVisible": true,
+      "entryScreen": "home",
+      "entryStatus": "idle",
+      "entryError": "",
+      "title": "MINE · DEFEND · ATTACK",
+      "messageBounds": {
+        "x": 23,
+        "y": 64,
+        "width": 752,
+        "height": 23
+      }
+    },
+    {
+      "what": "HOST pressed at its own reported centre",
+      "press": {
+        "point": {
+          "x": 589,
+          "y": 173
+        },
+        "topmost": "CANVAS#app",
+        "statusBefore": "idle",
+        "statusAfter": "error",
+        "stateBefore": {
+          "screen": "home",
+          "status": "idle",
+          "error": "",
+          "notice": "",
+          "title": "MINE · DEFEND · ATTACK",
+          "lobby": false
+        },
+        "stateAfter": {
+          "screen": "home",
+          "status": "error",
+          "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "changed": [
+          "status",
+          "error",
+          "title"
+        ],
+        "downloaded": null
+      }
+    },
+    {
+      "what": "the refusal, as drawn",
+      "entryVisible": true,
+      "entryScreen": "home",
+      "entryStatus": "error",
+      "entryError": "Can’t reach the servers. Check your connection — SOLO still works.",
+      "title": "FAILED: no allocator configured",
+      "messageBounds": {
+        "x": 23,
+        "y": 64,
+        "width": 752,
+        "height": 23
+      },
+      "panel": {
+        "mounted": true,
+        "hidden": false,
+        "box": {
+          "x": 159,
+          "y": 92,
+          "width": 480,
+          "height": 69.375
+        },
+        "retry": {
+          "x": 249.609375,
+          "y": 117.375,
+          "width": 100.1875,
+          "height": 44
+        },
+        "download": {
+          "x": 359.390625,
+          "y": 117.375,
+          "width": 189,
+          "height": 44
+        },
+        "hint": "DOWNLOAD LOG to report this."
+      },
+      "overlays": [
+        {
+          "id": "p.pr-ct-hint",
+          "box": {
+            "x": 306,
+            "y": 92,
+            "width": 186,
+            "height": 18.1875
+          }
+        },
+        {
+          "id": "pr-connect-trace-retry",
+          "box": {
+            "x": 249.609375,
+            "y": 117.375,
+            "width": 100.1875,
+            "height": 44
+          }
+        },
+        {
+          "id": "pr-connect-trace-download",
+          "box": {
+            "x": 359.390625,
+            "y": 117.375,
+            "width": 189,
+            "height": 44
+          }
+        }
+      ],
+      "doors": [
+        {
+          "kind": "campaign",
+          "physicalCenter": {
+            "x": 209,
+            "y": 172.5
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "solo",
+          "physicalCenter": {
+            "x": 209,
+            "y": 246
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 211.5,
+            "width": 372,
+            "height": 69
+          }
+        },
+        {
+          "kind": "create",
+          "physicalCenter": {
+            "x": 589,
+            "y": 172.5
+          },
+          "physicalBounds": {
+            "x": 403,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "join",
+          "physicalCenter": {
+            "x": 589,
+            "y": 242.5
+          },
+          "physicalBounds": {
+            "x": 403,
+            "y": 211.5,
+            "width": 372,
+            "height": 62
+          }
+        },
+        {
+          "kind": "back",
+          "physicalCenter": {
+            "x": 83,
+            "y": 359.5
+          },
+          "physicalBounds": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          }
+        }
+      ],
+      "doorVerdicts": {
+        "door<campaign>": [
+          {
+            "x": 209,
+            "y": 173,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 209,
+            "y": 144,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 209,
+            "y": 202,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 173,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 173,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 144,
+            "at": "top-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 144,
+            "at": "top-right",
+            "topmost": "BUTTON#pr-connect-trace-download",
+            "foreign": true
+          },
+          {
+            "x": 25,
+            "y": 202,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 202,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ],
+        "door<solo>": [
+          {
+            "x": 209,
+            "y": 246,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 209,
+            "y": 214,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 209,
+            "y": 279,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 246,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 246,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 214,
+            "at": "top-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 214,
+            "at": "top-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 279,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 393,
+            "y": 279,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ],
+        "door<create>": [
+          {
+            "x": 589,
+            "y": 173,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 589,
+            "y": 144,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 589,
+            "y": 202,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 173,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 173,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 144,
+            "at": "top-left",
+            "topmost": "BUTTON#pr-connect-trace-download",
+            "foreign": true
+          },
+          {
+            "x": 773,
+            "y": 144,
+            "at": "top-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 202,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 202,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ],
+        "door<join>": [
+          {
+            "x": 589,
+            "y": 243,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 589,
+            "y": 214,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 589,
+            "y": 272,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 243,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 243,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 214,
+            "at": "top-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 214,
+            "at": "top-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 405,
+            "y": 272,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 272,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ],
+        "door<back>": [
+          {
+            "x": 83,
+            "y": 360,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 83,
+            "y": 338,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 83,
+            "y": 382,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 360,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 141,
+            "y": 360,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 338,
+            "at": "top-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 141,
+            "y": 338,
+            "at": "top-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 382,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 141,
+            "y": 382,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ]
+      },
+      "messageVerdicts": {
+        "message": [
+          {
+            "x": 399,
+            "y": 76,
+            "at": "centre",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 399,
+            "y": 66,
+            "at": "top",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 399,
+            "y": 85,
+            "at": "bottom",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 76,
+            "at": "left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 76,
+            "at": "right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 66,
+            "at": "top-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 66,
+            "at": "top-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 25,
+            "y": 85,
+            "at": "bottom-left",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          },
+          {
+            "x": 773,
+            "y": 85,
+            "at": "bottom-right",
+            "topmost": "CANVAS#app",
+            "foreign": false
+          }
+        ]
+      },
+      "coveredDoors": [
+        {
+          "control": "door<campaign>",
+          "at": [
+            "top-right -> BUTTON#pr-connect-trace-download"
+          ]
+        },
+        {
+          "control": "door<create>",
+          "at": [
+            "top-left -> BUTTON#pr-connect-trace-download"
+          ]
+        }
+      ]
+    },
+    {
+      "what": "CAMPAIGN pressed where the refusal IS",
+      "at": "top-right",
+      "press": {
+        "point": {
+          "x": 393,
+          "y": 144
+        },
+        "topmost": "BUTTON#pr-connect-trace-download",
+        "statusBefore": "error",
+        "statusAfter": "error",
+        "stateBefore": {
+          "screen": "home",
+          "status": "error",
+          "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "stateAfter": {
+          "screen": "home",
+          "status": "error",
+          "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "changed": [],
+        "downloaded": "planet-rush-log-fb2ba5f-20260820-130615.json"
+      }
+    },
+    {
+      "what": "CAMPAIGN pressed where the refusal is NOT",
+      "at": "centre",
+      "press": {
+        "point": {
+          "x": 209,
+          "y": 173
+        },
+        "topmost": "CANVAS#app",
+        "statusBefore": "error",
+        "statusAfter": "idle",
+        "stateBefore": {
+          "screen": "home",
+          "status": "error",
+          "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "stateAfter": {
+          "screen": "home",
+          "status": "idle",
+          "error": "",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "changed": [
+          "status",
+          "error"
+        ],
+        "downloaded": null
+      }
+    },
+    {
+      "what": "HOST pressed where the refusal IS",
+      "at": "top-left",
+      "press": {
+        "point": {
+          "x": 405,
+          "y": 144
+        },
+        "topmost": "BUTTON#pr-connect-trace-download",
+        "statusBefore": "idle",
+        "statusAfter": "idle",
+        "stateBefore": {
+          "screen": "home",
+          "status": "idle",
+          "error": "",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "stateAfter": {
+          "screen": "home",
+          "status": "idle",
+          "error": "",
+          "notice": "",
+          "title": "FAILED: no allocator configured",
+          "lobby": false
+        },
+        "changed": [],
+        "downloaded": "planet-rush-log-fb2ba5f-20260820-130615.json"
+      }
+    }
+  ],
+  "reports": [
+    {
+      "state": "doors-host-refused",
+      "profile": "phone-798x384",
+      "viewport": {
+        "width": 798,
+        "height": 384,
+        "dpr": 2,
+        "touch": true
+      },
+      "log": {
+        "mounted": false
+      },
+      "controls": [
+        {
+          "control": "__onlineMenu.doorControls[0]<campaign>",
+          "page": {
+            "x": 209,
+            "y": 173
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 209,
+              "y": 173,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 144,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 202,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 173,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 173,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 144,
+              "at": "top-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 144,
+              "at": "top-right",
+              "topmost": "BUTTON#pr-connect-trace-download",
+              "foreign": true
+            },
+            {
+              "x": 25,
+              "y": 202,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 202,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [
+            "BUTTON#pr-connect-trace-download"
+          ],
+          "covered": true,
+          "foreignFraction": 0.12
+        },
+        {
+          "control": "__onlineMenu.doorControls[1]<solo>",
+          "page": {
+            "x": 209,
+            "y": 246
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 211.5,
+            "width": 372,
+            "height": 69
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 209,
+              "y": 246,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 214,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 279,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 246,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 246,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 214,
+              "at": "top-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 214,
+              "at": "top-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 279,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 279,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [],
+          "covered": false,
+          "foreignFraction": 0
+        },
+        {
+          "control": "__onlineMenu.doorControls[2]<create>",
+          "page": {
+            "x": 589,
+            "y": 173
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 403,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 589,
+              "y": 173,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 144,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 202,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 173,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 173,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 144,
+              "at": "top-left",
+              "topmost": "BUTTON#pr-connect-trace-download",
+              "foreign": true
+            },
+            {
+              "x": 773,
+              "y": 144,
+              "at": "top-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 202,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 202,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [
+            "BUTTON#pr-connect-trace-download"
+          ],
+          "covered": true,
+          "foreignFraction": 0.13
+        },
+        {
+          "control": "__onlineMenu.doorControls[3]<join>",
+          "page": {
+            "x": 589,
+            "y": 243
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 403,
+            "y": 211.5,
+            "width": 372,
+            "height": 62
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 589,
+              "y": 243,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 214,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 272,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 243,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 243,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 214,
+              "at": "top-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 214,
+              "at": "top-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 272,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 272,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [],
+          "covered": false,
+          "foreignFraction": 0
+        },
+        {
+          "control": "__onlineMenu.doorControls[4]<back>",
+          "page": {
+            "x": 83,
+            "y": 360
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 83,
+              "y": 360,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 83,
+              "y": 338,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 83,
+              "y": 382,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 360,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 141,
+              "y": 360,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 338,
+              "at": "top-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 141,
+              "y": 338,
+              "at": "top-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 382,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 141,
+              "y": 382,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [],
+          "covered": false,
+          "foreignFraction": 0
+        }
+      ],
+      "collisions": [],
+      "covered": [
+        {
+          "control": "__onlineMenu.doorControls[0]<campaign>",
+          "page": {
+            "x": 209,
+            "y": 173
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 209,
+              "y": 173,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 144,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 209,
+              "y": 202,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 173,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 173,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 25,
+              "y": 144,
+              "at": "top-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 144,
+              "at": "top-right",
+              "topmost": "BUTTON#pr-connect-trace-download",
+              "foreign": true
+            },
+            {
+              "x": 25,
+              "y": 202,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 393,
+              "y": 202,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [
+            "BUTTON#pr-connect-trace-download"
+          ],
+          "covered": true,
+          "foreignFraction": 0.12
+        },
+        {
+          "control": "__onlineMenu.doorControls[2]<create>",
+          "page": {
+            "x": 589,
+            "y": 173
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 403,
+            "y": 141.5,
+            "width": 372,
+            "height": 62
+          },
+          "coveredFraction": null,
+          "verdicts": [
+            {
+              "x": 589,
+              "y": 173,
+              "at": "centre",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 144,
+              "at": "top",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 589,
+              "y": 202,
+              "at": "bottom",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 173,
+              "at": "left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 173,
+              "at": "right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 144,
+              "at": "top-left",
+              "topmost": "BUTTON#pr-connect-trace-download",
+              "foreign": true
+            },
+            {
+              "x": 773,
+              "y": 144,
+              "at": "top-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 405,
+              "y": 202,
+              "at": "bottom-left",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            },
+            {
+              "x": 773,
+              "y": 202,
+              "at": "bottom-right",
+              "topmost": "CANVAS#app",
+              "foreign": false
+            }
+          ],
+          "coveredBy": [
+            "BUTTON#pr-connect-trace-download"
+          ],
+          "covered": true,
+          "foreignFraction": 0.13
+        }
+      ],
+      "overlays": [
+        {
+          "id": "p.pr-ct-hint",
+          "box": {
+            "x": 306,
+            "y": 92,
+            "width": 186,
+            "height": 18.1875
+          }
+        },
+        {
+          "id": "pr-connect-trace-retry",
+          "box": {
+            "x": 249.609375,
+            "y": 117.375,
+            "width": 100.1875,
+            "height": 44
+          }
+        },
+        {
+          "id": "pr-connect-trace-download",
+          "box": {
+            "x": 359.390625,
+            "y": 117.375,
+            "width": 189,
+            "height": 44
+          }
+        }
+      ],
+      "coveredButDead": [],
+      "context": {
+        "entryVisible": true,
+        "entryScreen": "home",
+        "entryStatus": "error",
+        "entryError": "Can’t reach the servers. Check your connection — SOLO still works.",
+        "title": "FAILED: no allocator configured",
+        "messageBounds": {
+          "x": 23,
+          "y": 64,
+          "width": 752,
+          "height": 23
+        }
+      }
+    }
+  ]
+}

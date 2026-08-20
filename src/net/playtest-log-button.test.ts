@@ -38,6 +38,17 @@ import type { DownloadLogDom, DownloadLogElement } from './playtest-log-button';
 // same way.
 import { kickOutClaimsTheGlass, matchLogOffer } from '../ui/log-offer';
 import type { MatchLogOfferState } from '../ui/log-offer';
+// a0-114: the same crossing again, for the same reason and on the same terms. The
+// refusal panel is `src/net`'s, but WHERE it may stand on the entry screen is a
+// placement decision about the game's own screens, so the rule lives in `src/ui`
+// (`../ui/refusal-strip`) and the doors it must clear come from the layout that
+// draws them (`../ui/lobby-geometry`).
+// `overlaps` is imported under a name of its own: a0-98's block above already
+// has a local one, and the two are the same predicate reached from two lanes.
+import { overlaps as rectsOverlap, refusalCovers } from '../ui/refusal-strip';
+import { entryLayout } from '../ui/lobby-geometry';
+import type { EntryLayout } from '../ui/lobby-geometry';
+import { DOOR_OPTIONS } from '../ui/lobby-entry';
 
 afterEach(() => resetDownloadLogButton());
 
@@ -968,6 +979,291 @@ describe('the offer never lands on a control the player needs', () => {
           const answer = matchLogOffer({ pauseScreen, session, glass });
           expect([null, 'pause', 'disconnect']).toContain(answer);
         }
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-114 — the refusal never lands on the door that was pressed
+// ---------------------------------------------------------------------------
+
+/**
+ * a0-98 asked whether the CORNER affordance stands on a control. a0-111 found the
+ * OTHER log button — the one `src/net/connect-trace-view` draws under the title
+ * with RETRY beside it when a door is refused — standing on the door that was
+ * pressed: *"DOWNLOAD LOG covers the HOST plate: at 3x the button is opaque and
+ * takes the top of the word HOST, leaving only the bottom sliver of the four
+ * letters showing below its lower edge."*
+ *
+ * Every number below came back from a real Chromium driven through the shipped
+ * offline artifact's own front door, with HOST pressed at the point the client
+ * itself reported drawing it — a0-97's method and a0-98's, unchanged
+ * (`evidence/a0-114-refusal-over-the-doors`).
+ */
+interface RefusalPoint {
+  /** Where on the door's own reported rect this point is. */
+  readonly at: string;
+  readonly x: number;
+  readonly y: number;
+  /** `document.elementFromPoint` at that point. */
+  readonly topmost: string;
+}
+
+interface MeasuredRefusal {
+  readonly viewport: string;
+  readonly width: number;
+  readonly height: number;
+  readonly touch: boolean;
+  /** The failure the screen was showing when this was taken. */
+  readonly title: string;
+  /** The panel's own box, as the browser measured it — the band the constant
+   *  `CONNECT_TRACE_TOP_PX` put it in. */
+  readonly panel: MeasuredBox;
+  /** …and the two opaque buttons inside it, which is what a player can see. */
+  readonly buttons: readonly { readonly id: string; readonly box: MeasuredBox }[];
+  /** The failure LINE's own reported rect (`__onlineMenu.messageBounds`). */
+  readonly message: MeasuredBox;
+  /** Each door, as the client reported drawing it, keyed by the seam's own kind. */
+  readonly doors: readonly { readonly kind: string; readonly box: MeasuredBox }[];
+  /** Every point on a door where the browser named something FOREIGN — anything
+   *  that is neither the canvas nor the door. Empty is the clean answer. */
+  readonly caught: readonly (RefusalPoint & { readonly door: string })[];
+  /** The two presses that answer the brief's fork, taken on ONE plate. */
+  readonly press: {
+    readonly covered: { readonly x: number; readonly y: number; readonly topmost: string; readonly moved: readonly string[]; readonly downloaded: string | null };
+    readonly clear: { readonly x: number; readonly y: number; readonly topmost: string; readonly moved: readonly string[] };
+  };
+}
+
+const MEASURED_REFUSALS: readonly MeasuredRefusal[] = [
+  {
+    viewport: 'phone 798x384',
+    width: 798,
+    height: 384,
+    touch: true,
+    title: 'FAILED: no allocator configured',
+    panel: { x: 159, y: 92, width: 480, height: 69.375 },
+    buttons: [
+      { id: 'pr-connect-trace-retry', box: { x: 249.609375, y: 117.375, width: 100.1875, height: 44 } },
+      { id: 'pr-connect-trace-download', box: { x: 359.390625, y: 117.375, width: 189, height: 44 } },
+    ],
+    message: { x: 23, y: 64, width: 752, height: 23 },
+    doors: [
+      { kind: 'campaign', box: { x: 23, y: 141.5, width: 372, height: 62 } },
+      { kind: 'solo', box: { x: 23, y: 211.5, width: 372, height: 69 } },
+      { kind: 'create', box: { x: 403, y: 141.5, width: 372, height: 62 } },
+      { kind: 'join', box: { x: 403, y: 211.5, width: 372, height: 62 } },
+      { kind: 'back', box: { x: 23, y: 335.5, width: 120, height: 48 } },
+    ],
+    caught: [
+      { door: 'campaign', at: 'top-right', x: 393, y: 144, topmost: 'BUTTON#pr-connect-trace-download' },
+      { door: 'create', at: 'top-left', x: 405, y: 144, topmost: 'BUTTON#pr-connect-trace-download' },
+    ],
+    press: {
+      // Same plate, two points. This is the brief's fork, answered by pressing it.
+      covered: {
+        x: 393,
+        y: 144,
+        topmost: 'BUTTON#pr-connect-trace-download',
+        moved: [],
+        downloaded: 'planet-rush-log-fb2ba5f-20260820-130615.json',
+      },
+      clear: { x: 209, y: 173, topmost: 'CANVAS#app', moved: ['status', 'error'] },
+    },
+  },
+  {
+    viewport: 'desktop 1280x800',
+    width: 1280,
+    height: 800,
+    touch: false,
+    title: 'FAILED: no allocator configured',
+    panel: { x: 400, y: 92, width: 480, height: 69.375 },
+    buttons: [
+      { id: 'pr-connect-trace-retry', box: { x: 490.609375, y: 117.375, width: 100.1875, height: 44 } },
+      { id: 'pr-connect-trace-download', box: { x: 600.390625, y: 117.375, width: 189, height: 44 } },
+    ],
+    message: { x: 44, y: 120, width: 1192, height: 44 },
+    doors: [
+      { kind: 'campaign', box: { x: 240, y: 265.5, width: 800, height: 72 } },
+      { kind: 'solo', box: { x: 240, y: 352.5, width: 800, height: 80 } },
+      { kind: 'create', box: { x: 240, y: 447.5, width: 800, height: 72 } },
+      { kind: 'join', box: { x: 240, y: 534.5, width: 800, height: 72 } },
+      { kind: 'back', box: { x: 44, y: 726, width: 140, height: 56 } },
+    ],
+    // The doors are clear on a desk — they start 100px below the panel. The victim
+    // here is the failure LINE, which is not a control and which no sweep of
+    // controls will ever look at: `elementFromPoint` at the message's own reported
+    // centre answers with the button offering to report it.
+    caught: [],
+    press: {
+      covered: { x: 640, y: 142, topmost: 'BUTTON#pr-connect-trace-download', moved: [], downloaded: null },
+      clear: { x: 640, y: 484, topmost: 'CANVAS#app', moved: ['status', 'error'] },
+    },
+  },
+];
+
+/** The doors as the entry screen lays them out, named the way a report can use
+ *  them — `DOOR_OPTIONS` order is `layout.doors` order, asserted in
+ *  `../ui/lobby-entry.test.ts`. */
+function namedDoors(layout: EntryLayout): { name: string; rect: MeasuredBox }[] {
+  return layout.doors.map((rect, i) => ({ name: DOOR_OPTIONS[i]?.label ?? `door[${i}]`, rect }));
+}
+
+/** The layout the client draws for one measured state — with the refusal's own
+ *  measured height reserved, which is the whole of the fix. */
+function layoutFor(s: MeasuredRefusal, refusalHeight: number): EntryLayout {
+  return entryLayout({ width: s.width, height: s.height }, { isTouch: s.touch, refusalHeight });
+}
+
+describe('the refusal never lands on a control the player needs (a0-114)', () => {
+  it('a refusal never covers the door that was pressed', () => {
+    // The rule, at each measured viewport, against the doors THAT SAME LAYOUT draws
+    // — never against the shipped rects, or a fix that moved the panel onto a door
+    // it had not moved would still pass.
+    for (const s of MEASURED_REFUSALS) {
+      const layout = layoutFor(s, s.panel.height);
+      expect(
+        refusalCovers(layout.refusal, namedDoors(layout)),
+        `${s.viewport}: the refusal stands on a door`,
+      ).toEqual([]);
+      // BACK is on this screen too, and it is a door out.
+      expect(rectsOverlap(layout.refusal, layout.back), `${s.viewport}: the refusal stands on BACK`).toBe(false);
+      // …and the strip really is the room the panel needs, not a token gap.
+      expect(layout.refusal.height, `${s.viewport}: the strip is the panel's own height`).toBeCloseTo(
+        s.panel.height,
+        5,
+      );
+    }
+  });
+
+  it('is about a cover the browser actually found, not one this file argued for', () => {
+    // Every caught point came back from `document.elementFromPoint` at a point on
+    // the door's OWN reported rect. Two things have to hold or the table is fiction:
+    // the point is inside the door the seam reported, and it is inside the band the
+    // panel was measured standing in.
+    const caught = MEASURED_REFUSALS.flatMap((s) =>
+      s.caught.map((c) => ({ s, c, door: s.doors.find((d) => d.kind === c.door) })),
+    );
+    expect(caught.length, 'the capture proved at least one cover').toBeGreaterThan(0);
+    for (const { s, c, door } of caught) {
+      expect(door, `${s.viewport}: ${c.door} was reported by the seam`).toBeDefined();
+      expect(
+        c.x >= door!.box.x && c.x <= door!.box.x + door!.box.width,
+        `${s.viewport}: ${c.door} ${c.at} is on the door horizontally`,
+      ).toBe(true);
+      expect(
+        c.y >= door!.box.y && c.y <= door!.box.y + door!.box.height,
+        `${s.viewport}: ${c.door} ${c.at} is on the door vertically`,
+      ).toBe(true);
+      // …and the thing the browser named is one of the panel's own buttons.
+      expect(
+        s.buttons.some((b) => c.topmost.includes(b.id)),
+        `${s.viewport}: ${c.door} ${c.at} was taken by the refusal`,
+      ).toBe(true);
+    }
+  });
+
+  it('withdraws from every door the browser caught it covering — as SHIPPED, it did not', () => {
+    // The half that says the fix is a fix. The panel's measured band, laid over the
+    // doors the SHIPPED layout draws (no reservation — `refusalHeight` absent is
+    // today's screen to the pixel), has to cover the plates a0-111 named. The same
+    // band's replacement, over the reserved layout, has to cover none.
+    const phone = MEASURED_REFUSALS[0]!;
+    const shipped = namedDoors(layoutFor(phone, 0));
+    expect(
+      refusalCovers(phone.panel, shipped),
+      'the shipped screen: the panel is on CAMPAIGN and HOST',
+    ).toEqual(['CAMPAIGN', 'HOST']);
+    expect(refusalCovers(layoutFor(phone, phone.panel.height).refusal, shipped).length).toBeGreaterThan(0);
+  });
+
+  it('gets off the failure line too — the desk case no sweep of CONTROLS can see', () => {
+    // `messageBounds` is words, not a control, so it is in no table of controls and
+    // was in none of a0-98's. On a desk the panel's band is y92-161 and the message
+    // is y120-164: the red words the player is being asked to report are behind the
+    // button offering to report them, and `elementFromPoint` at the message's own
+    // reported centre says so.
+    const desk = MEASURED_REFUSALS[1]!;
+    expect(desk.press.covered.topmost).toContain('pr-connect-trace-download');
+    expect(rectsOverlap(desk.panel, desk.message), 'as shipped, the panel is on the failure line').toBe(true);
+    for (const s of MEASURED_REFUSALS) {
+      const layout = layoutFor(s, s.panel.height);
+      expect(rectsOverlap(layout.refusal, layout.message), `${s.viewport}: the refusal stands on the failure`).toBe(
+        false,
+      );
+    }
+  });
+
+  it('proves the doors are LIVE under it, which is why moving the refusal is the fix', () => {
+    // a0-114's brief asks which is true — the doors are pressable behind the
+    // refusal, or they are inert and must stop looking live. Two real presses on one
+    // CAMPAIGN plate settle it, and nothing else differs between them.
+    const phone = MEASURED_REFUSALS[0]!;
+    // Where the panel is NOT: the canvas took the press and the client moved.
+    expect(phone.press.clear.topmost).toBe('CANVAS#app');
+    expect(phone.press.clear.moved.length, 'the door under the refusal is live').toBeGreaterThan(0);
+    // Where the panel IS: the button took it, the client did not move at all, and a
+    // thumb aimed at CAMPAIGN came back with a JSON file — a0-98's press proof,
+    // happening to the other log button.
+    expect(phone.press.covered.topmost).toContain('pr-connect-trace-download');
+    expect(phone.press.covered.moved).toEqual([]);
+    expect(phone.press.covered.downloaded).toMatch(/^planet-rush-log-/);
+    // Both points are on the same plate.
+    const campaign = phone.doors.find((d) => d.kind === 'campaign')!;
+    for (const p of [phone.press.clear, phone.press.covered]) {
+      expect(p.x >= campaign.box.x && p.x <= campaign.box.x + campaign.box.width).toBe(true);
+      expect(p.y >= campaign.box.y && p.y <= campaign.box.y + campaign.box.height).toBe(true);
+    }
+  });
+
+  it('does NOT withdraw the refusal — a refused player still gets RETRY and DOWNLOAD LOG', () => {
+    // The other half, and the half a nervous fix gets wrong. a0-98 could withdraw
+    // its offer because the same button was one press away on the pause menu; there
+    // is no second RETRY on this screen and no second way to report a join that
+    // never landed. The strip is a PLACE, and it is always a real one.
+    for (const s of MEASURED_REFUSALS) {
+      const layout = layoutFor(s, s.panel.height);
+      expect(layout.refusal.width, `${s.viewport}: the strip has width`).toBeGreaterThan(0);
+      expect(layout.refusal.height, `${s.viewport}: the strip has height`).toBeGreaterThan(0);
+      // Under the message it belongs to, never above it (`connect-trace-view`: "right
+      // under the line that just told the player what went wrong").
+      expect(layout.refusal.y, `${s.viewport}: the strip is under the failure`).toBeGreaterThanOrEqual(
+        layout.message.y + layout.message.height,
+      );
+      // …and the doors are still all on the screen under it.
+      for (const d of layout.doors) {
+        expect(d.height, `${s.viewport}: a door was squeezed to nothing`).toBeGreaterThan(0);
+        expect(d.y + d.height, `${s.viewport}: a door was pushed into the footer`).toBeLessThanOrEqual(
+          layout.footer.y + 0.5,
+        );
+      }
+    }
+  });
+
+  it('is a no-op on every screen with nothing failed on it', () => {
+    // The reservation must cost nothing where there is no refusal, or every golden
+    // of the doors moves for a state that is not on them.
+    for (const s of MEASURED_REFUSALS) {
+      const shipped = layoutFor(s, 0);
+      expect(shipped.refusal).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+      for (const [i, d] of shipped.doors.entries()) {
+        expect(d, `${s.viewport}: door ${i} moved with no refusal up`).toEqual(s.doors[i]!.box);
+      }
+      expect(shipped.message).toEqual(s.message);
+    }
+  });
+
+  it('is total — every height has an answer, so no frame can fall through it', () => {
+    // Including the absurd ones. A DOM measurement can come back as anything: a font
+    // that never loaded, a hint that wrapped six times, a viewport 200px tall.
+    for (const s of MEASURED_REFUSALS) {
+      for (const h of [0, -1, 0.5, 44, 200, 10_000, Number.MAX_SAFE_INTEGER]) {
+        const layout = layoutFor(s, h);
+        expect(refusalCovers(layout.refusal, namedDoors(layout)), `${s.viewport} @ ${h}`).toEqual([]);
+        expect(rectsOverlap(layout.refusal, layout.message), `${s.viewport} @ ${h}`).toBe(false);
+        expect(layout.refusal.height).toBeLessThanOrEqual(s.height);
+        expect(Number.isFinite(layout.refusal.y)).toBe(true);
       }
     }
   });

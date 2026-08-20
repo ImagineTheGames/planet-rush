@@ -932,3 +932,54 @@ profiles by 3 control schemes, built from each element's own exported anchor
 constant and its own pure placement function. It was RED on the merged tree, on
 the minimap and nothing else, 24 violations
 (`evidence/a0-103-anchor-reach/red-before-the-fix.txt`).
+
+---
+
+### 4.14 SURFACE — an overlap the placement cannot honestly ask itself (a0-114, 2026-08-20)
+
+| Export | Verdict |
+|---|---|
+| `src/ui/refusal-strip.ts#overlaps` | SURFACE — the primitive: do two rects share a pixel |
+| `src/ui/refusal-strip.ts#refusalCovers` | SURFACE — the check itself: which doors the strip stands on, by name |
+| `src/ui/refusal-strip.ts#REFUSAL_MAX_BAND_SHARE` | SURFACE — the floor the clamp will not go below, so a spec can assert it without restating it |
+
+This is the §4.7 shape — *an invariant that must not be the code it checks* — and
+`refusal-strip.ts` splits cleanly down that line. Its two live exports are the
+**placement**: `lobby-geometry` calls `refusalStrip` to get the band the refusal
+stands in and `contentTopBelow` to start the doors below it. The three above are
+the **check**, and there is no honest production call site for them:
+
+- **A caller inside the placement would be the arithmetic asserted against
+  itself.** `contentTopBelow` is what puts the doors below the strip, so the
+  overlap it computes is zero by construction. A `refusalCovers` call next to it
+  can only fail when the function that just made the reservation is wrong — and
+  then it is wrong in the check by the same amount. That is the failure mode
+  §4.13 was written about, one screen over.
+- **The two rects are not in the same coordinate system inside this lane.** The
+  covering surface is `src/net/connect-trace-view`'s DOM panel, `position:fixed`
+  in physical page px; the doors are canvas rects in the entry screen's logical
+  space. They only meet after `src/main.ts` measures the panel and converts it,
+  which is also why the placement takes its height as an *input* rather than
+  reading it. The one honest production caller is that layout host, and the
+  surface it would be checking belongs to another lane's file.
+
+What holds it instead is `src/net/playtest-log-button.test.ts` — *a refusal never
+covers the door that was pressed* — which runs the check over every door the
+entry layout reports, at both shipped viewport profiles, and over seven panel
+heights including the absurd ones (`0`, `-1`, `0.5`, `10_000`,
+`MAX_SAFE_INTEGER`) so no measurement a browser can return falls through it. Two
+of its cases are the ones that matter: against the SHIPPED layout — no
+reservation, today's screen to the pixel — the panel's measured band returns
+`['CAMPAIGN', 'HOST']`, which is a0-111's screenshot restated as a list; against
+the reserved layout it returns `[]`.
+
+**Why this is a check and not a sweep.** a0-98 already swept this state, drove it
+through a real refusal on this exact profile, and reported `"collisions": []`. It
+asked the question at ONE point per control — the centre — and the HOST plate's
+centre (y=172.5) is below where the buttons end (y≈160), so the centre answered
+`CANVAS#app` truthfully while the top of the word HOST was under an opaque
+button. `overlaps` is deliberately a RECT test for that reason: a cover taking the
+top third of a plate is a collision, and no number of probe points is a proof
+that it is not. The probe was fixed too
+(`evidence/a0-98-corner-collisions-everywhere-else/probe.ts`, nine points off each
+control's own reported box), but the rect test is the half that cannot miss.

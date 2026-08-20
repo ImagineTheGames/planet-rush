@@ -109,6 +109,7 @@ import {
 } from '../art/materials';
 import type { FrameMetrics, PlateScale } from '../art/materials';
 import { beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
+import { contentTopBelow, refusalStrip } from './refusal-strip';
 
 // ---------------------------------------------------------------------------
 // Safe area
@@ -141,6 +142,19 @@ export interface LobbyLayoutOptions {
    * that is not there.
    */
   readonly claim?: boolean;
+  /**
+   * How tall the REFUSAL surface standing on this screen measured, in logical px
+   * — `src/net/connect-trace-view`'s RETRY and DOWNLOAD LOG (a0-114). Default
+   * **0**, which is every screen with nothing failed on it, and which lays out to
+   * the pixel it always did.
+   *
+   * It is a measurement rather than a constant because the surface is DOM: its
+   * height is its own font's, its own wrapping and its own button count, and a
+   * number written down here would be a second opinion about it. `src/main.ts`
+   * reads the rendered box and converts it through the same landscape-lock
+   * transform every pointer crosses. See {@link ./refusal-strip}.
+   */
+  readonly refusalHeight?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1719,6 +1733,14 @@ export interface EntryLayout {
   readonly eyebrow: Rect;
   /** The one line under it: the prompt, or the failure (`./lobby-entry`). */
   readonly message: Rect;
+  /**
+   * The strip directly under {@link message} that a refusal's own DOM buttons
+   * stand in (`./refusal-strip`, a0-114) — and that the screen's content starts
+   * BELOW. **Zero-extent unless {@link LobbyLayoutOptions.refusalHeight} asked for
+   * it**, which is what makes every screen without a refusal on it identical to
+   * the one that shipped.
+   */
+  readonly refusal: Rect;
   /** The four doors, in `DOOR_ORDER`. Home screen. */
   readonly doors: readonly Rect[];
   /** How those doors were arranged — one column or two. */
@@ -1820,6 +1842,7 @@ export function entryTargetKey(target: EntryTarget | null): string | null {
  */
 export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}): EntryLayout {
   const isTouch = options.isTouch ?? false;
+  const refusalHeight = options.refusalHeight ?? 0;
   const frame = gantryFrame(viewport, options.insets);
   const m = frame.metrics;
 
@@ -1878,7 +1901,12 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     width: frame.band.width,
     height: messageHeight,
   };
-  const middleY = message.y + messageHeight + m.gutter;
+  // a0-114: a refusal's own buttons are a fixed DOM surface that lands between the
+  // message and the doors, and until this line the doors were laid out straight
+  // through it. The strip is claimed FIRST and the band resumes below it, so the
+  // plate a thumb is aimed at is the plate it hits.
+  const refusal = refusalStrip({ message, band: frame.band, gutter: m.gutter, height: refusalHeight });
+  const middleY = contentTopBelow(message, refusal, m.gutter);
   const middle: Rect = {
     x: frame.band.x,
     y: middleY,
@@ -1901,6 +1929,7 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     title,
     eyebrow,
     message,
+    refusal,
     doors,
     doorShape,
     ...placeCodeEntry(middle, join.cellsRow),

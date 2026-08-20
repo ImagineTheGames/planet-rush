@@ -172,6 +172,7 @@ import {
   // into the right words.
   LobbyEntryView,
   entryLayout,
+  NO_STRIP,
   entryTargetKey,
   DOOR_OPTIONS,
   createEntry,
@@ -384,6 +385,7 @@ import type {
   PauseButton,
   UiCue,
   EntryState,
+  EntryLayout,
   EntryTarget,
   EntryDoor,
   EntryNarration,
@@ -431,6 +433,7 @@ import {
   connectTraceLogEntry,
   connectTraceModel,
   connectTransportState,
+  CONNECT_TRACE_ROOT_ID,
   hideConnectTrace,
   installConnectTraceView,
   showConnectTrace,
@@ -8711,6 +8714,92 @@ function openMainMenu(
     );
   }
 
+  // --- a0-114: the refusal's own buttons, and the strip they stand in --------
+  //
+  // `src/net/connect-trace-view` puts RETRY and DOWNLOAD LOG on the screen when a
+  // CREATE or a JOIN is refused. It is DOM, `position:fixed`, and it used to stand
+  // at a CONSTANT distance from the top of the page — which on a 798x384 phone put
+  // DOWNLOAD LOG on the top third of the HOST plate (a0-111: the failure message
+  // for HOST, drawn over the word HOST) and on a 1280x800 desktop put it on the
+  // failure line itself. The doors underneath stay LIVE while it is up, measured
+  // rather than assumed: two presses on one CAMPAIGN plate, one where the panel is
+  // and one where it is not, and only the second one moved the client
+  // (`evidence/a0-114-refusal-over-the-doors`). So the panel has to get off them.
+  //
+  // The rule is `@ui` refusal-strip; these two functions are its only edge with the
+  // page. Nothing here decides anything — one measures, one places.
+
+  /**
+   * The page-space origin of the canvas the game draws into. Zero while the canvas
+   * fills the window, which it does on every profile this ships to; READ rather
+   * than assumed, because a subpath boot can embed it (tests/live-stage/subpath).
+   */
+  function canvasPageOrigin(): { x: number; y: number } {
+    const r = app.canvas.getBoundingClientRect();
+    return { x: r.left, y: r.top };
+  }
+
+  /**
+   * How tall the refusal panel actually is this frame, in the entry screen's own
+   * LOGICAL px — `0` when nothing has failed and it is not on screen at all.
+   *
+   * Measured off the rendered box rather than written down, because the surface is
+   * DOM: its height is its own font's, its own wrapping and its own button count
+   * (`renderConnectTraceHtml` draws one button or two), and a constant here would
+   * be a second opinion about a thing that can answer for itself. That constant is
+   * exactly what a0-114 is.
+   *
+   * **Zero under the landscape lock, deliberately.** With the root rotated, this
+   * fixed DOM band lies ACROSS the logical screen rather than above it, and a
+   * horizontal strip is not the shape of the room it needs — placing it would take
+   * a guess where this file otherwise measures. A rotated boot therefore keeps
+   * exactly the behaviour it had before a0-114, and the portrait cell is carried
+   * as a measured, unfixed row in the capture rather than quietly claimed.
+   */
+  function refusalHeightLogical(): number {
+    if (ctx.isRotated()) return 0;
+    const el = document.getElementById(CONNECT_TRACE_ROOT_ID);
+    if (!el || el.hidden) return 0;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return 0;
+    // `toLogical` takes raw client coordinates and subtracts the canvas rect
+    // itself, so this is the panel's height in the space the doors are laid out in.
+    const top = ctx.toLogical(r.left, r.top);
+    const bottom = ctx.toLogical(r.left, r.bottom);
+    return Math.abs(bottom.y - top.y);
+  }
+
+  /**
+   * Stand the panel in the strip the screen just kept clear for it.
+   *
+   * **Only `top` is written.** The panel centres itself on the page and the band
+   * centres itself in the same viewport, so the horizontal half already agrees;
+   * leaving its width alone also means placing it cannot change its height, which
+   * is what keeps {@link refusalHeightLogical} a measurement and not a loop.
+   *
+   * An empty strip hands the element back to its own stylesheet, so a screen with
+   * no refusal on it — and a rotated boot — is byte-identical to before a0-114.
+   */
+  function standRefusalInStrip(strip: Rect): void {
+    const el = document.getElementById(CONNECT_TRACE_ROOT_ID);
+    if (!el) return;
+    if (strip.width <= 0 || strip.height <= 0) {
+      el.style.removeProperty('top');
+      return;
+    }
+    const origin = canvasPageOrigin();
+    el.style.top = `${Math.round(origin.y + ctx.toPhysical(strip.x, strip.y).y)}px`;
+  }
+
+  /** The entry screen's rects as they are being DRAWN this frame — the reservation
+   *  included. Every reader goes through here: a seam that laid the screen out
+   *  without the strip would report doors at points nobody drew, which is the class
+   *  of bug the seam exists to catch. */
+  function entryLayoutNow(): EntryLayout {
+    const { w, h } = ctx.logicalSize();
+    return entryLayout({ width: w, height: h }, { isTouch, refusalHeight: refusalHeightLogical() });
+  }
+
   function render(): void {
     // The doors were torn down while somebody was still holding this function.
     // `entryView` and its siblings are destroyed Graphics by now — `backdrop.clear()`
@@ -8740,6 +8829,11 @@ function openMainMenu(
     }
     if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
     if (entryView.visible) {
+      // a0-114, and the order is the whole of it: MEASURE the refusal surface,
+      // give it a strip of the band, draw the screen around that strip, then stand
+      // the surface in it. A screen cannot lay out around a thing it has not
+      // measured, and a surface cannot be placed in a strip that does not exist yet.
+      entryView.reserveForRefusal(refusalHeightLogical());
       // The list's model is built only when the list is the thing on screen: it
       // reads the clock, and a screen nobody is looking at has no age to stamp.
       entryView.update(
@@ -8747,6 +8841,11 @@ function openMainMenu(
         browsing() ? browseModelNow() : null,
       );
     }
+    // Off this screen the panel goes back to its own stylesheet, unconditionally.
+    // An inline `top` left behind by a refusal on the doors would follow the panel
+    // onto whatever screen came next, which is the same class of bug one screen
+    // over — chrome placed against a layout that is no longer there.
+    standRefusalInStrip(entryView.visible ? entryView.refusalStrip : NO_STRIP);
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -8783,8 +8882,7 @@ function openMainMenu(
     onlineSeam.regionPickerVisible = regionPickerVisible(onlineRegions);
     onlineSeam.regionSelected = selectedRegion() ?? null;
     onlineSeam.regionLine = formatRegionChoices(onlineRegions, selectedRegion());
-    const { w, h } = ctx.logicalSize();
-    const layout = entryLayout({ width: w, height: h }, { isTouch });
+    const layout = entryLayoutNow();
     const point = (r: Rect): { x: number; y: number } =>
       ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2);
     // Both corners through the rotation, then re-normalised — under the landscape
@@ -8986,8 +9084,7 @@ function openMainMenu(
   /** The list's frame model, built against the rects the layout actually has —
    *  so what did not fit is COUNTED rather than dropped (`browseModel.hidden`). */
   function browseModelNow(): ReturnType<typeof browseModel> {
-    const { w, h } = ctx.logicalSize();
-    const layout = entryLayout({ width: w, height: h }, { isTouch });
+    const layout = entryLayoutNow();
     return browseModel(browse, {
       now: Date.now(),
       regions: onlineRegions,
@@ -10274,6 +10371,10 @@ function openMainMenu(
     // browser calls, but not the work already in flight that calls US. Flipping the
     // latch here is what makes the lines after it safe (u12-01).
     life.dispose();
+    // …and give the refusal panel back to its own stylesheet. It is DOM, so it
+    // outlives every view in this function, and a `top` written for a doors layout
+    // that no longer exists is exactly the stranded-chrome failure u12-01 is about.
+    standRefusalInStrip(NO_STRIP);
     app.canvas.removeEventListener('pointerdown', onPointerDown);
     app.canvas.removeEventListener('pointermove', onPointerMove);
     app.canvas.removeEventListener('pointerup', onPointerUp);

@@ -181,8 +181,22 @@ export class LobbyEntryView extends Container {
    *  one, so a tap can never land on a control the other mode is covering. */
   private mode: EntryModel['mode'] = 'browse';
 
+  /** The viewport this screen was last laid out for. Kept because a refusal can
+   *  claim a strip of the band at any moment ({@link reserveForRefusal}) and the
+   *  re-layout that follows needs the same numbers the last one used. */
+  private vp: { width: number; height: number };
+  /** The safe area the last layout used, for the same reason. */
+  private vpInsets: Insets | undefined;
+  /** How tall the refusal surface standing over this screen measured, logical px
+   *  — `src/net/connect-trace-view`'s RETRY and DOWNLOAD LOG (a0-114). Zero on
+   *  every screen with nothing failed on it, which is every screen this class
+   *  drew before a0-114. */
+  private refusalHeight = 0;
+
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
+    this.vp = { width: screenWidth, height: screenHeight };
+    this.vpInsets = insets;
     this.layout = entryLayout({ width: screenWidth, height: screenHeight }, opts(isTouch, insets));
 
     this.wordmark = makeText('PLANET RUSH', FONT_HEADING, WORDMARK_PX, MATERIAL_SHADES.bone);
@@ -213,10 +227,40 @@ export class LobbyEntryView extends Container {
 
   /** Re-lay-out for a new viewport, device or safe area. */
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
-    this.layout = entryLayout({ width, height }, opts(isTouch, insets));
+    this.vp = { width, height };
+    this.vpInsets = insets;
+    this.layout = entryLayout({ width, height }, opts(isTouch, insets, this.refusalHeight));
     // The cached texture is the size the OLD viewport rasterised to; refreshing
     // it in place would blit a stale-sized screen, so drop it (./screen-cache).
     this.cache.invalidate();
+  }
+
+  /**
+   * **Keep a strip of the band clear for the refusal standing over this screen**
+   * (a0-114; the rule and the whole of the why is `./refusal-strip`).
+   *
+   * `height` is a MEASUREMENT of `src/net/connect-trace-view`'s panel, in this
+   * screen's own logical px, taken by `src/main.ts` from the rendered box and put
+   * through the same landscape-lock transform every pointer crosses. Zero takes
+   * the strip away again, and a screen with no refusal on it lays out to the pixel
+   * it always did.
+   *
+   * Idempotent, and it is called every render: a re-layout that ran on a height
+   * that had not changed would drop the doors' cached texture every frame the
+   * refusal is up (`./screen-cache`).
+   */
+  reserveForRefusal(height: number): void {
+    const next = Math.max(0, Number.isFinite(height) ? height : 0);
+    if (next === this.refusalHeight) return;
+    this.refusalHeight = next;
+    this.layout = entryLayout(this.vp, opts(this.layout.isTouch, this.vpInsets, next));
+    this.cache.invalidate();
+  }
+
+  /** The strip the refusal was given, in this screen's logical space — the rect
+   *  `src/main.ts` stands the DOM panel in. Zero-extent when none is up. */
+  get refusalStrip(): Rect {
+    return this.layout.refusal;
   }
 
   /**
@@ -750,8 +794,13 @@ export class LobbyEntryView extends Container {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function opts(isTouch: boolean, insets?: Insets): { isTouch: boolean; insets?: Insets } {
-  return insets ? { isTouch, insets } : { isTouch };
+function opts(
+  isTouch: boolean,
+  insets?: Insets,
+  refusalHeight = 0,
+): { isTouch: boolean; insets?: Insets; refusalHeight?: number } {
+  const base = insets ? { isTouch, insets } : { isTouch };
+  return refusalHeight > 0 ? { ...base, refusalHeight } : base;
 }
 
 function setVisible(visible: boolean, ...nodes: Array<Graphics | Text>): void {
