@@ -1,0 +1,122 @@
+# a0-102 — the ore counter has a ground now, and it is the HUD's own
+
+QA failed the top-left of both a0-99 profiles: the counter *"drawn straight onto
+whatever the world put there"*, with an asteroid carrying a **yellow ore crystal**
+and a **gold vein ring** within a few tens of pixels of the counter's own
+signal-yellow numeral. They were explicit that the frame was still readable, and
+just as explicit about why that is not the point: *"what it has is no guarantee
+that it will be, and the thing most likely to drift under a counter that reads
+ore is a rock with ore on it."*
+
+## Which of the two it was
+
+The brief asked me to say whether the HUD already had a treatment for this or
+whether no readout had one. **It has one, and this counter was drawing it.**
+
+Every corner readout — `ORE`, `HOME`, the wave clock — wears the same chrome:
+a `SCRIM.corner` scrim closed by a Bone edge rule, never a plate (`./instrument`,
+u7-07). `Hud.drawOreChrome` was calling `drawScrim` on every frame the number
+changed. So this is not a missing-language finding.
+
+**The bug is that the scrim was sized to a rect coincident with its own type.**
+
+```
+width  = max(labelWidth, numeralWidth) + hudSpace(18)   // from the glyphs' own x
+height = ruleY + hudSpace(SCRIM_BLEED)                  // from the glyphs' own y
+```
+
+All 18 px of slack sat to the **right** of the numeral, and none above, below or
+left of it. A scrim decays to nothing at every edge — that is exactly what makes
+it a scrim instead of a panel — so a rect coincident with the type puts the type
+in the falloff. Measured on the shipped baseline at the desktop reference:
+
+| where                           | coverage |
+|---------------------------------|----------|
+| `ORE`, leading glyph            | 0.15     |
+| `ORE`, mid                      | 0.37     |
+| banked numeral, leading column  | 0.15     |
+| the closing rule                | 0.09–0.40|
+| the one point that reached peak | 0.55     |
+
+`SCRIM.corner`'s own doc says 0.55 is *"enough that 11px Oxanium survives a lit
+asteroid passing under it, **and no more**"*. By that file's own stated reasoning
+everything under 0.55 is not enough, and 0.55 was being reached at a single point
+no glyph was standing on. **Chrome that was drawn and could not be seen.** QA read
+the frame correctly.
+
+There is a matching false premise in the test suite, which is how this survived a
+file that already measured the right number: `instrument.test.ts`'s *"the stated
+peak is a plateau the readout sits on"* asserts the peak at ±0.29 of the rect from
+its centre and commented *"which is where the label's own glyphs are"*. They were
+not — they were at the corner. Corrected in place.
+
+## The fix
+
+- **`instrument.ts`** — `scrimPlateau(rect, anchor)`: the part of a scrim that is
+  actually dark, i.e. the innermost band where the advertised peak is reached and
+  held. And `scrimGround(ink)`: the smallest `center` scrim whose plateau covers a
+  given ink box. `drawScrim` now takes its taper from the same `scrimTaper` solve,
+  so the three cannot drift apart.
+- **`hud-geometry.ts`** — `oreCounterLayout(label, numeral, scale)`: pure, fed
+  measured text, returning the two lines, the rule, the cluster's ink box and the
+  ground under all of it. `TOTAL_LABEL_H` moved here as `ORE_LABEL_LEADING`, with
+  the eyebrow/bank reference sizes, for `PROMPT_TYPE`'s reason — the ground has to
+  be sized before any `Text` exists, so the geometry has to know the size.
+- **`hud.ts`** draws from it and places both lines from it.
+
+**Why the counter moved.** The falloff has to go somewhere, and there are only two
+places: onto the type, or into padding. It could not be bled outward — `ore-hud`
+registers at `top-left` with margin `HUD_PAD`, `describeLayout` records what the
+element *draws*, and a ground reaching past the margin fails QA's layout contract
+on a real device (`tests/mobile/layout.spec.ts` failed on exactly that when the
+corner scrims were first written; hud.ts carries the note). So the ground keeps
+the corner and the type sits inside it, a third of the ink box in — that third is
+what `1 / SCRIM_CORE` costs. The 18 px the cluster always carried is still 18 px;
+it is split either side of the type now instead of spent entirely to the right,
+where nothing was reading. `SCRIM_BLEED` is part of that inflation rather than
+added by hand.
+
+**The numeral's colour is untouched.** Signal yellow is ore by the palette
+contract (style-guide §2) and the palette audit owns it; the separation comes from
+the ground, as the brief requires.
+
+Two things came along because they would otherwise have regressed:
+
+- Cost floats aimed at a hardcoded `PAD + 8, PAD + TOTAL_LABEL_H`. The numeral
+  moved, so they now aim through the layout and off `oreGroup.x` — which also
+  makes them follow the content box on an ultrawide, which they did not before.
+- The chrome's redraw key was the banked *number*. The ground is sized from the
+  measured text, so the key is the measured boxes now: `ORE` never changes and its
+  width does, and a cluster first laid out against the boot fallback face would
+  have kept that placement for the whole match.
+
+## Definition of done
+
+- **`the ore counter is legible over any world behind it`** — `hud-geometry.test.ts`.
+  Asserts the ground exists, is the counter's own (never bled past the group
+  origin), and that its **plateau** — not its rect — contains both glyph boxes and
+  the rule. Every profile in the matrix, six bank widths. It is deliberately
+  written against the plateau: the rect is mostly falloff, and falloff is what
+  a0-99 photographed.
+- Beside it, `is the fix a0-102 filed — the shipped rect FAILED the assertion
+  above` reproduces the old sizing and asserts it fails all three containments, so
+  *"failing today"* stays checkable after today.
+- Plus an anchor sweep (the element grew **inward**: `ore-hud` and `banked-total`
+  are still inside `top-left`/`HUD_PAD` everywhere), and four tests in
+  `instrument.test.ts` including one that samples the **drawn** bands' coverage at
+  the ink's four corners rather than trusting the arithmetic.
+- **Evidence**: `evidence/a0-102-ore-counter-ground/shots/*-before-after.png` —
+  the counter over the ore-bearing asteroid, before | after, at 4×, cut from the
+  frozen golden scene on both profiles.
+- **Goldens rebaked** from the merged tree.
+
+## Not changed here — flagged for the Director
+
+`HOME` and the wave clock have the same coincident-edge shape.
+`drawStationChrome` puts all 18 px of its slack to the **left** of the bar and
+none above; the clock pads ±12 in x (it is centre-anchored) but nothing above its
+first line. Neither is as exposed as this one — `HOME` inks a blue bar and bone
+type, not a yellow numeral over yellow rock — and both have dependents that make
+them a brief of their own: the touch zoom control stacks off `stationChromeHeight`
+and the peer-presence banner hangs off the clock's drawn footprint. `scrimGround`
+is there for whoever picks that up.

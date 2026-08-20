@@ -1194,8 +1194,8 @@ export class Hud extends Container {
 
   /**
    * The top-left ore cluster's chrome, in the group's own space (origin at the
-   * ground's top-left, i.e. the HUD margin). Redrawn when the number changes
-   * width, not per frame.
+   * ground's top-left, i.e. the HUD margin). Redrawn when the cluster's measured
+   * type changes, not per frame.
    *
    * **a0-102.** This used to size the scrim to `max(labelWidth, numeralWidth) +
    * 18` from the type's own origin, so every pixel of slack sat to the right of
