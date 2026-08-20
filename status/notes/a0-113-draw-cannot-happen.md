@@ -101,6 +101,27 @@ Ran both failing suites under a throwaway diagnostic (deleted; never committed):
   iteration. The scripted raiders never break two turtles before the collapse —
   a balance observation for the harness owner, out of scope here.
 
+### Re-verified red on `main`, this session (2026-08-20)
+
+Not taken on trust from the earlier run. Threw a detached worktree at `main`
+(`fb2ba5fc`), dropped **only** `src/sim/outcome.test.ts` into it, ran it:
+
+```
+Tests  6 failed | 4 passed (10)
+x every seat dying on the same tick is a draw      -> expected 7 to be null
+x two seats destroying each other on the same tick -> expected +0 to be null
+x the draw does not depend on which core resolved first -> expected 1 to be null
+x collapse taking the last cores together is a draw     -> expected 1 to be null
+x a draw ends the match once and is never re-decided    -> expected 1 to be null
+x both sides' last cores dying on one tick is a draw    -> expected 2 to be null
+```
+
+`expected 7 to be null` on the eight-seat wipe **is QA's screen**: slot 7 is
+their "Player 8". And the two-seat case shows the artefact plainly — kill 1
+then 0 yields winner `0`, kill 0 then 1 yields winner `1`. Same two ships,
+same tick, opposite result, decided by nothing but array order. Worktree
+removed afterwards (`git worktree remove`; no `git clean`, ever).
+
 ## DECISIONS
 
 **Made it a draw; did not keep the tiebreak.** The deciding fact is
@@ -136,10 +157,28 @@ anybody" — and it would have preserved the exact artefact QA photographed.
 
 ## NEXT
 
-- Nothing outstanding on the sim.
-- For the Director: GDD §1 line 49 + line 690 need amending to the draw
-  rule. The sim is now the odd one out until they are.
-- For the Bots owner: review commits 3 and 4 (`50198413`, `2bae6e5f`).
-- For the QA/harness owner: commit 4's second half, and the balance question it
-  exposes — the scripted 2v2 never produces a survivor on any seed 1-10.
-- For the writer/UI: the draw subhead names the collapse only.
+1. ~~Re-verify red on `main`~~ — done this session, above.
+2. Full `npm test -- --run` + `npx tsc --noEmit` green (tsc: clean, exit 0).
+3. Open the PR with the before/after citations. **Not yet open as of the start
+   of this session** — the branch was pushed (`1ef3db67`) with no PR on it.
+4. Nothing outstanding on the sim itself.
+
+### Hand-offs the PR must carry (none of them block this branch)
+
+- **Director:** GDD §1 line 49 and the line-690 changelog fragment still state
+  the last-to-die rule. The sim is now the odd one out until they are amended.
+  I did not edit GDD.md — not my file.
+- **Bots owner:** commits `50198413` and `2bae6e5f` touch `src/bots/*.test.ts`.
+  Assertion-only, no bot logic. They are outside my lane and are flagged as
+  such; they exist because those suites *encoded the tiebreak* and go red the
+  moment the sim stops inventing a winner. `team-winning.test.ts` also has one
+  genuine loosening — `expect(winners).toHaveLength(SEEDS.length)` became
+  `toBeGreaterThan(SEEDS.length / 2)`, because seed 4 is a real draw. Tightening
+  it to an exact count is the owner's call, not mine.
+- **QA/harness owner:** the scripted 2v2 in `tests/harness/match.test.ts` never
+  produces a survivor on ANY seed 1-10 — it was green only because the tiebreak
+  invented one, and its `if (slot.survived)` body never executed. That is a
+  balance question about the scripted raiders, deliberately not fixed here.
+- **Writer/UI:** the draw subhead reads "No reactor survived the collapse.",
+  but a draw also arrives by mutual destruction under fire. Copy untouched per
+  the brief.
