@@ -172,6 +172,7 @@ import {
   // into the right words.
   LobbyEntryView,
   entryLayout,
+  NO_STRIP,
   entryTargetKey,
   DOOR_OPTIONS,
   createEntry,
@@ -8839,8 +8840,12 @@ function openMainMenu(
         entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }),
         browsing() ? browseModelNow() : null,
       );
-      standRefusalInStrip(entryView.refusalStrip);
     }
+    // Off this screen the panel goes back to its own stylesheet, unconditionally.
+    // An inline `top` left behind by a refusal on the doors would follow the panel
+    // onto whatever screen came next, which is the same class of bug one screen
+    // over — chrome placed against a layout that is no longer there.
+    standRefusalInStrip(entryView.visible ? entryView.refusalStrip : NO_STRIP);
     seam.screen = screen;
     updateOnlineSeam();
     logEntryStatus();
@@ -10366,6 +10371,10 @@ function openMainMenu(
     // browser calls, but not the work already in flight that calls US. Flipping the
     // latch here is what makes the lines after it safe (u12-01).
     life.dispose();
+    // …and give the refusal panel back to its own stylesheet. It is DOM, so it
+    // outlives every view in this function, and a `top` written for a doors layout
+    // that no longer exists is exactly the stranded-chrome failure u12-01 is about.
+    standRefusalInStrip(NO_STRIP);
     app.canvas.removeEventListener('pointerdown', onPointerDown);
     app.canvas.removeEventListener('pointermove', onPointerMove);
     app.canvas.removeEventListener('pointerup', onPointerUp);
