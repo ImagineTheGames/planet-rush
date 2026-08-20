@@ -1,0 +1,225 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "tag": "after",
+  "boot": "?debug=1 on the production bundle, fresh context (no carried onboarding memory)",
+  "staged": "a0-99's state: the local ship parked at its own station (__oreHudStage.dock(0))",
+  "damage": "damageCore(0, 2) every 400ms through the sim's own damage function on a tick boundary, held for the whole capture and floored at 30 core HP so the station survives",
+  "pollsToAlarm": 17,
+  "stillUpAfterTheShot": true,
+  "prompt": {
+    "visible": false,
+    "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+    "wrapWidth": 328,
+    "width": 302.2,
+    "height": 42
+  },
+  "device": "touch",
+  "scheme": "tap",
+  "world": {
+    "left": 1775,
+    "top": 1008,
+    "right": 2573,
+    "bottom": 1392,
+    "width": 798,
+    "height": 384
+  },
+  "viewport": {
+    "width": 798,
+    "height": 384
+  },
+  "alarm": {
+    "local": 0,
+    "localPlayer": 0,
+    "allies": [
+      0
+    ],
+    "active": false,
+    "engagements": 0,
+    "sounds": 0
+  },
+  "coreHp": 86,
+  "ship": {
+    "x": 2174,
+    "y": 1200
+  },
+  "home": {
+    "x": 2174,
+    "y": 1200
+  },
+  "homeOnScreen": true,
+  "arrowDrawn": false,
+  "alarmFrameDrawn": true,
+  "promptDrawn": false,
+  "elements": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap",
+    "alarm-frame",
+    "healthbars"
+  ],
+  "rows": [
+    {
+      "id": "ship-local",
+      "anchor": {
+        "region": "center",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 383,
+        "y": 176,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "id": "build-button",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 54,
+        "y": 134,
+        "width": 76,
+        "height": 76
+      }
+    },
+    {
+      "id": "build-badge",
+      "anchor": {
+        "region": "bottom-left",
+        "margin": 8
+      },
+      "bounds": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      }
+    },
+    {
+      "id": "pause-button",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 72,
+        "y": 16,
+        "width": 48,
+        "height": 48
+      }
+    },
+    {
+      "id": "ore-hud",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      }
+    },
+    {
+      "id": "banked-total",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 26.573333333333334,
+        "y": 39,
+        "width": 10.000000000000004,
+        "height": 21
+      }
+    },
+    {
+      "id": "station-hp",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 628,
+        "y": 16,
+        "width": 154.5,
+        "height": 39
+      }
+    },
+    {
+      "id": "zoom-control",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      }
+    },
+    {
+      "id": "nameplates",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 276.3,
+        "y": 104,
+        "width": 25.399999999999977,
+        "height": 16
+      }
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      }
+    },
+    {
+      "id": "alarm-frame",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 798,
+        "height": 384
+      }
+    },
+    {
+      "id": "healthbars",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 378.5,
+        "y": 162,
+        "width": 71.10000000000002,
+        "height": 12
+      }
+    }
+  ]
+}

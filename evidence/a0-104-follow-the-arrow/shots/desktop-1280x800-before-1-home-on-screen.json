@@ -1,0 +1,211 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "tag": "before",
+  "boot": "?debug=1 on the production bundle, fresh context (no carried onboarding memory)",
+  "staged": "a0-99's state: the local ship parked at its own station (__oreHudStage.dock(0))",
+  "damage": "damageCore(0, 2) every 400ms through the sim's own damage function on a tick boundary, held for the whole capture and floored at 30 core HP so the station survives",
+  "pollsToAlarm": 11,
+  "stillUpAfterTheShot": true,
+  "prompt": {
+    "visible": true,
+    "text": "Your station is under attack — follow the arrow",
+    "wrapWidth": 904,
+    "width": 545.76,
+    "height": 19
+  },
+  "device": "keyboard",
+  "scheme": "tap",
+  "world": {
+    "left": 1534,
+    "top": 800,
+    "right": 2814,
+    "bottom": 1600,
+    "width": 1280,
+    "height": 800
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "alarm": {
+    "local": 0,
+    "localPlayer": 0,
+    "allies": [
+      0
+    ],
+    "active": false,
+    "engagements": 0,
+    "sounds": 0
+  },
+  "coreHp": 82,
+  "ship": {
+    "x": 2174,
+    "y": 1200
+  },
+  "home": {
+    "x": 2174,
+    "y": 1200
+  },
+  "homeOnScreen": true,
+  "arrowDrawn": false,
+  "alarmFrameDrawn": true,
+  "promptDrawn": true,
+  "elements": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "onboarding",
+    "nameplates",
+    "minimap",
+    "healthbars",
+    "alarm-frame"
+  ],
+  "rows": [
+    {
+      "id": "ship-local",
+      "anchor": {
+        "region": "center",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 624,
+        "y": 384,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "id": "build-badge",
+      "anchor": {
+        "region": "bottom-left",
+        "margin": 8
+      },
+      "bounds": {
+        "x": 8,
+        "y": 753,
+        "width": 43.5,
+        "height": 13
+      }
+    },
+    {
+      "id": "ore-hud",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 75
+      }
+    },
+    {
+      "id": "banked-total",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 26.573333333333334,
+        "y": 45,
+        "width": 13.000000000000004,
+        "height": 26
+      }
+    },
+    {
+      "id": "controls-strip",
+      "anchor": {
+        "region": "bottom-strip",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 760,
+        "width": 1280,
+        "height": 40
+      }
+    },
+    {
+      "id": "station-hp",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 1106,
+        "y": 16,
+        "width": 158.5,
+        "height": 42
+      }
+    },
+    {
+      "id": "onboarding",
+      "anchor": {
+        "region": "full",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 347.12,
+        "y": 709,
+        "width": 585.76,
+        "height": 41
+      }
+    },
+    {
+      "id": "nameplates",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 517.3,
+        "y": 312,
+        "width": 25.40000000000009,
+        "height": 16
+      }
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 1120,
+        "y": 600,
+        "width": 148,
+        "height": 148
+      }
+    },
+    {
+      "id": "healthbars",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 619.5,
+        "y": 370,
+        "width": 71.10000000000002,
+        "height": 12
+      }
+    },
+    {
+      "id": "alarm-frame",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800
+      }
+    }
+  ]
+}
