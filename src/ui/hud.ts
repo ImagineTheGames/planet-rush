@@ -123,6 +123,8 @@ import type { HudMetrics } from './instrument';
 import {
   ARROW_SIZE,
   arrowPoly,
+  arrowClearOfReadouts,
+  stationHpBounds,
   ALARM_FRAME_INSET,
   ALARM_FRAME_STROKE,
   HUD_PAD,
@@ -2088,6 +2090,30 @@ export class Hud extends Container {
     return this.alarm.cause;
   }
 
+  /**
+   * The wave clock's drawn rect in SCREEN space, or null before the first
+   * `update()` places it.
+   *
+   * The clock is the one M2-adjacent element that does not register with the
+   * layout registry — `top-center` is a third of the viewport wide and the strip
+   * is intrinsically wider, and answering that with `full` would discard the one
+   * placement claim GDD §2.2 actually makes (the argument is in full over
+   * {@link describeLayout}). So there is no seam that reports where it went, and
+   * a0-116 needs one: the whole claim of that fix is that the screen-edge arrow
+   * no longer shares pixels with this rect, and a claim about two rects can only
+   * be evidenced by reading both off the same frame. `alarm-arrow` comes out of
+   * `describeLayout`; this is the other half.
+   *
+   * The rect is `waveClockLayout`'s own — the strip is laid out in content-box
+   * space and drawn from that layout, so this is the scrim that was filled and
+   * not a second measurement of it.
+   */
+  debugWaveClock(): Rect | null {
+    const clock = this.clockLayout;
+    if (!clock) return null;
+    return { ...clock.bounds, x: clock.bounds.x + this.content.x };
+  }
+
   // --- Build/Upgrade wheel ?debug=1 live-stage seam (field report v0.2) ------
 
   /** Whether the wheel view accepts input this frame — read by the cycle
@@ -2317,9 +2343,16 @@ export class Hud extends Container {
     );
     if (visible.onScreen) return;
     const inBox = homeArrow(ship, home, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
+    // …and then off the readouts (a0-116). The edge it rides is the edge the HUD
+    // hangs its instruments from, so on a fifth of the bearings on a landscape
+    // phone the triangle was drawn through the wave clock's first line. It gives
+    // up RADIUS to get clear — never bearing: the pulled-in arrow is still on the
+    // ray from the ship to the station, still at the same angle. See
+    // ./hud-geometry `arrowClearOfReadouts`.
+    const clear = arrowClearOfReadouts(inBox, { x: box.width / 2, y: box.height / 2 }, this.arrowKeepOut());
     // Content-space → screen space. The box is centred, so the ship sits at its
     // middle exactly as it sits at the screen's, and the shift is the one offset.
-    const arrow = { ...inBox, x: inBox.x + box.x };
+    const arrow = { ...clear, x: clear.x + box.x };
     this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn at the clamped edge position.
@@ -2328,6 +2361,57 @@ export class Hud extends Container {
     this.alarmArrow
       .poly(arrowPoly(arrow, ARROW_SIZE))
       .fill({ color: PALETTE.threatRed, alpha: 0.55 + 0.45 * pulse });
+  }
+
+  /**
+   * The readouts the screen-edge arrow has to stay off (a0-116), in CONTENT-BOX
+   * space — the space the arrow is clamped in, so neither has to be translated
+   * twice.
+   *
+   * These are the four groups that carry a number or a word the player *reads*:
+   * the ore counter, the wave clock, the HOME cluster and — on touch — the zoom
+   * control. The same four a0-115's `HUD_READOUT_IDS` names (its `banked-total`
+   * is the numeral inside the ore counter's own ground, so it is already here).
+   * Everything else the HUD draws is either world-space and passes under by
+   * design, or is the fight itself.
+   *
+   * **From the layouts, not from `getBounds()`.** Each rect is the one the
+   * element's own geometry function returned when `layout()`/`update()` placed it
+   * — `oreCounterLayout`'s ground, `waveClockLayout`'s bounds, `stationHpBounds`,
+   * `zoomControlBounds` — so the rect the arrow yields to is the rect the view
+   * drew, and a headless test can compute both from the same functions. (a0-115
+   * measures its keep-out off the live display objects instead, because a
+   * nameplate is arbitrated against what a `Text` really inked. When that lands,
+   * the two want to become one call; noted in that PR and this one.)
+   *
+   * Hidden groups are left out: an element that is not drawn is not in the way.
+   * The station's rect is its INK — the `HOME` label and the bars — and not the
+   * scrim's full depth, which runs on down to the zoom control: darkness is not
+   * something the arrow can make illegible, and the yield should cost only what
+   * the words cost.
+   */
+  private arrowKeepOut(): Rect[] {
+    const box = this.content;
+    const out: Rect[] = [];
+    const ore = this.oreLayout;
+    if (ore) {
+      // `layout()` pins the group at (box.x + PAD, PAD) and the ground's own
+      // origin is (0, 0) there, so the ground in content space is just offset.
+      out.push({
+        x: PAD + ore.ground.x,
+        y: PAD + ore.ground.y,
+        width: ore.ground.width,
+        height: ore.ground.height,
+      });
+    }
+    const clock = this.clockLayout;
+    // Already content space — `updateWave` lays the strip out on the box.
+    if (clock) out.push(clock.bounds);
+    if (this.stationGroup.visible) out.push(stationHpBounds(box.width, this.stationLabel.width));
+    // …and back out of screen space, the one offset `updateZoomControl` added.
+    const zoom = this.zoomRect;
+    if (zoom && this.zoomGroup.visible) out.push({ ...zoom, x: zoom.x - box.x });
+    return out;
   }
 
   // --- Build & Upgrade wheel (GDD §2.5) -----------------------------------

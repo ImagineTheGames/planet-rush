@@ -1481,6 +1481,10 @@ export {
   arrowPoly,
   polyBounds,
   ARROW_SIZE,
+  // a0-116: the arrow rides the edge, and the top edge is where the readouts are.
+  // It gives up radius — never bearing — to stay off them.
+  arrowClearOfReadouts,
+  ARROW_READOUT_PAD,
   ALARM_FRAME_STROKE,
   ALARM_FRAME_INSET,
   WHEEL_SCALE,
