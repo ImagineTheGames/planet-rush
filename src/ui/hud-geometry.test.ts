@@ -87,6 +87,7 @@ import {
 } from './hud-geometry';
 import type { AnnularSector, OreCounterLayout } from './hud-geometry';
 import { contentBox } from './viewport';
+import { pauseButtonRect } from './pause-menu';
 import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
 import { textHeight, textWidth } from './font-metrics';
 import type { TypeSpec } from './font-metrics';
@@ -332,6 +333,45 @@ describe('the banked-ore counter', () => {
     expect(rectContains(plateau, fixed.label, 1e-6)).toBe(true);
     expect(rectContains(plateau, fixed.numeral, 1e-6)).toBe(true);
     expect(rectContains(plateau, fixed.rule, 1e-6)).toBe(true);
+  });
+
+  it('leaves the corner PAUSE BUTTON alone — the other tenant of this corner', () => {
+    // The counter grew, and it grew into a corner that is not empty on touch:
+    // `PAUSE_BUTTON_LEFT` is 72 *precisely* to be "past the top-left ORE block",
+    // and an earlier cut of a0-102 (which kept a 9px rule overhang and then paid
+    // the ground's third on top of it) put `ORE` two pixels off that button on a
+    // landscape phone. The evidence shot caught it; this catches the next one.
+    //
+    // The assertion is on the counter's INK, not on its ground. The ground's outer
+    // fade may pass under the button — it is drawn beneath it and reaches ~zero
+    // coverage out there, so it covers nothing. A GLYPH under the button is the
+    // failure.
+    //
+    // ## The bound, stated
+    //
+    // A cluster sized from its number has no width until you say how big the
+    // number gets, so: **999**. Wheel prices run 1–14 (`src/sim/constants.ts`) and
+    // a hold is at most `CARGO_CAP_MAX` = 8 an trip, so a four-figure bank is not
+    // a state this economy reaches. `PAUSE_BUTTON_LEFT`'s own doc already assumed
+    // it ("a two-to-three digit banked number"); this is that assumption made
+    // checkable. If the economy ever does produce one, THIS test is what fails,
+    // and the fix is to re-derive that constant — not to widen this bound.
+    const WIDEST_BANK = '999';
+    for (const { name, vp, isTouch } of PROFILES) {
+      if (!isTouch) continue; // the button is the touch-only way in (pauseButtonVisible)
+      const button = pauseButtonRect(vp);
+      const box = contentBox({ width: vp.width, height: vp.height });
+      for (const banked of [...BANKED.filter((b) => b.length <= 3), WIDEST_BANK]) {
+        const l = layoutFor(vp, banked);
+        const inkRight =
+          box.x + HUD_PAD + Math.max(l.label.x + l.label.width, l.numeral.x + l.numeral.width);
+        expect(
+          inkRight,
+          `${name} / banked=${banked}: the counter's type reaches x=${inkRight.toFixed(1)}, ` +
+            `and the pause button starts at x=${button.x}`,
+        ).toBeLessThanOrEqual(button.x);
+      }
+    }
   });
 
   it('keeps the whole cluster inside its top-left anchor, on every profile', () => {

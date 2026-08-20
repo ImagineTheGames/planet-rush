@@ -372,9 +372,21 @@ export function panelBounds(
 // and the type sits inside it: `ORE` starts a third of the ink box in from the
 // margin instead of on it.
 //
-// The 18 px the cluster always carried is still 18 px; it is split either side of
-// the type now ({@link ORE_RULE_OVERHANG}) instead of being spent entirely to the
-// right, where nothing was reading.
+// ## What the rule spans, and where the 18 px went
+//
+// The closing rule is exactly as wide as the cluster's widest line of type. It
+// used to overhang by the 18 px the scrim was padded with, and an earlier cut of
+// this branch kept that overhang and then paid the ground's own third on top of
+// it — which put `ORE` two pixels off the corner pause button on a landscape
+// phone ({@link ./pause-menu} `PAUSE_BUTTON_LEFT`, which sits at 72 *precisely*
+// to be clear of this readout). The evidence shot caught it; the clearance is
+// asserted in ./hud-geometry.test.ts now.
+//
+// So the air the 18 px was buying comes from the ground instead, and there is
+// more of it: the ground pads the ink by a third of its own width on each side —
+// ~10 px a side at the reference, against the old 18 on the right only. A rule is
+// a closing edge, not a margin; it does not have to be the widest thing in the
+// cluster to do its job.
 
 /** The eyebrow above a corner readout (`ORE`, `HOME`), reference px. Here rather
  *  than in ./hud for {@link PROMPT_TYPE}'s reason: the ore counter's ground has
@@ -392,10 +404,6 @@ export const ORE_LABEL_LEADING = 14;
 /** Air between the banked numeral and the rule that closes the cluster,
  *  reference px — the same gap the clock keeps ({@link CLOCK_RULE_GAP}). */
 export const ORE_RULE_GAP = 4;
-
-/** How far the closing rule overhangs the widest line of type, each side,
- *  reference px. Two of these is the 18 the cluster has always been drawn with. */
-export const ORE_RULE_OVERHANG = 9;
 
 /** The drawn thickness of the closing rule, CSS px — not scaled: a 1px edge is
  *  1px on every screen, exactly as `drawEdgeRule` draws it. */
@@ -449,21 +457,20 @@ export function oreCounterLayout(
   numeral: OreLine,
   scale: HudScale,
 ): OreCounterLayout {
-  const overhang = hudSpace(ORE_RULE_OVERHANG, scale);
   const widest = Math.max(label.width, numeral.width);
 
   // Ink space first, with the type's left edge at x = 0 and the label's top at
   // y = 0; the whole box is shifted into ground space at the end.
   const numeralY = hudSpace(ORE_LABEL_LEADING, scale);
   const ruleY = numeralY + numeral.height + hudSpace(ORE_RULE_GAP, scale);
-  // The union of the three, computed rather than assumed: the rule is the widest,
-  // leftmost and lowest of them at every size the HUD draws today, but "today" is
-  // what a re-scaled eyebrow would quietly change, and the ground is only correct
-  // if it is sized to everything the cluster actually inks.
+  // The union of the three, computed rather than assumed: the rule is the widest
+  // and lowest of them at every size the HUD draws today, but "today" is what a
+  // re-scaled eyebrow would quietly change, and the ground is only correct if it
+  // is sized to everything the cluster actually inks.
   const ink = union(
     { x: 0, y: 0, width: label.width, height: label.height },
     { x: 0, y: numeralY, width: numeral.width, height: numeral.height },
-    { x: -overhang, y: ruleY, width: widest + overhang * 2, height: ORE_RULE_THICKNESS },
+    { x: 0, y: ruleY, width: widest, height: ORE_RULE_THICKNESS },
   );
 
   // …then the ground that has to hold it, and the offset that puts the ground's

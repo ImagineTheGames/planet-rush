@@ -108,7 +108,33 @@ Two things came along because they would otherwise have regressed:
 - **Evidence**: `evidence/a0-102-ore-counter-ground/shots/*-before-after.png` —
   the counter over the ore-bearing asteroid, before | after, at 4×, cut from the
   frozen golden scene on both profiles.
-- **Goldens rebaked** from the merged tree.
+
+  Measured on those two frames, in luminance:
+
+  | | before | after |
+  |---|---|---|
+  | ore crystals inside the counter's footprint (162 px) | **177.7** | **58.6** |
+  | the banked numeral itself | 187.1 | 187.1 |
+  | numeral ÷ crystal | **1.05×** | **3.19×** |
+
+  QA's words were *"the same hue, at a similar size, with nothing separating
+  them"*. At 1.05× there was nothing separating them. The numeral did not move a
+  shade — the ore behind it lost two thirds of its luminance, because the ground
+  dims everything under it and the readout is drawn on top of the ground.
+
+- **Goldens rebaked** from the merged tree — with a caveat QA should see.
+  `--update-snapshots` rewrote **nothing**: this change passes the existing
+  baselines. `maxDiffPixelRatio` is 0.01, i.e. 1,229 px of the 122,880 px top
+  band; the moved glyphs and rule come to roughly half that, and the scrim's
+  darkening of the rock falls under `pixelmatch`'s per-pixel threshold and is not
+  counted at all. A change this visible to a reader is invisible to that gate.
+  I rebaked the two HUD-band baselines deliberately (deleted and regenerated),
+  since they exist to depict the corner instruments; the full-frame baselines were
+  left alone because they pass and rewriting them wholesale would put antialiasing
+  churn in the diff. **The tolerance is QA's and is untouched** — flagging it, not
+  changing it.
+- `tests/mobile/layout.spec.ts` re-run: the grown element is still inside its
+  declared anchor on a real device.
 
 ## Not changed here — flagged for the Director
 

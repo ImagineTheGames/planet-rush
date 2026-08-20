@@ -50,3 +50,41 @@ past the margin fails QA's layout contract.
 
 The numeral is the same signal yellow it was. Yellow means ore (style-guide §2);
 the separation comes from the ground.
+
+## The number QA's finding turns on
+
+Measured on the two golden frames above — the ore crystals *behind* the counter,
+and the counter's own numeral, in luminance:
+
+| | before | after |
+|---|---|---|
+| ore crystals inside the counter's footprint (162 px) | **177.7** | **58.6** |
+| the banked numeral itself | 187.1 | 187.1 |
+| numeral ÷ crystal | **1.05×** | **3.19×** |
+
+That is the whole fix in one row. QA's complaint was *"the same hue, at a similar
+size, with nothing separating them"* — and at 1.05× there was nothing separating
+them. The numeral did not move a shade; the ore behind it lost two thirds of its
+luminance, because the ground dims everything drawn under it and the readout is
+drawn on top of the ground.
+
+(The luminance drop is 0.67 where the scrim's coverage is 0.55 because the two
+compose over a crystal much brighter than the rock the constant was reasoned
+about. And it is not 0.55 exactly for the rock either — `SCRIM_COLOR` is
+`PALETTE.vacuum`, not black, so 0.55 coverage of it costs a lit rock ~0.46 of its
+luminance, not 0.55.)
+
+## A note for QA on the golden gate
+
+`--update-snapshots` rewrote **nothing**: this change passes the existing
+baselines. `GOLDEN.maxDiffPixelRatio` is 0.01 — 1,229 px of the 122,880 px top
+band — and the counter's moved glyphs plus its rule come to roughly half that,
+while the scrim's own darkening of the rock is under `pixelmatch`'s per-pixel
+threshold and is not counted at all. So a change this visible to a reader is
+invisible to the gate.
+
+The two HUD-band baselines were therefore rebaked deliberately (deleted and
+regenerated), because they exist to depict the corner instruments and should
+depict the shipped ones. The full-frame baselines were left alone: they pass, and
+rewriting them wholesale would put antialiasing churn in the diff. The tolerance
+itself is QA's and is untouched.
