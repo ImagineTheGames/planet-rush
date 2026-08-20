@@ -19,14 +19,14 @@
  *    the repair channel in `./buildings`, wave spawning in `./waves` — and this
  *    module owns the transition and the one flag they all read.
  *
- *  - **Win/loss, last TEAM to die.** The last *team* with a core standing wins
+ *  - **Win/loss, last TEAM standing.** The last *team* with a core standing wins
  *    (Task D1). In FFA every player is a team of one, so this is the familiar
  *    "one home left standing"; in TEAMS a side keeps playing while any ally's
  *    core survives, and wins the instant the opposing team's last core falls —
  *    even while two of its own homes still stand. If the final cores of the last
- *    two teams die in the *same tick*, the team whose core reached zero last in
- *    the simulation's resolution order wins — `match.eliminated` is that order,
- *    recorded as it happens, so the tiebreak is a lookup rather than a guess.
+ *    two teams die in the *same tick*, nobody outlived anybody and the match is a
+ *    **draw** (a0-113): `winner` and `winningTeam` are null, and the end screen
+ *    says DRAW.
  *
  * Determinism (GDD §4.8): fixed iteration order, no RNG (debris scatters on an
  * index-derived ring, exactly like a ship's death drop), every rate `* dt`.
@@ -139,8 +139,9 @@ export function destroyCore(world: World, station: MiningStation, by?: PlayerId)
 
 /**
  * Record the death in the elimination order and pay out the wreck. The push onto
- * `match.eliminated` *is* the last-to-die order, so it happens here, in
- * resolution order, rather than being reconstructed later from timestamps.
+ * `match.eliminated` *is* the death order, so it happens here, in resolution
+ * order, rather than being reconstructed later from timestamps. It records who
+ * fell and when; it does not decide the match (a0-113 — see {@link resolveWinner}).
  *
  * The `eliminated` guard below makes this the once-per-death point, which is why
  * the station kill is credited HERE rather than in `destroyCore` (which is
@@ -312,12 +313,30 @@ function applyCollapseDecay(world: World, dt: number): void {
  * is teams-of-one (`team` defaults to `owner`, see {@link teamOfStation}), so
  * this reduces to "one home left standing", byte-for-byte the old rule.
  *
- * The tie rule is the interesting half. If the final cores of the last two teams
- * die in the same instant — attackers finishing both homes on one tick, or the
- * collapse taking the last two together — there is no survivor to crown, so the
- * match goes to **whoever's core reached zero last** in the simulation's
- * resolution order. That order is `match.eliminated`, appended to as each core
- * dies; the last entry's *team* wins.
+ * The tie is the interesting half. If the final cores of the last two teams die
+ * in the same instant — attackers finishing both homes on one tick, or the
+ * collapse taking the last two together — there is no survivor to crown, and the
+ * match is a **draw**: `winner` and `winningTeam` stay null.
+ *
+ * ── a0-113: THE SCREEN THAT NAMED A WINNER OVER EIGHT DEAD REACTORS ─────────
+ * This branch used to hand the match to `lastToDie(match.eliminated)` — the last
+ * entry of the elimination order, which `eliminate` appends to as each core
+ * reaches zero. QA killed all eight seats in one call and the summary read
+ * DEFEAT, subhead *"Player 8 won."* Slot 8 did nothing to earn it: within a tick
+ * the elimination order is projectile-array and station-array index, and a
+ * fixed-timestep sim has no time inside a tick for one of those cores to have
+ * fallen "later" than another.
+ *
+ * It was not a corner of the rule either, it was all of it: `resolveWinner` runs
+ * at the end of every step and latches on `ended`, so the surviving-team count
+ * can never walk 1 → 0 — a single surviving team ends the match that tick. The
+ * no-survivor branch therefore fires **only** on a same-tick wipe of the last two
+ * or more teams, which is exactly the case that has no winner in it. So the
+ * tiebreak either always applied (and DRAW, shipped as a headline by a0-108, was
+ * a word for a state the sim could not produce) or it never should have. It never
+ * should have. `match.eliminated` stays exactly as it was — it is the death
+ * order, read by the wreck payout, the harness and the state hash — it just no
+ * longer decides a match.
  *
  * A world with fewer than two stations is not a match (the render/test harnesses
  * run single-slot worlds); it never ends and never declares a winner. Derelict
@@ -345,10 +364,10 @@ function resolveWinner(world: World): void {
     m.winner = survivor;
     m.winningTeam = survivorTeam;
   } else {
-    // Every core is gone: the last team to lose its last core takes it.
-    const last = lastToDie(m.eliminated);
-    m.winner = last;
-    m.winningTeam = last === null ? null : teamOfOwner(world, last);
+    // Every core is gone in the same tick: a draw. Nothing to crown, and the
+    // elimination order is not a ranking (a0-113).
+    m.winner = null;
+    m.winningTeam = null;
   }
   m.phase = 'ended';
   m.endTime = world.time;
@@ -360,19 +379,4 @@ function resolveWinner(world: World): void {
  *  actually decides the match rather than off a ship that may be a wreck. */
 function teamOfStation(station: MiningStation): number {
   return station.team ?? station.owner;
-}
-
-/** The team a given slot fought for, found by its home station — used only for
- *  the same-tick tiebreak, where the winning `PlayerId` is already known and its
- *  team must be reported. Falls back to the id itself (teams-of-one). */
-function teamOfOwner(world: World, owner: PlayerId): number {
-  for (const station of world.stations) {
-    if (station.owner === owner) return teamOfStation(station);
-  }
-  return owner;
-}
-
-/** Whoever died last — the tiebreak, and null if nobody ever did. */
-function lastToDie(eliminated: readonly PlayerId[]): PlayerId | null {
-  return eliminated.length > 0 ? eliminated[eliminated.length - 1]! : null;
 }

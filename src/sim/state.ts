@@ -668,7 +668,8 @@ export interface SensoryMemory {
  *  - `live`     — waves are still arriving or ore is still in the field.
  *  - `collapse` — the field is spent: no shield regeneration, no repair, no new
  *                 ore. Entropy finishes whoever the players don't (GDD §1).
- *  - `ended`    — one station left standing (or none, resolved last-to-die).
+ *  - `ended`    — one team left standing, or none at all: a same-tick wipe of
+ *                 the last teams is a draw (a0-113).
  */
 export type MatchPhase = 'live' | 'collapse' | 'ended';
 
@@ -686,14 +687,17 @@ export interface MatchState {
    *  collapse rules survive the transition to `ended`. */
   collapseTime: number;
   /**
-   * Players eliminated, **in the order their cores reached zero**. This array is
-   * the last-to-die tiebreak (GDD §1): if the final cores die in the same tick,
-   * the last entry — the last core to reach zero in the simulation's resolution
-   * order — is the winner.
+   * Players eliminated, **in the order their cores reached zero**. The death
+   * order, and only that: the wreck payout, the harness's match record and the
+   * state hash all read it, and it is *not* a ranking. It used to be the
+   * last-to-die tiebreak, until a0-113 established that within a tick the order
+   * is array index and nothing a player did — a same-tick wipe of the last teams
+   * is a draw ({@link winner}).
    */
   eliminated: PlayerId[];
-  /** The winning slot once `phase === 'ended'`; null until then, and null in the
-   *  degenerate case where a match had nobody to win it. In TEAMS this is a
+  /** The winning slot once `phase === 'ended'`; null until then, and null for a
+   *  **draw** — every remaining core lost on one tick, so nobody outlived anybody
+   *  (a0-113; `endKind` reads exactly this as DRAW). In TEAMS this is a
    *  *representative* survivor of the winning team (a real `PlayerId`), so every
    *  existing consumer that reads `winner === you` keeps working for the slot
    *  that actually held a core; {@link winningTeam} is the team-level answer. */
@@ -701,7 +705,7 @@ export interface MatchState {
   /**
    * The winning **team** once `phase === 'ended'` — the team that owns the last
    * surviving core(s) (Task D1, TEAMS). In FFA (teams-of-one) it equals `winner`.
-   * Null until the match ends, and null in the degenerate no-winner case.
+   * Null until the match ends, and null for a draw (a0-113).
    *
    * Optional, the same backward-compatible discipline as `Ship.team`/`derelict`:
    * the many hand-built `MatchState` literals other lanes construct (art/vfx, ui,

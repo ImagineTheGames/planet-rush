@@ -22,7 +22,8 @@
  * Day-2 endgame (GDD §1, §2.3, §2.7): the five asteroid waves on their
  * metronome, each landing closer to centre than the last (`./waves`); core
  * destruction, elimination, the wreck and its scavengeable debris; the collapse
- * phase; and win/loss with the last-to-die tiebreak (`./match`).
+ * phase; and win/loss — last team standing, or a draw when the last teams fall
+ * on one tick (`./match`).
  *
  * Day-4 scope (GDD §2.5, §2.11): **ship classes take effect.** Every stat the
  * step reads — acceleration, top speed, turn rate, weapon damage, core damage,
