@@ -53,7 +53,11 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { DeviceKind, FireMode } from '@platform/actions';
-import type { LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+// a0-115: which HUD elements a world-anchored label may not be drawn inside, and
+// the rule for what it does about it. The table is the contract; this file only
+// offers the drawn rects to it.
+import { readoutRects } from './layout-exclusions';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
 import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
@@ -93,7 +97,7 @@ import type { DrawnHealthBar } from './healthbar-view';
 import { nameplateModel } from './nameplates';
 import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
-import type { DrawnNameplate } from './nameplates-view';
+import type { DrawnNameplate, WithheldNameplate } from './nameplates-view';
 import { PeerPresenceView } from './peer-presence-view';
 import type { DrawnPresenceLine } from './peer-presence-view';
 import type { PresenceTell } from './peer-presence';
@@ -125,7 +129,6 @@ import {
   arrowPoly,
   arrowClearOfReadouts,
   stationChromeWidth,
-  stationHpFootprint,
   ALARM_FRAME_INSET,
   ALARM_FRAME_STROKE,
   HUD_PAD,
@@ -1163,7 +1166,6 @@ export class Hud extends Container {
     // earlier changes nothing it computes.
     const underAttack = this.updateAlarm(frame);
     this.updateHealthBars(frame, underAttack);
-    this.updateNameplates(frame);
     this.updateTapMarkers(frame);
     this.updateMinimap(frame);
     this.updateStationHp(frame);
@@ -1180,6 +1182,16 @@ export class Hud extends Container {
     // …and the presence banner after it, because it hangs off the clock's drawn
     // footprint and that footprint depends on whether the clock re-flowed.
     this.updatePresence(frame, wheelOpen);
+    // The name labels run LAST of the world-anchored layers (a0-115), after every
+    // fixed readout has drawn itself at this frame's size. They have to yield to
+    // those readouts' rects, and a readout's rect is a measured thing that moves
+    // when its text does — the banked total gains a digit, the clock ticks from
+    // `NEXT 1:00` to `NEXT 0:59`, HOME becomes HOME LOST. Reading them before they
+    // were updated would step every label around LAST frame's counter, which is
+    // the one frame of lag a camera can photograph. They read nothing the readouts
+    // write beyond those rects, so this is purely a question of which frame's
+    // answer they get.
+    this.updateNameplates(frame);
     this.updateCostFloats(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
@@ -1240,9 +1252,11 @@ export class Hud extends Container {
    *  the readout's right edge, so the cluster runs leftward from 0. */
   private drawStationChrome(): void {
     const m = this.metrics;
-    // One arithmetic for the cluster's width: `stationHpFootprint` reports the
-    // rect this draws, and a0-116's arrow yields to that rect (a0-74's note about
-    // the depth, now true of the width as well).
+    // One arithmetic for the cluster's width, in `./hud-geometry` beside the
+    // depth it already owned: `readoutKeepOut` reports this rect off the drawn
+    // group and `hud-geometry.test.ts` recomputes it headless, so the number had
+    // to stop living only here (a0-74's note about the depth, now true of the
+    // width as well).
     const width = stationChromeWidth(m.scale);
     const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
@@ -1917,7 +1931,60 @@ export class Hud extends Container {
       frame.difficulties ?? NO_DIFFICULTIES,
       frame.playerTeams ?? NO_TEAMS,
     );
-    this.nameplates.update(plates, this.screenWidth, this.screenHeight);
+    this.nameplates.update(plates, this.screenWidth, this.screenHeight, this.readoutKeepOut());
+  }
+
+  /**
+   * The fixed readouts' drawn rects this frame, in the HUD's own screen space —
+   * what a world-anchored label may not be drawn inside (a0-115).
+   *
+   * **Measured off the drawn objects, not off the constants they were laid out
+   * with**, and for the same reason {@link describeLayout} is: the rect that
+   * matters is the one the ink actually occupies, and a banked total that has
+   * ticked from `3` to `1204` is a wider counter than any constant in
+   * `./hud-geometry` knows about. These are the same Pixi groups that method
+   * registers under `ore-hud` / `station-hp` / `zoom-control`, so the keep-out and
+   * the registry can never disagree about where a readout is.
+   *
+   * `wave-clock` is here too, even though `describeLayout` still cannot honestly
+   * register it (its `top-center` zone is a third of the viewport and the strip is
+   * intrinsically wider — the argument is above). What a label has to clear is
+   * where the strip is DRAWN, which is a fact about the frame regardless of
+   * whether the registry has an anchor it can hold the strip to; a0-116 is this
+   * same collision on that element.
+   *
+   * Local bounds plus the group's own origin rather than `getBounds()`: the labels
+   * are laid out in this container's space, and `getBounds()` is global/physical
+   * (PR #93's rotation trap). Same space in, same space out. The `anchor` on each
+   * entry is a placeholder — `readoutRects` reads ids and bounds, and a keep-out
+   * makes no claim about where an element is *supposed* to be.
+   */
+  /** The anchor on a keep-out candidate. A keep-out is a claim about pixels, not
+   *  about where an element is supposed to be — {@link describeLayout} is where
+   *  each of these elements makes its real anchor claim (and argues it). */
+  private static readonly KEEPOUT_ANCHOR: AnchorSpec = { region: 'full' };
+
+  private readoutKeepOut(): Rect[] {
+    const entries: LayoutEntry[] = [];
+    const offer = (id: string, group: Container): void => {
+      if (!group.visible) return;
+      const b = group.getLocalBounds();
+      if (b.width <= 0 || b.height <= 0) return;
+      entries.push({
+        id,
+        anchor: Hud.KEEPOUT_ANCHOR,
+        bounds: { x: group.x + b.x, y: group.y + b.y, width: b.width, height: b.height },
+      });
+    };
+    offer('ore-hud', this.oreGroup);
+    offer('wave-clock', this.waveGroup);
+    offer('station-hp', this.stationGroup);
+    offer(ZOOM_CONTROL_ID, this.zoomGroup);
+    // The id table decides, not this list: `offer` puts every candidate forward
+    // and `./layout-exclusions` `HUD_READOUT_IDS` picks the ones a world label may
+    // not enter. Take a row out of that table and the element stops being a
+    // keep-out here, which is what makes it the contract rather than a comment.
+    return readoutRects(entries);
   }
 
   /** ?debug=1 live-stage seam: arm the nameplate layer's drawn-label capture so
@@ -1932,6 +1999,15 @@ export class Hud extends Container {
    *  {@link enableNameplateDebug} was called. */
   debugNameplates(): DrawnNameplate[] {
     return this.nameplates.debugPlates();
+  }
+
+  /** The name labels the layer decided NOT to draw last frame, and why (a0-115) —
+   *  a plate that stepped out of a readout's way and found nowhere to stand is
+   *  recorded here rather than simply gone, so a live-stage test can tell a label
+   *  that yielded from a label that broke. Empty unless
+   *  {@link enableNameplateDebug} was called. */
+  debugWithheldNameplates(): WithheldNameplate[] {
+    return this.nameplates.debugWithheld();
   }
 
   // --- Tap Commander order markers (developer §4) -------------------------
@@ -2347,17 +2423,24 @@ export class Hud extends Container {
     );
     if (visible.onScreen) return;
     const inBox = homeArrow(ship, home, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
+    // Content-space → screen space. The box is centred, so the ship sits at its
+    // middle exactly as it sits at the screen's, and the shift is the one offset.
+    const onEdge = { ...inBox, x: inBox.x + box.x };
     // …and then off the readouts (a0-116). The edge it rides is the edge the HUD
     // hangs its instruments from, so on a fifth of the bearings on a landscape
     // phone the triangle was drawn through the wave clock's first line. It gives
     // up RADIUS to get clear — never bearing: the pulled-in arrow is still on the
-    // ray from the ship to the station, still at the same angle. See
-    // ./hud-geometry `arrowClearOfReadouts`.
-    const centre = { x: box.width / 2, y: box.height / 2 };
-    const clear = arrowClearOfReadouts(inBox, centre, this.arrowKeepOut());
-    // Content-space → screen space. The box is centred, so the ship sits at its
-    // middle exactly as it sits at the screen's, and the shift is the one offset.
-    const arrow = { ...clear, x: clear.x + box.x };
+    // ray from the ship to the station, still at the same angle
+    // (./hud-geometry `arrowClearOfReadouts`).
+    //
+    // The rects are {@link readoutKeepOut}'s — a0-115's list, measured off the
+    // drawn groups, in this container's screen space. One keep-out for both
+    // collisions: a world label may not be drawn in a readout, and neither may
+    // the mark that points home. The ray runs from the ship, which the follow
+    // camera holds at the middle of the box (and the box is centred, so that is
+    // the screen's middle too).
+    const centre = { x: box.x + box.width / 2, y: box.height / 2 };
+    const arrow = arrowClearOfReadouts(onEdge, centre, this.readoutKeepOut());
     this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn where the two clamps above left
@@ -2367,63 +2450,6 @@ export class Hud extends Container {
     this.alarmArrow
       .poly(arrowPoly(arrow, ARROW_SIZE))
       .fill({ color: PALETTE.threatRed, alpha: 0.55 + 0.45 * pulse });
-  }
-
-  /**
-   * The readouts the screen-edge arrow has to stay off (a0-116), in CONTENT-BOX
-   * space — the space the arrow is clamped in, so neither has to be translated
-   * twice.
-   *
-   * These are the four groups that carry a number or a word the player *reads*:
-   * the ore counter, the wave clock, the HOME cluster and — on touch — the zoom
-   * control. The same four a0-115's `HUD_READOUT_IDS` names (its `banked-total`
-   * is the numeral inside the ore counter's own ground, so it is already here).
-   * Everything else the HUD draws is either world-space and passes under by
-   * design, or is the fight itself.
-   *
-   * **From the layouts, not from `getBounds()`.** Each rect is the one the
-   * element's own geometry function returned when `layout()`/`update()` placed it
-   * — `oreCounterLayout`'s ground, `waveClockLayout`'s bounds, `stationHpFootprint`,
-   * `zoomControlBounds` — so the rect the arrow yields to is the rect the view
-   * drew, and a headless test can compute both from the same functions. (a0-115
-   * measures its keep-out off the live display objects instead, because a
-   * nameplate is arbitrated against what a `Text` really inked. When that lands,
-   * the two want to become one call; noted in that PR and this one.)
-   *
-   * Hidden groups are left out: an element that is not drawn is not in the way.
-   *
-   * Each rect is the element's whole drawn footprint — the scrim and the rule as
-   * well as the type. It is tempting to yield only to the ink, since darkness is
-   * not something a mark can make illegible, and on the first cut this did
-   * exactly that for the HOME cluster. The specimen said no: `stationHpBounds`
-   * stops at the bar, the cluster's closing rule is drawn 3px below it, and an
-   * arrow cleared to the ink lands on that rule. A readout's footprint is what it
-   * draws, and the three that carry chrome all draw a rule inside it.
-   */
-  private arrowKeepOut(): Rect[] {
-    const box = this.content;
-    const out: Rect[] = [];
-    const ore = this.oreLayout;
-    if (ore) {
-      // `layout()` pins the group at (box.x + PAD, PAD) and the ground's own
-      // origin is (0, 0) there, so the ground in content space is just offset.
-      out.push({
-        x: PAD + ore.ground.x,
-        y: PAD + ore.ground.y,
-        width: ore.ground.width,
-        height: ore.ground.height,
-      });
-    }
-    const clock = this.clockLayout;
-    // Already content space — `updateWave` lays the strip out on the box.
-    if (clock) out.push(clock.bounds);
-    if (this.stationGroup.visible) {
-      out.push(stationHpFootprint(box.width, this.metrics.scale, this.stationLabel.width));
-    }
-    // …and back out of screen space, the one offset `updateZoomControl` added.
-    const zoom = this.zoomRect;
-    if (zoom && this.zoomGroup.visible) out.push({ ...zoom, x: zoom.x - box.x });
-    return out;
   }
 
   // --- Build & Upgrade wheel (GDD §2.5) -----------------------------------

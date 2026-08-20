@@ -1482,9 +1482,9 @@ export {
   polyBounds,
   ARROW_SIZE,
   // a0-116: the arrow rides the edge, and the top edge is where the readouts are.
-  // It gives up radius — never bearing — to stay off them.
+  // It gives up radius — never bearing — to stay off them. The air it keeps is
+  // a0-115's `READOUT_KEEPOUT_PAD`, exported from ./layout-exclusions.
   arrowClearOfReadouts,
-  ARROW_READOUT_PAD,
   ALARM_FRAME_STROKE,
   ALARM_FRAME_INSET,
   WHEEL_SCALE,

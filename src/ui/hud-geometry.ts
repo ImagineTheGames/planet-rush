@@ -26,6 +26,9 @@ import type { HomeArrow, Point } from './alarm';
 import { hudMetrics, hudSpace, hudType, hullBarFill, scrimGround } from './instrument';
 import { HEALTHBAR_MIN_FILL } from './healthbar';
 import { collapsedRect } from './minimap';
+// a0-116 keeps the same air off a readout that a0-115's world labels do, from the
+// same constant — see `arrowClearOfReadouts`.
+import { READOUT_KEEPOUT_PAD } from './layout-exclusions';
 import type { MinimapInsets } from './minimap';
 
 /**
@@ -564,33 +567,6 @@ export const STATION_CHROME_PAD_X = 18;
  *  had the only copy of the arithmetic. */
 export function stationChromeWidth(scale: number): number {
   return HP_BAR_WIDTH + hudSpace(STATION_CHROME_PAD_X, { scale });
-}
-
-/**
- * The HOME cluster's whole DRAWN footprint — the scrim, the rule that closes it
- * and everything inside them. This is the rect `station-hp` registers
- * (`Hud.describeLayout` reads the group's bounds, and the group's widest, deepest
- * child is its chrome), which makes it the rect anything else on screen has to
- * clear.
- *
- * Distinct from {@link stationHpBounds}, which is the *ink* — the label and the
- * bars — and answers the anchor question ("does own-station HP stay in the
- * top-right zone"). a0-116 needs the other one: the closing rule is drawn 3px
- * under the bar, so a mark cleared to the ink's edge is a mark standing on the
- * rule.
- *
- * `labelWidth` is `HOME` / `HOME LOST` as measured; the chrome is wider than
- * either at every size the HUD draws, but the union is taken rather than assumed
- * for the same reason `stationHpBounds` takes it.
- */
-export function stationHpFootprint(viewportWidth: number, scale: number, labelWidth = 0): Rect {
-  const width = Math.max(stationChromeWidth(scale), labelWidth);
-  return {
-    x: viewportWidth - HUD_PAD - width,
-    y: HUD_PAD,
-    width,
-    height: stationChromeHeight(scale),
-  };
 }
 
 export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
@@ -1524,17 +1500,6 @@ export function polyBounds(poly: readonly number[]): Rect {
 // finding about draw order, one layer up: chrome can separate a readout from the
 // WORLD, it cannot separate it from another mark drawn over the same words.
 
-/**
- * Clear air the arrow keeps from a readout's rect, CSS px.
- *
- * Two, and not zero: a bare non-overlap is enough when the question is "is this
- * rect covered", but here a 15px triangle in threat red is landing beside HUD
- * type, and a mark whose edge is the glyph's edge reads as part of the word. The
- * same two pixels a0-115 keeps between a nameplate and a readout, for the same
- * reason — the smallest gap that survives antialiasing at 1×.
- */
-export const ARROW_READOUT_PAD = 2;
-
 /** The interval of `t` for which `o + t·d` lies strictly inside `[lo, hi]`, or
  *  `null` when it never does. A ray parallel to the slab is inside for all `t`
  *  or for none, which is what the `Infinity`s say. */
@@ -1560,16 +1525,22 @@ function raySlab(o: number, d: number, lo: number, hi: number): [number, number]
  *                 holds at the middle of the box the arrow was clamped in. Passed
  *                 in rather than derived so the caller's content box (a0-74) and
  *                 this computation cannot disagree about where the middle is.
- * @param readouts The rects to clear, in the same space as `arrow` and `centre`.
+ * @param readouts The rects to clear, in the same space as `arrow` and `centre`
+ *                 — `Hud.readoutKeepOut()` in the view, a0-115's own list.
  * @param size     The triangle's tip length ({@link ARROW_SIZE}).
- * @param pad      Clear air to keep ({@link ARROW_READOUT_PAD}).
+ * @param pad      Clear air to keep. `READOUT_KEEPOUT_PAD` (a0-115), and the
+ *                 same constant rather than a second 2: a bare non-overlap is
+ *                 enough when the question is "is this rect covered", but a mark
+ *                 whose edge is a glyph's edge reads as part of the word, and
+ *                 that is one rule about HUD type, not one per element that
+ *                 lands on it.
  */
 export function arrowClearOfReadouts(
   arrow: HomeArrow,
   centre: Point,
   readouts: readonly Rect[],
   size: number = ARROW_SIZE,
-  pad: number = ARROW_READOUT_PAD,
+  pad: number = READOUT_KEEPOUT_PAD,
 ): HomeArrow {
   // An arrow the view is not drawing has nothing to clear: `onScreen` means the
   // station is visible and `./hud` `drawHomeArrow` returns before it draws.
