@@ -274,20 +274,33 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
 
         expect(result.timedOut, `seed ${seed}`).toBe(false);
         expect(result.ended, `seed ${seed}`).toBe(true);
-        expect(result.winner, `seed ${seed}`).not.toBeNull();
 
         // The result is the TEAM's, and the surviving slot is one of its
         // members — the sim's own attribution, which a bot's model now matches.
+        //
+        // a0-113: `winner` is null on a DRAW — every remaining core lost on one
+        // tick — and this suite met one. **Seed 4 really is a draw**: home death
+        // times are [843.72, 850.02, 850.02, 850.02], so slot 1 (team 0) and both
+        // of team 1's homes reached zero on the same collapse tick. It used to
+        // read as a team-1 win off `eliminated`'s last entry, which in a
+        // collapse-lockstep is `world.stations` index and nothing either side
+        // did. The anti-stalemate claim this test exists for is untouched by
+        // that: the match still ENDS, inside the ceiling, with nothing hung —
+        // which is what `timedOut`/`ended` above assert. What is asserted below
+        // is the attribution, and it can only be asserted where there is one.
         const winningTeam = world.match.winningTeam;
-        expect(winningTeam, `seed ${seed}`).not.toBeNull();
-        const home = world.stations.find((p) => p.owner === result.winner)!;
-        expect(home.team, `seed ${seed}`).toBe(winningTeam);
-        winners.push(winningTeam!);
+        expect(winningTeam === null, `seed ${seed}`).toBe(result.winner === null);
+        if (result.winner !== null) {
+          const home = world.stations.find((p) => p.owner === result.winner)!;
+          expect(home.team, `seed ${seed}`).toBe(winningTeam);
+          winners.push(winningTeam!);
+        }
       }
 
       // Every match landed inside the design band's neighbourhood rather than
-      // grinding to the ceiling: the spike's pre-change baseline is 847 s.
-      expect(winners).toHaveLength(SEEDS.length);
+      // grinding to the ceiling: the spike's pre-change baseline is 847 s. Most
+      // of them are decided; a draw is a legal ending, not a hung one.
+      expect(winners.length).toBeGreaterThan(SEEDS.length / 2);
     });
   }
 
