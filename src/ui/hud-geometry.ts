@@ -1472,10 +1472,11 @@ export function polyBounds(poly: readonly number[]): Rect {
 // halves of that are the constraint: the arrow has to keep pointing where it
 // points, and the clock has to stay readable.
 //
-// It is not a rare bearing. Swept at 1° over this profile, **75 of 360** bearings
-// put the arrow's triangle inside the clock's rect, and 110 put it inside some
-// readout — a fifth of the circle for the clock alone. See `hud-geometry.test.ts`
-// `the home arrow never lands on a readout`.
+// It is not a rare bearing. Swept at 0.1° over this profile, **75 of every 360**
+// bearings put the arrow's triangle inside the clock's rect, and 111 put it
+// inside some readout — a fifth of the circle for the clock alone, and 66 of 360
+// on the desktop. See `hud-geometry.test.ts` `the home arrow never lands on a
+// readout`.
 //
 // ## Which one yields
 //
@@ -1506,15 +1507,15 @@ export function polyBounds(poly: readonly number[]): Rect {
 // where it was, on the edge.
 //
 // **What this costs, stated rather than buried.** As a bearing sweeps past the
-// end of a readout the arrow hops back out to the edge instead of easing out:
-// at the clock's left corner on the QA phone that is a 72px jump, at a constant
-// bearing (measured, 1° sweep — and it is the largest step anywhere on the
-// circle on either profile). Every rule of the "clear this rect" shape has that discontinuity, and
-// the alternatives that do not are worse — a per-edge inset deep enough to clear
-// `station-hp` would push the arrow 166px in from the right edge on the bearings
-// where nothing is in its way at all, and anything smoother than that buys its
-// smoothness by moving the arrow off its bearing, which is the one thing the
-// brief forbids and the one thing that would make the arrow lie.
+// end of a readout the arrow hops back out to the edge instead of easing out.
+// Measured at 0.1°, the largest such step is **70px on the qa-phone and 78px on
+// the desktop**, at a constant bearing. Every rule of the "clear this rect" shape
+// has that discontinuity, and the alternatives that do not are worse: a per-edge
+// inset deep enough to clear `station-hp` would push the arrow 166px in from the
+// right edge on the bearings where nothing is in its way at all, and anything
+// smoother than that buys its smoothness by moving the arrow off its bearing,
+// which is the one thing the brief forbids and the one thing that would make the
+// arrow lie.
 //
 // **Rejected: a ground under the arrow.** The third option the brief offers. The
 // collision is ink on ink — the clock already draws its own scrim, so the arrow

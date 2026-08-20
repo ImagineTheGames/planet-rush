@@ -2353,7 +2353,8 @@ export class Hud extends Container {
     // up RADIUS to get clear — never bearing: the pulled-in arrow is still on the
     // ray from the ship to the station, still at the same angle. See
     // ./hud-geometry `arrowClearOfReadouts`.
-    const clear = arrowClearOfReadouts(inBox, { x: box.width / 2, y: box.height / 2 }, this.arrowKeepOut());
+    const centre = { x: box.width / 2, y: box.height / 2 };
+    const clear = arrowClearOfReadouts(inBox, centre, this.arrowKeepOut());
     // Content-space → screen space. The box is centred, so the ship sits at its
     // middle exactly as it sits at the screen's, and the shift is the one offset.
     const arrow = { ...clear, x: clear.x + box.x };

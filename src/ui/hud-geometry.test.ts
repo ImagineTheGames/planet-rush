@@ -2497,8 +2497,12 @@ describe('the screen-edge arrow and the readouts it rides past (a0-116)', () => 
         expect(clear.onScreen, at).toBe(edge.onScreen);
         expect(clear.distance, at).toBe(edge.distance);
         const bore = Math.atan2(clear.y - centre.y, clear.x - centre.x);
-        const drift = Math.abs(Math.atan2(Math.sin(bore - clear.angle), Math.cos(bore - clear.angle)));
-        expect(drift, `${at}: the arrow is ${((drift * 180) / Math.PI).toFixed(3)}° off its bearing`).toBeLessThan(1e-9);
+        const off = bore - clear.angle;
+        const drift = Math.abs(Math.atan2(Math.sin(off), Math.cos(off)));
+        expect(
+          drift,
+          `${at}: the arrow is ${((drift * 180) / Math.PI).toFixed(3)}° off its bearing`,
+        ).toBeLessThan(1e-9);
 
         // 3. It yields INWARD, never outward — an arrow pushed the other way
         //    would leave the screen, which is the promise `full` + 0 makes.
@@ -2511,7 +2515,7 @@ describe('the screen-edge arrow and the readouts it rides past (a0-116)', () => 
 
       // The other half of "failing today": on every profile the shipped arrow
       // really does land on a readout, so the sweep above is a fix and not a
-      // tautology. 110 of 360 bearings on the qa-phone, 65 on the desktop.
+      // tautology. 111 of 360 bearings on the qa-phone, 66 on the desktop.
       expect(
         before.length,
         `${name}: the unyielded arrow never hit a readout — this suite is asserting nothing`,
