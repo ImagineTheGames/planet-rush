@@ -397,3 +397,91 @@ export function labelYieldsToReadouts(
   }
   return best === null ? { dx: 0, withheld: true } : { dx: best, withheld: false };
 }
+
+// ---------------------------------------------------------------------------
+// The same keep-out, with a LABEL as the blocker (a0-119)
+// ---------------------------------------------------------------------------
+//
+// a0-115 above answers "a world label must not be drawn inside a fixed readout."
+// a0-119 is the same sentence with the other noun swapped: **a world label must
+// not be drawn inside another world label of the same owner.** QA photographed it
+// on a0-118's sweep, and the developer's own screenshot of 2026-08-19 has it
+// twice over — `Rusty (EASY)` printed on `Rusty (EASY)`, one label laid across
+// the other, on a station and a ship belonging to the same character.
+//
+// It is deliberately NOT a second rule with its own vocabulary. The argument
+// a0-115 made is intact and general: two runs of type in the same pixels read as
+// one illegible run, draw order cannot separate them because type is mostly
+// holes, so one of them has to not be there. What a0-115 fixed was WHICH rects a
+// label had to stay out of; this brief only adds rects to that list. Everything
+// below is {@link rectOverlap} and {@link READOUT_KEEPOUT_PAD} again — the same
+// overlap convention (touching is not covering) and the same two pixels of air,
+// read from there rather than restated, so one suite cannot mean two things by
+// "clear."
+//
+// **WHY THE ANSWER IS "DROP ONE" AND NOT "STEP ASIDE".** This is the one place
+// the two shapes of the rule genuinely differ, and it is a fact about the text
+// rather than about the geometry. A readout and a label say different things, so
+// a label that steps out of the ore counter has preserved a reading a player
+// wanted. Two plates for ONE owner say the *same* thing, character for character
+// — the name, the difficulty tag and the side tag are all resolved per-SLOT
+// ({@link ./nameplates} `resolveName` / `resolveDifficultySuffix` /
+// `resolveTeamLabel`), so an owner's ship plate and station plate are the same
+// string by construction. Stepping one aside would leave `Rusty (EASY)` beside
+// `Rusty (EASY)`, which is not two labels; it is one label and a rendering fault.
+// So the second plate stands down for the frame, and the frame loses nothing: the
+// plate that remains is *at the place the other one wanted to be*, and it is the
+// same word.
+//
+// Which one remains is the caller's ordering, not this function's — see
+// {@link ./nameplates-view} `NAMEPLATE_KIND_ORDER` for the ruling (the station's
+// plate is placed first and keeps its pixels) and the argument for it. This
+// module knows only "a label already placed for this owner", which is the shape
+// that lifts into `@platform/layout-registry` with the rest of the section.
+
+/**
+ * A world label reduced to what this rule needs: whose it is, and the rect it
+ * occupies **where it was drawn** — after the a0-115 step, not where it would
+ * have been. A plate that yielded out of the ore counter blocks the pixels it
+ * ended up in, and a plate that was withheld blocks nothing at all, because it is
+ * not in the frame (the same principle {@link exclusionViolations} applies to a
+ * rule whose ids are not both present).
+ */
+export interface PlacedLabel {
+  /** The owner slot the label names — {@link ./nameplates} `Nameplate.owner`. */
+  readonly owner: number;
+  /** The label's drawn rect, screen space CSS px. */
+  readonly rect: Rect;
+}
+
+/**
+ * Whether a label about to be drawn would repeat one already placed for the SAME
+ * owner — the a0-119 test, and the whole of it.
+ *
+ * `pad` is {@link READOUT_KEEPOUT_PAD} by default for the reason that constant
+ * exists: this is two runs of type being told apart, and glyphs that end exactly
+ * where the next begin read as one word. Labels for *other* owners are ignored
+ * here on purpose — they carry different names in different identity colours, and
+ * whether two rival plates may crowd each other is a separate question nobody has
+ * ruled on. Answering it here would be the third overlap rule this HUD has, which
+ * is how the fourth one gets missed.
+ *
+ * True means "this plate adds nothing and should stand down"; the caller decides
+ * what standing down looks like ({@link ./nameplates-view} withholds it and
+ * records a `duplicate` receipt on the ?debug=1 seam, so it is never a label that
+ * merely disappeared).
+ */
+export function labelRepeatsOwner(
+  owner: number,
+  rect: Rect,
+  placed: readonly PlacedLabel[],
+  pad: number = READOUT_KEEPOUT_PAD,
+): boolean {
+  if (placed.length === 0) return false;
+  const grown = grow(rect, pad);
+  for (const other of placed) {
+    if (other.owner !== owner) continue;
+    if (rectOverlap(grown, other.rect)) return true;
+  }
+  return false;
+}

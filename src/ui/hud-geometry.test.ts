@@ -105,12 +105,15 @@ import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
 import {
   HUD_READOUT_IDS,
   READOUT_KEEPOUT_PAD,
+  labelRepeatsOwner,
   labelYieldsToReadouts,
   readoutRects,
   rectOverlap,
 } from './layout-exclusions';
+import type { PlacedLabel } from './layout-exclusions';
 import {
   NAMEPLATE_FONT_SIZE,
+  NAMEPLATE_KIND_ORDER,
   nameplateClusterClearance,
   nameplateRowLayout,
 } from './nameplates-view';
@@ -3011,5 +3014,371 @@ describe('the fixed readouts and the world labels that pass over them', () => {
     // than swapping which readout it is drawn through.
     const secondReadout: Rect = { x: 182, y: 0, width: 200, height: 100 };
     expect(labelYieldsToReadouts(row, 200, SHIP_RADIUS, [narrow, secondReadout], 800).withheld).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-119 — one owner, two plates, and the pixels they were sharing
+// ---------------------------------------------------------------------------
+//
+// QA, on a0-118's sweep, having confirmed all four of a0-111's fixes:
+//
+//   > **failed** — Not one of the four: two nameplates for the same owner are
+//   > drawn on each other and neither can be read.
+//
+// The developer's own screenshot of 2026-08-19 has it: `Rusty (EASY)` printed
+// twice, overlapping, one label across the other, on a station and a ship
+// belonging to the same character.
+//
+// **Two plates for one owner is not the defect.** The field request that created
+// this layer asked for both by name — *"I want to see player names over their
+// stations and their ships"* — and a character genuinely has two things worth
+// labelling. The defect is that the two collide and neither survives it, which
+// happens on exactly the frames where the ship is at its own home.
+//
+// So the model here is the view's own placement loop, composed out of the same
+// pure pieces the layer draws with — `nameplateRowLayout` for the rigid row,
+// `nameplateClusterClearance` for how far it floats above its entity,
+// `labelYieldsToReadouts` for the a0-115 step, `labelRepeatsOwner` for a0-119 —
+// walked in `NAMEPLATE_KIND_ORDER`, which is the ruling about which of an owner's
+// two plates keeps its pixels. Same discipline as the a0-115 block above: nothing
+// is restated as a number a test can drift away from.
+describe('one owner, two nameplates (a0-119)', () => {
+  const PLATE_TYPE = { face: 'body', size: NAMEPLATE_FONT_SIZE, tracking: HUD_TRACKING.name } as const;
+  const tokenWidth = (text: string): number => (text.length > 0 ? textWidth(text, PLATE_TYPE) : 0);
+  const PLATE_LINE = textHeight('Rusty', PLATE_TYPE);
+
+  /** The character in the screenshot, character for character — a bot seat, so
+   *  the plate carries the recessive difficulty tag that made it as wide as it is. */
+  const RUSTY = 3;
+  /** A second seat, so the rule's SCOPE is exercised and not merely asserted: a
+   *  rival's plate must never be dropped for crowding this one. */
+  const SABLE = 5;
+
+  const NAMES: Record<number, { name: string; suffix: string }> = {
+    [RUSTY]: { name: 'Rusty', suffix: '(EASY)' },
+    [SABLE]: { name: 'Sable', suffix: '(HARD)' },
+  };
+
+  /** Screen radii: a home is a big disc, a hull is not (GDD §2.2). These are the
+   *  two numbers that decide how far apart the two rows float, and therefore the
+   *  band of ship positions where they collide. */
+  const STATION_RADIUS = 40;
+  const SHIP_RADIUS = 12;
+
+  const plate = (owner: number, kind: 'ship' | 'station', x: number, y: number): Nameplate => ({
+    owner,
+    kind,
+    text: NAMES[owner]!.name,
+    suffix: NAMES[owner]!.suffix,
+    teamLabel: '',
+    teamColor: 0xffffff,
+    color: 0xffffff,
+    x,
+    y,
+    radius: kind === 'station' ? STATION_RADIUS : SHIP_RADIUS,
+    alpha: 1,
+    local: false,
+  });
+
+  /** The rect a plate's row occupies at a given sideways step, screen space. */
+  const rectFor = (p: Nameplate, dx: number): Rect => {
+    const row = nameplateRowLayout(p.x, {
+      side: tokenWidth(p.teamLabel),
+      name: tokenWidth(p.text),
+      suffix: tokenWidth(p.suffix),
+    });
+    const bottom = p.y - nameplateClusterClearance(p);
+    return { x: row.left + dx, y: bottom - PLATE_LINE, width: row.width, height: PLATE_LINE };
+  };
+
+  interface Placement extends PlacedLabel {
+    readonly kind: 'ship' | 'station';
+  }
+  interface Frame {
+    readonly drawn: Placement[];
+    readonly withheld: { owner: number; kind: string; reason: string }[];
+  }
+
+  /**
+   * The view's placement loop for one frame, as pure geometry.
+   *
+   * `arbitrate` is the whole diff: with it OFF this is exactly what the layer did
+   * before this brief — each row placed from its own entity and from nothing else
+   * — and with it ON each plate also has to clear the plates already down for its
+   * own owner. Keeping both behind one flag is what lets the BEFORE below be the
+   * real before rather than a story about it.
+   */
+  const placeFrame = (
+    plates: readonly Nameplate[],
+    vp: Viewport,
+    readouts: readonly Rect[] = [],
+    arbitrate = true,
+  ): Frame => {
+    const drawn: Placement[] = [];
+    const withheld: { owner: number; kind: string; reason: string }[] = [];
+    for (const kind of NAMEPLATE_KIND_ORDER) {
+      for (const p of plates) {
+        if (p.kind !== kind) continue;
+        const at = rectFor(p, 0);
+        // The layer's own edge cull runs first and is untouched by this brief.
+        if (at.x < 0 || at.y < 0 || at.x + at.width > vp.width || at.y + at.height > vp.height) {
+          withheld.push({ owner: p.owner, kind: p.kind, reason: 'offscreen' });
+          continue;
+        }
+        const yielded = labelYieldsToReadouts(
+          { left: at.x, right: at.x + at.width, top: at.y, bottom: at.y + at.height },
+          p.x,
+          p.radius,
+          readouts,
+          vp.width,
+        );
+        if (yielded.withheld) {
+          withheld.push({ owner: p.owner, kind: p.kind, reason: 'readout' });
+          continue;
+        }
+        const rect = rectFor(p, yielded.dx);
+        if (arbitrate && labelRepeatsOwner(p.owner, rect, drawn)) {
+          withheld.push({ owner: p.owner, kind: p.kind, reason: 'duplicate' });
+          continue;
+        }
+        drawn.push({ owner: p.owner, kind: p.kind, rect });
+      }
+    }
+    return { drawn, withheld };
+  };
+
+  /**
+   * Every pair of DRAWN plates that share pixels and an owner — the thing QA
+   * photographed, and what this whole block exists to drive to zero.
+   *
+   * `pad` grows each rect before the test, which is the difference between the
+   * two questions worth asking of a frame. At `0` it is *are these two on each
+   * other* — the defect, literally. At {@link READOUT_KEEPOUT_PAD} it is what the
+   * rule actually reacts to, because two runs of type that end where the next
+   * begins read as one word (a0-115's argument, inherited whole).
+   */
+  const sameOwnerCollisions = (frame: Frame, pad = 0): { a: Placement; b: Placement; overlap: Rect }[] => {
+    const grown = (r: Rect): Rect => ({ x: r.x - pad, y: r.y - pad, width: r.width + 2 * pad, height: r.height + 2 * pad });
+    const out: { a: Placement; b: Placement; overlap: Rect }[] = [];
+    for (let i = 0; i < frame.drawn.length; i++) {
+      for (let j = i + 1; j < frame.drawn.length; j++) {
+        const a = frame.drawn[i]!;
+        const b = frame.drawn[j]!;
+        if (a.owner !== b.owner) continue;
+        const overlap = rectOverlap(grown(a.rect), b.rect);
+        if (overlap) out.push({ a, b, overlap });
+      }
+    }
+    return out;
+  };
+
+  it('no two nameplates for the same owner overlap', () => {
+    // ── THE FRAME IN THE SCREENSHOT ────────────────────────────────────────
+    // One character with a station and a ship on screen at once, the ship
+    // hovering just above its own home — which is where a player spends the
+    // opening of every match (GDD §2.3: you build at your station) and where the
+    // developer's 2026-08-19 capture caught it.
+    const vp: Viewport = { width: 1280, height: 800 };
+    const home = plate(RUSTY, 'station', 640, 420);
+    // 24px above its home: the offset at which the two rows land on exactly the
+    // same baseline, because a station's row floats by `radius + 8` off a 40px
+    // disc and a ship's by `radius + 5 + 4 + 3` off a 12px hull. It is the worst
+    // case of the band, and the band either side of it is swept below.
+    const hull = plate(RUSTY, 'ship', 640, 420 - 24);
+
+    // BEFORE — the defect, measured rather than described. Both rows draw, they
+    // are the SAME STRING, and they share pixels.
+    const before = placeFrame([hull, home], vp, [], false);
+    expect(before.drawn, 'both plates drew, as they did on the frame QA failed').toHaveLength(2);
+    expect(before.drawn[0]!.rect.x, 'and they are the same row, so the collision is total').toBeCloseTo(
+      before.drawn[1]!.rect.x,
+      6,
+    );
+    const collided = sameOwnerCollisions(before);
+    expect(collided, 'the reproduction is not reproducing anything').toHaveLength(1);
+    // The overlap is the whole line, both ways: a full-height, full-width
+    // intersection of two identical rows is precisely "neither can be read".
+    expect(collided[0]!.overlap.height).toBeCloseTo(PLATE_LINE, 6);
+    expect(collided[0]!.overlap.width).toBeCloseTo(before.drawn[0]!.rect.width, 6);
+
+    // AFTER — one plate, and it is the STATION's (NAMEPLATE_KIND_ORDER). The ship's
+    // stands down with a `duplicate` receipt rather than disappearing quietly.
+    const after = placeFrame([hull, home], vp);
+    expect(sameOwnerCollisions(after)).toEqual([]);
+    expect(after.drawn).toHaveLength(1);
+    expect(after.drawn[0]!.kind, 'the landmark keeps its name; the thing in motion yields').toBe('station');
+    expect(after.withheld).toEqual([{ owner: RUSTY, kind: 'ship', reason: 'duplicate' }]);
+    // Nothing was lost by dropping it: the plate that remains is the same word,
+    // within a hull's width of where the dropped one wanted to be.
+    expect(Math.abs(after.drawn[0]!.rect.x - collided[0]!.b.rect.x)).toBeLessThanOrEqual(SHIP_RADIUS);
+
+    // ── THE WHOLE BAND, ON EVERY PROFILE ──────────────────────────────────
+    // The screenshot is one position out of a continuum. A ship orbits, docks,
+    // launches and dies at its own station all match, so the assertion has to be
+    // about every offset, not about the one that was photographed. Sweep the hull
+    // over a lattice around its home — and put a RIVAL's station and ship in the
+    // same frame throughout, so the rule's scope is exercised: two plates for two
+    // owners may crowd each other all they like, and this rule must not touch them.
+    const STEP = 4;
+    const SPAN = 140;
+    let sampled = 0;
+    let wouldCollide = 0;
+    let wouldCrowd = 0;
+    let dropped = 0;
+    for (const { name, vp: profile } of PROFILES) {
+      const cx = profile.width / 2;
+      const cy = profile.height / 2;
+      const rustyHome = plate(RUSTY, 'station', cx, cy);
+      // The rival sits a plate-width to the left, close enough that its rows and
+      // Rusty's cross constantly.
+      const sableHome = plate(SABLE, 'station', cx - 70, cy - 30);
+      const sableShip = plate(SABLE, 'ship', cx - 70, cy - 90);
+
+      for (let dy = -SPAN; dy <= SPAN; dy += STEP) {
+        for (let dx = -SPAN; dx <= SPAN; dx += STEP) {
+          const rustyShip = plate(RUSTY, 'ship', cx + dx, cy + dy);
+          const plates = [rustyShip, sableShip, rustyHome, sableHome];
+          sampled++;
+
+          const raw = placeFrame(plates, profile, [], false);
+          // What the frame looked like before the rule: the pairs literally on
+          // each other, and the wider set the rule reacts to (those plus the ones
+          // separated by less than the keep-out pad).
+          const rawHits = sameOwnerCollisions(raw);
+          const rawCrowded = sameOwnerCollisions(raw, READOUT_KEEPOUT_PAD);
+          if (rawHits.length > 0) wouldCollide++;
+          if (rawCrowded.length > 0) wouldCrowd++;
+
+          const frame = placeFrame(plates, profile);
+
+          // THE ASSERTION. Whatever the hull is doing, no two plates for one owner
+          // are in the same pixels.
+          const hits = sameOwnerCollisions(frame);
+          expect(
+            hits.map((h) => `${h.a.kind}/${h.b.kind} ${fmt(h.overlap)}`),
+            `${name}: a ship at (+${dx}, +${dy}) from its own home draws two plates for owner ${RUSTY} on each other`,
+          ).toEqual([]);
+
+          // A plate is dropped ONLY when it really would have repeated one — the
+          // half of the rule that keeps "yield" from becoming "sometimes there is
+          // no name". Every withheld plate this frame is a duplicate the raw pass
+          // also saw.
+          const dupes = frame.withheld.filter((w) => w.reason === 'duplicate');
+          if (dupes.length > 0) dropped++;
+          expect(
+            dupes.length,
+            `${name} @ (+${dx}, +${dy}): a plate stood down as a duplicate with nothing to duplicate`,
+          ).toBeLessThanOrEqual(rawCrowded.length);
+          // …and it is never the station's, and never a rival's: the ordering
+          // ruling holds on every sample, not just on the staged frame above.
+          for (const d of dupes) {
+            expect(d.kind, `${name} @ (+${dx}, +${dy}): the landmark yielded`).toBe('ship');
+          }
+          // The rival is untouched throughout — both of Sable's plates are still
+          // in the frame (they never collide with each other; their owner's two
+          // marks are 60px apart by construction), whatever Rusty's hull is doing.
+          expect(
+            frame.drawn.filter((d) => d.owner === SABLE).length,
+            `${name} @ (+${dx}, +${dy}): a rival's plate was dropped for crowding someone else's`,
+          ).toBe(raw.drawn.filter((d) => d.owner === SABLE).length);
+        }
+      }
+    }
+
+    // Not vacuous, and worth being exact about how common this is: the collision
+    // is not an exotic camera position like a0-115's, it is a hull near its home.
+    expect(sampled, 'nothing was sampled').toBeGreaterThan(40000);
+    expect(wouldCollide, 'no sampled offset collided — the sweep is not exercising the rule').toBeGreaterThan(1000);
+    // Every frame the rule reacted to is a frame that was crowded, and every
+    // crowded frame got a reaction: the rule is neither trigger-happy nor asleep.
+    expect(dropped, 'the rule fired on a frame that was clear, or slept through one that was not').toBe(wouldCrowd);
+    expect(wouldCrowd, 'the pad reacts to strictly more than bare overlap').toBeGreaterThanOrEqual(wouldCollide);
+  });
+
+  it('drops the plate only while the two are actually on each other', () => {
+    // The other edge of the same rule, and the one that decides whether this is a
+    // fix or a feature removal: a ship AWAY from its home keeps its own name. Walk
+    // it straight up from the station and find where the plate comes back.
+    const vp: Viewport = { width: 1280, height: 800 };
+    const home = plate(RUSTY, 'station', 640, 420);
+    const heldAt: number[] = [];
+    for (let d = 0; d <= 200; d++) {
+      const frame = placeFrame([plate(RUSTY, 'ship', 640, 420 - d), home], vp);
+      if (frame.withheld.some((w) => w.reason === 'duplicate')) heldAt.push(d);
+    }
+    // A contiguous band, not a scatter — a plate that blinked in and out as the
+    // ship crept upward would be the same illegibility in the time axis.
+    expect(heldAt.length, 'the ship never lost its plate at all').toBeGreaterThan(4);
+    expect(heldAt[heldAt.length - 1]! - heldAt[0]! + 1, 'the drop is not one contiguous band').toBe(
+      heldAt.length,
+    );
+    // …and it is a small band. Most of the time a ship is nowhere near its home
+    // and both plates are wanted, which is why "drop one of them always" was the
+    // wrong answer to this brief.
+    expect(heldAt.length, 'the ship loses its name over far too much of the field').toBeLessThan(60);
+    // Sitting exactly ON the station is NOT in the band: a station's row floats
+    // above a 40px disc and a ship's above a 12px hull, so at zero offset the two
+    // are already 30-odd px apart. The collision is the approach, not the dock.
+    expect(heldAt).not.toContain(0);
+
+    // Far away, both plates draw and both are legible.
+    const apart = placeFrame([plate(RUSTY, 'ship', 900, 200), home], vp);
+    expect(apart.drawn).toHaveLength(2);
+    expect(sameOwnerCollisions(apart)).toEqual([]);
+  });
+
+  it('a withheld station plate blocks nothing — it is not in the frame', () => {
+    // The composition rule the a0-115 section states and this one inherits: the
+    // blocker list is what was DRAWN, not what was wanted. A plate that stood down
+    // is not in the frame, and a rule about two rects has nothing to say about one.
+    //
+    // Staged on the edge cull, which is the one way to withhold an owner's station
+    // plate without withholding their ship's along with it — the two collide
+    // precisely because they are in the same horizontal band, so no readout can
+    // take one and leave the other, but the canvas edge can: the row is culled on
+    // its own left edge, and the two rows have different left edges.
+    const vp: Viewport = { width: 1280, height: 800 };
+    // How far a row reaches left of the entity it names — asked of the geometry
+    // rather than restated, so a longer name moves the staging honestly.
+    const reachLeft = -rectFor(plate(RUSTY, 'station', 0, 400), 0).x;
+    const homeX = reachLeft - 5; // its row's left edge lands at -5: culled
+    const home = plate(RUSTY, 'station', homeX, 400);
+    const hull = plate(RUSTY, 'ship', homeX + 40, 400 - 24);
+    // The staging is only worth anything if the two WOULD have collided.
+    expect(rectOverlap(rectFor(home, 0), rectFor(hull, 0)), 'the staged pair does not even overlap').not.toBeNull();
+
+    const frame = placeFrame([hull, home], vp);
+    expect(frame.withheld, 'the station plate should have been culled at the edge').toContainEqual({
+      owner: RUSTY,
+      kind: 'station',
+      reason: 'offscreen',
+    });
+    expect(frame.drawn.map((d) => d.kind), 'the ship yielded to a plate that was never drawn').toEqual(['ship']);
+    expect(sameOwnerCollisions(frame)).toEqual([]);
+
+    // …and the control: slide the whole pair right so the station's row fits, and
+    // the ordering ruling takes over again — the station draws, the ship yields.
+    const shifted = placeFrame(
+      [plate(RUSTY, 'ship', homeX + 240, 400 - 24), plate(RUSTY, 'station', homeX + 200, 400)],
+      vp,
+    );
+    expect(shifted.drawn.map((d) => d.kind)).toEqual(['station']);
+    expect(shifted.withheld).toEqual([{ owner: RUSTY, kind: 'ship', reason: 'duplicate' }]);
+  });
+
+  it('the two rules keep the same air between two runs of type', () => {
+    // a0-119 is a0-115's keep-out with the blocker swapped, so it must not invent
+    // a second idea of "clear". Two rows separated by exactly the pad are clear;
+    // one pixel closer and they are not.
+    const rect: Rect = { x: 100, y: 50, width: 80, height: 16 };
+    const justClear: PlacedLabel = { owner: RUSTY, rect: { ...rect, x: rect.x + rect.width + READOUT_KEEPOUT_PAD } };
+    const tooClose: PlacedLabel = { owner: RUSTY, rect: { ...rect, x: rect.x + rect.width + READOUT_KEEPOUT_PAD - 1 } };
+    expect(labelRepeatsOwner(RUSTY, rect, [justClear])).toBe(false);
+    expect(labelRepeatsOwner(RUSTY, rect, [tooClose])).toBe(true);
+    // Another owner in the same pixels is not this rule's business.
+    expect(labelRepeatsOwner(RUSTY, rect, [{ owner: SABLE, rect }])).toBe(false);
+    // …and an empty frame is the common case, answered without touching anything.
+    expect(labelRepeatsOwner(RUSTY, rect, [])).toBe(false);
   });
 });
