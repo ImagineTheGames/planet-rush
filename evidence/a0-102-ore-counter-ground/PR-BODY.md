@@ -64,6 +64,20 @@ not — they were at the corner. Corrected in place.
   be sized before any `Text` exists, so the geometry has to know the size.
 - **`hud.ts`** draws from it and places both lines from it.
 
+**One thing the evidence caught that the tests did not.** The first cut of this
+kept the closing rule's 9 px-a-side overhang *and* then paid the ground's own
+third on top of it, which pushed `ORE` to x = 70 on a landscape phone —
+two pixels off the corner pause button, whose `PAUSE_BUTTON_LEFT` of 72 exists
+precisely to be "past the top-left ORE block". Every test was green; the shot was
+not. The rule spans the widest line of type now (a rule is a closing edge, not a
+margin), the air the 18 px was buying comes from the ground where there is more of
+it, and the clearance is asserted with its bound stated — `leaves the corner PAUSE
+BUTTON alone`, every touch profile, banks up to 999. Wheel prices run 1–14 and a
+hold is `CARGO_CAP_MAX` = 8 a trip, so four figures is not a state this economy
+reaches, and that constant's own doc already assumed two-to-three digits. If that
+changes, the test fails and the fix is to re-derive `PAUSE_BUTTON_LEFT`, not to
+widen the bound.
+
 **Why the counter moved.** The falloff has to go somewhere, and there are only two
 places: onto the type, or into padding. It could not be bled outward — `ore-hud`
 registers at `top-left` with margin `HUD_PAD`, `describeLayout` records what the
