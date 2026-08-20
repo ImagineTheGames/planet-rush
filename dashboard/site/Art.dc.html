@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<style>
+  body{margin:0;background:#070a0e;color:#c8d2e0;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1300px 820px at 12% -12%,rgba(20,52,86,.32),transparent 60%),radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:auto,150px 150px;}
+  a{color:#5CD1FF;text-decoration:none}a:hover{color:#8fe0ff}
+  button{cursor:pointer;font-family:'IBM Plex Mono',monospace}
+
+/* Director mobile pass (inside the first style block - helmet lifts only this one) */
+@media (max-width: 700px) {
+  [style*='max-width:1180px'], [style*='max-width:1240px'] { padding: 14px 10px 70px !important; }
+  [style*='max-width:1500px'] { padding: 10px 6px 0 !important; }
+  [style*='padding:30px 38px 40px'] { padding: 12px 8px 20px !important; }
+  [style*='padding:20px 26px'] { padding: 14px 12px !important; flex-wrap: wrap !important; }
+  [style*='font-size:30px'], [style*='font-size:34px'] { font-size: 21px !important; white-space: normal !important; }
+  [style*='white-space:nowrap'] { white-space: normal !important; }
+  [style*='min-height:96px'] { min-height: 0 !important; flex-wrap: wrap !important; }
+  [style*='margin-left:auto'][style*='display:flex'] { margin-left: 0 !important; flex-wrap: wrap !important; gap: 6px !important; width: 100%; }
+  [style*='margin-left:auto'][style*='display:flex'] a, [style*='margin-left:auto'][style*='display:flex'] span[style*='border-radius:10px'] { padding: 8px 10px !important; font-size: 11px !important; }
+  [style*='grid-template-columns:296px 1fr'] { grid-template-columns: 1fr !important; }
+  audio { height: 40px !important; }
+  button { min-height: 40px; }
+}
+</style>
+
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:40px 40px 100px">
+  <div style="display:flex;align-items:center;gap:18px;border:1px solid #223349;border-radius:18px;background:linear-gradient(105deg,#070c14,#0a1322 55%,#0b1526);padding:20px 26px">
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.42em;color:#7fdcff;margin-bottom:8px">◤ PLANET RUSH · STUDIO ◢</div>
+      <div style="font-size:30px;font-weight:700;letter-spacing:-.02em;background:linear-gradient(180deg,#fff,#aeddf7 58%,#5CD1FF);-webkit-background-clip:text;background-clip:text;color:transparent">Art review — your eyes decide.</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:#8aa0b6;margin-top:8px">CONCEPT BOARDS · OPEN, LOOK, PICK A DIRECTION · PRODUCTION NEVER WAITS</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:10px">
+      <a href="/board" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8794a6;padding:9px 14px;border:1px solid #223046;border-radius:10px">BOARD</a><a href="/crew" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8794a6;padding:9px 14px;border:1px solid #223046;border-radius:10px">CREW</a>
+      <a href="/sounds" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8794a6;padding:9px 14px;border:1px solid #223046;border-radius:10px">SOUNDS</a>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 14px;border-radius:10px;color:#0a0d12;background:#5CD1FF;font-weight:600">ART</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:26px;border:1px dashed #223046;border-radius:14px;padding:26px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6a7688">
+      No concept boards yet — they appear here as art briefs merge them into docs/art-direction.
+    </div>
+  </sc-if>
+
+  <sc-for list="{{ reviews }}" as="b" hint-placeholder-count="1">
+    <div style="margin-top:16px;border:1px solid #1d2433;border-left:3px solid {{ b.color }};border-radius:14px;background:rgba(11,13,20,.55);padding:14px 18px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span style="font-size:15px;font-weight:600;color:#e7ecf3">{{ b.question }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ b.color }};letter-spacing:.08em">{{ b.stateLabel }}</span>
+      </div>
+      <sc-for list="{{ b.questions }}" as="q" hint-placeholder-count="3">
+        <div style="margin-top:12px;border-top:1px solid #161c28;padding-top:11px">
+          <sc-if value="{{ q.hasHead }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:600;color:{{ q.headColor }}">{{ q.heading }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ q.stateColor }};letter-spacing:.08em">{{ q.stateLabel }}</span>
+              <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ q.clear }}" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #3a2b3f;background:transparent;color:#c79ad6;font-size:11px;font-family:'IBM Plex Mono',monospace">TAKE IT BACK</button>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ q.hasProse }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:6px;font-size:12px;line-height:1.5;color:#8aa0b6">{{ q.prose }}</div>
+          </sc-if>
+          <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:7px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:600;color:#e7ecf3">{{ q.verdictLabel }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c6878">{{ q.when }}</span>
+            </div>
+            <div style="margin-top:7px;font-size:12px;color:{{ q.statusColor }}">{{ q.statusLine }}</div>
+            <sc-for list="{{ q.briefs }}" as="w" hint-placeholder-count="1">
+              <div style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8aa0b6">{{ w.file }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 9px;border-radius:6px;color:{{ w.color }};background:{{ w.bg }};border:1px solid {{ w.border }}">{{ w.laneLabel }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ q.asking }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+              <sc-for list="{{ q.picks }}" as="p" hint-placeholder-count="4">
+                <button onClick="{{ p.act }}" style="padding:9px 16px;border-radius:8px;border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.color }};font-size:12px;font-weight:600">{{ p.label }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <sc-for list="{{ b.stale }}" as="s" hint-placeholder-count="0">
+        <div style="margin-top:10px;border-top:1px solid #161c28;padding-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;color:#F2D24B">{{ s.line }}</span>
+          <button onClick="{{ s.clear }}" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #3a2b3f;background:transparent;color:#c79ad6;font-size:11px;font-family:'IBM Plex Mono',monospace">TAKE IT BACK</button>
+        </div>
+      </sc-for>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c6878;margin-top:10px">{{ b.name }} renders below. <a href="{{ b.href }}" target="_blank">Full page ↗</a> if you want it bigger.</div>
+      <iframe src="{{ b.href }}" loading="lazy" style="width:100%;height:70vh;margin-top:10px;border:1px solid #1d2433;border-radius:10px;background:#0a0e14"></iframe>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ hasDecided }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:34px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.3em;color:#7fe0c4">◤ YOUR DECISIONS — and what happened next ◢</div>
+  </sc-if>
+  <sc-for list="{{ decided }}" as="d" hint-placeholder-count="2">
+    <div style="margin-top:12px;border:1px solid #1d2433;border-left:3px solid {{ d.accent }};border-radius:14px;background:rgba(11,13,20,.5);padding:14px 18px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:14px;font-weight:600;color:#e7ecf3">{{ d.title }}</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <a href="{{ d.href }}" target="_blank" style="padding:5px 12px;border-radius:8px;border:1px solid #223046;color:#8aa0b6;font-size:11px;font-family:'IBM Plex Mono',monospace">BOARD ↗</a>
+        </div>
+      </div>
+      <sc-for list="{{ d.answers }}" as="a" hint-placeholder-count="1">
+        <div style="margin-top:10px;padding-top:9px;border-top:1px solid #161c28">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:14px;font-weight:600;color:#e7ecf3">{{ a.verdictLabel }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c6878">{{ a.when }}</span>
+            <button onClick="{{ a.clear }}" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #3a2b3f;background:transparent;color:#c79ad6;font-size:11px;font-family:'IBM Plex Mono',monospace">TAKE IT BACK</button>
+          </div>
+          <div style="margin-top:9px;font-size:13px;color:{{ a.statusColor }}">{{ a.statusLine }}</div>
+          <sc-for list="{{ a.briefs }}" as="w" hint-placeholder-count="1">
+            <div style="margin-top:7px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8aa0b6">{{ w.file }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 9px;border-radius:6px;color:{{ w.color }};background:{{ w.bg }};border:1px solid {{ w.border }}">{{ w.laneLabel }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ hasRefs }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:34px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.3em;color:#5c6878">◤ RATIFIED / REFERENCE — already decided, kept for the record ◢</div>
+  </sc-if>
+  <sc-for list="{{ refs }}" as="r" hint-placeholder-count="6">
+    <div style="margin-top:10px;border:1px solid #161c28;border-radius:12px;background:rgba(11,13,20,.35);padding:10px 16px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;color:#8aa0b6">{{ r.name }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4FA08B">{{ r.stateLabel }}</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button onClick="{{ r.toggle }}" style="padding:5px 12px;border-radius:8px;border:1px solid #223046;background:transparent;color:#8aa0b6;font-size:11px">{{ r.toggleLabel }}</button>
+          <a href="{{ r.href }}" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5c6878;padding:5px 4px">↗</a>
+        </div>
+      </div>
+      <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+        <iframe src="{{ r.href }}" loading="lazy" style="width:100%;height:70vh;margin-top:10px;border:1px solid #1d2433;border-radius:10px;background:#0a0e14"></iframe>
+      </sc-if>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { data: null };
+
+  componentDidMount() {
+    const tick = async () => {
+      try {
+        const data = await (await fetch('/api/art')).json();
+        // Re-render reloads every embedded board iframe — only do it on real change.
+        const key = JSON.stringify(data);
+        if (key !== this.__lastKey) { this.__lastKey = key; this.setState({ data }); }
+      }
+      catch { /* keep last */ }
+    };
+    tick();
+    this.__poll = setInterval(tick, 30000);
+  }
+  componentWillUnmount() { clearInterval(this.__poll); }
+
+  // ONE ANSWER PER QUESTION. `question` names which of the board's questions
+  // this answers; boards that ask one thing send nothing and the server files it
+  // under that one question, exactly as it always did.
+  async choose(board, question, verdict, reason) {
+    try {
+      await fetch('/api/art/choice', { method: 'POST', body: JSON.stringify({ board, question, verdict, reason }) });
+      this.setState({ data: await (await fetch('/api/art')).json() });
+    } catch { /* poll retries */ }
+  }
+
+  // UNDO. A recorded verdict could only be taken back by hand-editing
+  // status/art-choices.json — which is what the Director had to do to give the
+  // explosion lab back after one tap closed it. Changing your mind is normal.
+  async takeBack(board, question) {
+    try {
+      await fetch('/api/art/choice', { method: 'POST', body: JSON.stringify({ board, question, clear: true }) });
+      this.setState({ data: await (await fetch('/api/art')).json() });
+    } catch { /* poll retries */ }
+  }
+
+  // ONE TAP USED TO BE A PERMANENT DECISION, and the option pressed was never
+  // named back to the developer:
+  //   "i didnt pick any of the explosions, i just clicked something and it all
+  //    went as if i had approved them"
+  // So the confirmation quotes the OPTION and the QUESTION it answers — a
+  // mis-tap is visible before it commits, not after — and says the decision can
+  // be undone, because now it can.
+  ask(board, q, opt) {
+    const heading = String(q.question || q.title || board).replace(/\s+/g, ' ').slice(0, 200);
+    if (opt.id === 'DENY ALL') {
+      if (!window.confirm('Turn down EVERY option for:\n\n    ' + heading + '\n\nNothing gets chosen and the Director owes you a fresh round.')) return;
+      const r = window.prompt('Why deny? Your words guide the next round:');
+      if (r === null) return;
+      this.choose(board, q.id, 'DENY ALL', r);
+      return;
+    }
+    if (!window.confirm('Record this as your answer?\n\n    ' + opt.label + '\n\nanswering:\n\n    ' + heading + '\n\nYou can take it back afterwards.')) return;
+    this.choose(board, q.id, opt.id);
+  }
+  askClear(board, question, label) {
+    if (!window.confirm('Take back this answer?\n\n    ' + label + '\n\nThe question goes back on the board and you can answer it again.')) return;
+    this.takeBack(board, question);
+  }
+
+  renderVals() {
+    const d = this.state.data ?? { boards: [], choices: {}, review: {}, work: {} };
+    const review = d.review ?? {};
+    const choices = d.choices ?? {};
+    const work = d.work ?? {};
+    const reviews = [];
+    const refs = [];
+    // A decision the developer MADE, and what the studio did about it. Picking a
+    // concept used to move the card to the "already decided" shelf, which is
+    // indistinguishable from the vote being thrown away — their words: "after
+    // approving it vanished". A verdict is only closed when its consequence is
+    // visible, so every pick now names the brief that acts on it and that
+    // brief's real lane.
+    const decided = [];
+    const LANE_META = {
+      backlog: { label: 'IN BACKLOG — not queued yet', color: '#7E8894' },
+      pending: { label: 'QUEUED — waiting for the agent', color: '#5CD1FF' },
+      active: { label: 'BEING WORKED RIGHT NOW', color: '#F2D24B' },
+      done: { label: 'BUILT — check the LIVE lane on the board', color: '#4FA08B' },
+      blocked: { label: 'BLOCKED — Director triaging', color: '#ff6b6b' },
+    };
+    // The briefs acting on ONE answer: whoever names the chosen option, and
+    // failing that whoever names the board it came from. A board that asks three
+    // questions has three consequences, and each pick has to show its own.
+    const briefsFor = (board, verdictId) => {
+      const hits = (verdictId && (work[verdictId] ?? []).length) ? work[verdictId] : (work[board] ?? []);
+      return hits.map(w => {
+        const m = LANE_META[w.lane] ?? { label: w.lane.toUpperCase(), color: '#8A94A2' };
+        return { file: w.file.replace(/\.md$/, ''), laneLabel: m.label,
+          color: m.color, bg: m.color + '1c', border: m.color + '55' };
+      });
+    };
+    const optionLabel = (spec, qid, verdictId) => {
+      const q = (spec?.questions ?? []).find(x => x.id === qid);
+      const o = (q?.options ?? []).find(x => x.id === verdictId);
+      return o ? o.label : String(verdictId ?? '');
+    };
+    // ONE ANSWERED QUESTION, with its consequence. Shared by the review list
+    // (where the other questions are still open) and the decided shelf.
+    const answerCard = (board, spec, qid, answer, { heading = '', multi = false, nameBoard = true } = {}) => {
+      const denied = answer.verdict === 'DENY ALL';
+      const label = optionLabel(spec, qid, answer.verdict);
+      const briefs = briefsFor(board, denied ? null : answer.verdict);
+      // Whether anything names THIS pick, as opposed to the board it came from.
+      // On a board that asks one thing they amount to the same claim; on one
+      // that asks three they do not, and calling a brief about the lab "the
+      // brief that builds your pick" would be the overclaim this section exists
+      // to avoid.
+      const exact = !denied && (work[answer.verdict] ?? []).length > 0;
+      // Never claim work is under way when nothing references the pick. An
+      // honest "nothing queued yet" is the whole reason this section exists.
+      const live = briefs.filter(b => b.laneLabel !== LANE_META.backlog.label);
+      const statusLine = briefs.length === 0
+        ? (denied ? 'No regeneration round queued yet — the Director owes you one.'
+                  : 'Nothing is queued against this pick yet — the Director owes you a brief.')
+        : live.length === 0
+          ? 'The brief that builds this exists but is not queued yet.'
+          : (denied ? 'A new round is in the queue, carrying your reason verbatim.'
+                    : (multi && !exact
+                        ? 'Briefs on this board — none names this pick specifically yet:'
+                        : 'The brief that builds your pick:'));
+      return {
+        verdictLabel: denied
+          ? ('✗ YOU DENIED' + (heading ? ' ' + heading : '') + ' — "' + (answer.reason ?? 'new round requested') + '"')
+          : ('✓ YOU PICKED ' + label + (heading || !nameBoard ? '' : ' — ' + board)),
+        when: answer.at ? new Date(answer.at).toLocaleString() : '',
+        statusLine, statusColor: briefs.length === 0 ? '#F2D24B' : '#9fb2c6',
+        briefs, hasBriefs: briefs.length > 0, denied,
+        clear: () => this.askClear(board, qid, denied ? 'DENY ALL' : label),
+      };
+    };
+    for (const name of (d.boards ?? [])) {
+      const spec = review[name];
+      const state = choices[name];
+      const answers = state?.answers ?? {};
+      const questions = spec?.questions ?? [];
+      // DECIDED MEANS EVERY QUESTION ANSWERED. One answer to a three-question
+      // board is not a decided board — that is the bug that made eighteen
+      // candidates disappear on the first tap.
+      const picked = state?.decided === true;
+      const href = '/art/board/' + name;
+      if (spec && !picked) {
+        // Awaiting the developer's eyes — settled parts marked settled, open
+        // ones still asking, and the board stays here until nothing is open.
+        const qs = questions.map(q => {
+          const answer = answers[q.id];
+          const multi = questions.length > 1;
+          const heading = q.title || (multi ? q.id.toUpperCase() : '');
+          // The board's own question is already the card's headline: repeating it
+          // per row is noise on a board that only asks one thing.
+          const prose = q.question && q.question !== spec.question ? q.question : '';
+          if (answer) {
+            const card = answerCard(name, spec, q.id, answer, { heading, multi });
+            return { ...card, id: q.id, settled: true, asking: false, hasHead: true,
+              heading: heading || 'Your answer', headColor: '#7fe0c4',
+              stateLabel: 'SETTLED', stateColor: '#4FA08B',
+              prose, hasProse: false, picks: [] };
+          }
+          const opts = (q.options ?? []).map(o => ({ id: o.id, label: o.label }));
+          opts.push({ id: 'DENY ALL', label: 'DENY ALL' });
+          return {
+            id: q.id, settled: false, asking: true, briefs: [], hasHead: multi,
+            heading, headColor: '#e7ecf3',
+            stateLabel: 'OPEN', stateColor: '#F2D24B',
+            prose, hasProse: prose.length > 0,
+            picks: opts.map(o => ({
+              label: o.label,
+              border: o.id === 'DENY ALL' ? '#4d2a2a' : '#24384f',
+              bg: 'transparent',
+              color: o.id === 'DENY ALL' ? '#ff9d9d' : '#8aa0b6',
+              act: () => this.ask(name, q, o),
+            })),
+          };
+        });
+        // An answer to a question the board no longer asks — the manifest gained
+        // or renamed questions after it was answered. Kept and shown rather than
+        // deleted behind the developer's back, with the way to drop it.
+        const stale = (state?.orphans ?? []).map(qid => ({
+          line: 'An earlier answer — "' + optionLabel(spec, qid, answers[qid]?.verdict) + '" — answers a question this board no longer asks.',
+          clear: () => this.askClear(name, qid, String(answers[qid]?.verdict ?? '')),
+        }));
+        const open = state?.open ?? questions.map(q => q.id);
+        reviews.push({
+          name, href, question: spec.question ?? name, color: '#F2D24B',
+          stateLabel: questions.length > 1
+            ? (open.length + ' OF ' + questions.length + ' QUESTIONS STILL OPEN')
+            : 'AWAITING YOUR EYES',
+          questions: qs, stale,
+        });
+      } else if (picked) {
+        // DECIDED — surfaced with its consequence, not filed away as history.
+        const rows = (state.answered ?? Object.keys(answers)).map(qid => {
+          const q = questions.find(x => x.id === qid);
+          // The card's title already names the board, so the row does not.
+          return answerCard(name, spec, qid, answers[qid], {
+            heading: q?.title || (questions.length > 1 ? qid.toUpperCase() : ''),
+            multi: questions.length > 1, nameBoard: false,
+          });
+        });
+        decided.push({
+          name, href, answers: rows,
+          title: rows.length > 1 ? (name + ' — all ' + rows.length + ' questions answered') : name,
+          accent: rows.every(r => r.denied) ? '#ff6b6b' : '#7fe0c4',
+        });
+      } else {
+        // Ratified reference — decided long ago, kept for the record.
+        const stateLabel = '✓ RATIFIED';
+        refs.push({
+          name, href, stateLabel,
+          open: this.__openRef === name,
+          toggleLabel: this.__openRef === name ? 'HIDE' : 'VIEW',
+          toggle: () => { this.__openRef = this.__openRef === name ? null : name; this.setState({}); },
+        });
+      }
+    }
+    return { reviews, refs, decided,
+      hasRefs: refs.length > 0, hasDecided: decided.length > 0,
+      empty: reviews.length === 0 && refs.length === 0 && decided.length === 0 };
+  }
+}
+</script>
+</body>
+</html>
