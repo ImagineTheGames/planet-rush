@@ -55,8 +55,9 @@ not — they were at the corner. Corrected in place.
 - **`instrument.ts`** — `scrimPlateau(rect, anchor)`: the part of a scrim that is
   actually dark, i.e. the innermost band where the advertised peak is reached and
   held. And `scrimGround(ink)`: the smallest `center` scrim whose plateau covers a
-  given ink box. `drawScrim` now takes its taper from the same `scrimTaper` solve,
-  so the three cannot drift apart.
+  given ink box. `drawScrim` now **interpolates its bands from the full rect to
+  `scrimPlateau`**, so the shape of a scrim's core is decided in one place and the
+  three cannot drift apart. See *The same defect, one level down* below.
 - **`hud-geometry.ts`** — `oreCounterLayout(label, numeral, scale)`: pure, fed
   measured text, returning the two lines, the rule, the cluster's ink box and the
   ground under all of it. `TOTAL_LABEL_H` moved here as `ORE_LABEL_LEADING`, with
@@ -93,6 +94,27 @@ added by hand.
 **The numeral's colour is untouched.** Signal yellow is ore by the palette
 contract (style-guide §2) and the palette audit owns it; the separation comes from
 the ground, as the brief requires.
+
+## The same defect, one level down
+
+The dark-matter gate (a1-09) went red on `scrimPlateau`: exported, tested four
+ways, called by no production code — the `matchAbundance` shape the gate exists
+to catch. Worth writing down that **neither `npx tsc --noEmit` nor `npm test`
+runs that check**; it is a step of the `Typecheck, test, build` job, and a branch
+can be green locally and red on it.
+
+The gate offers wire-it-up, delete-it, or allowlist-with-a-reason. Allowlisting
+would have been a lie, because `drawScrim`'s innermost band **already was the
+plateau** — inset `scrimTaper` a side, `SCRIM_CORE` of the height, the same
+anchor solve — computed from a second copy of those three lines. So the ground a
+readout is handed (`scrimGround` → `scrimPlateau`) and the darkness actually
+drawn agreed only because two copies of the same arithmetic happened to match.
+
+That is this brief's defect at a smaller scale: a scrim whose rect is not the
+thing it was solved against. The bands now interpolate from the full rect to
+`scrimPlateau(rect, anchor)` — algebraically the previous expression, so no
+pixels move and the goldens pass untouched — and `t = 1` lands on the plateau by
+definition rather than by coincidence.
 
 Two things came along because they would otherwise have regressed:
 
