@@ -268,7 +268,7 @@ describe('an empty list', () => {
     expect(model.stamp).toBe('');
   });
 
-  it('says NO OPEN CLAIMS — and what to do instead — once one has landed', () => {
+  it('says NO OPEN ROOMS — and what to do instead — once one has landed', () => {
     const model = browseModel(browseReceived(createBrowse(), [], 1_000), MODEL);
     expect(model.empty).toEqual([BROWSE_COPY.emptyHeadline, BROWSE_COPY.emptyDetail]);
     // The way out is named, and it is on this very screen: the other segment.

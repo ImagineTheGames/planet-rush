@@ -77,8 +77,8 @@
  */
 
 import type { AnchorRegion, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { stationChromeHeight, TOTAL_LABEL_H } from './hud-geometry';
-import { hudMetrics, hudSpace } from './instrument';
+import { ORE_LABEL_LEADING, stationChromeHeight } from './hud-geometry';
+import { hudMetrics, hudSpace, SCRIM_CORE } from './instrument';
 import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
 
@@ -167,6 +167,19 @@ export interface ReservationContext {
    * `collapsedRect`.
    */
   readonly fireCorner?: boolean;
+  /**
+   * The rect another element registered this frame, or `undefined` when it did
+   * not register at all.
+   *
+   * Some elements are ROWS INSIDE another element rather than free-standing
+   * corner chrome — the banked-ore numeral sits inside the ore counter's ground
+   * (a0-102 `oreCounterLayout`), which hugs the corner on its behalf. A row like
+   * that reserves whatever its container inset it by, and the only honest way to
+   * state that is to read the container's own rect rather than to restate the
+   * arithmetic that produced it. Populated by {@link reachViolations} from the
+   * entries it was handed.
+   */
+  readonly boundsOf?: (id: string) => Rect | undefined;
 }
 
 /**
@@ -193,10 +206,10 @@ export interface EdgeReservation {
 /**
  * Every gap in this build that is bigger than its element's margin ON PURPOSE.
  *
- * Six rows, and every one of them was found by running {@link reachViolations}
+ * Seven rows, and every one of them was found by running {@link reachViolations}
  * over the registry rather than by being remembered — which is the point.
  *
- * **A row never restates a number it can import.** Four of the six read the
+ * **A row never restates a number it can import.** Five of the seven read the
  * drawing constant itself — `MINIMAP_STRIP_CLEARANCE`, `stationChromeHeight`,
  * `ZOOM_CONTROL_GAP` — so a change at the drawing end moves the reservation with
  * it and cannot drift. The two badge lifts live in `@render` and `@net` modules
@@ -210,12 +223,28 @@ export const LAYOUT_RESERVATIONS: readonly EdgeReservation[] = [
   {
     id: 'banked-total',
     edge: 'top',
-    px: ({ frame }) => hudSpace(TOTAL_LABEL_H, hudMetrics(frame.width, frame.height)),
+    px: ({ frame, boundsOf }) =>
+      scrimPad(boundsOf?.('ore-hud')?.height) +
+      hudSpace(ORE_LABEL_LEADING, hudMetrics(frame.width, frame.height)),
     why:
       'The banked numeral is the second row of the top-left ore cluster: the word ' +
-      'TOTAL is on the top edge above it (`./hud-geometry` `TOTAL_LABEL_H`, scaled ' +
-      'with the frame). Both rows register `top-left`; the eyebrow reaches the ' +
-      'corner and the numeral reserves the eyebrow.',
+      'ORE is above it, one eyebrow leading up (`./hud-geometry` ' +
+      '`ORE_LABEL_LEADING`, scaled with the frame), and since a0-102 the whole ' +
+      'cluster sits on a scrim ground whose falloff is padding around the ink ' +
+      '(`./instrument` `scrimGround`). Both rows register `top-left`; the GROUND ' +
+      'reaches the corner and the numeral reserves the ground plus the eyebrow.',
+  },
+  {
+    id: 'banked-total',
+    edge: 'left',
+    px: ({ boundsOf }) => scrimPad(boundsOf?.('ore-hud')?.width),
+    why:
+      'The same ground, on the other axis. a0-102 argues at length why the ' +
+      "falloff is padding rather than bleed past the group origin: `ore-hud`'s " +
+      'registered footprint is what it DRAWS, so a ground reaching left of the ' +
+      'margin fails the containment half of this very contract. The cost is that ' +
+      'ORE starts a third of the ink box in from the margin — deliberately, and ' +
+      'now declared.',
   },
   {
     id: 'minimap',
@@ -275,6 +304,22 @@ export const LAYOUT_RESERVATIONS: readonly EdgeReservation[] = [
       'whatever the build badge reserved plus its own row.',
   },
 ];
+
+/**
+ * How much of a scrim-grounded element's extent is the falloff padding around
+ * its ink, on ONE side — `scrimGround` inflates by `1 / SCRIM_CORE` about the
+ * ink's centre, so each side takes `(1 - SCRIM_CORE) / 2` of the GROUND. Derived
+ * from the container's drawn rect rather than from the ink, because the drawn
+ * rect is the one thing the registry actually holds.
+ *
+ * `undefined` (the container did not register this frame) reserves nothing: a
+ * row about two elements has nothing to say when only one of them is there,
+ * exactly as `./layout-exclusions` treats a missing half.
+ */
+function scrimPad(groundExtent: number | undefined): number {
+  if (!groundExtent || groundExtent <= 0) return 0;
+  return (groundExtent * (1 - SCRIM_CORE)) / 2;
+}
 
 /**
  * Mirror of `@render/build-badge` `BADGE_STRIP_LIFT` (26). Mirrored rather than
@@ -370,6 +415,11 @@ export function reachViolations(
   const table = opts.reservations ?? LAYOUT_RESERVATIONS;
   const viewportRect: Rect = { x: 0, y: 0, width: viewport.width, height: viewport.height };
   const out: ReachViolation[] = [];
+  // A row may need a sibling's rect (see ReservationContext.boundsOf); the
+  // entries handed in ARE the frame's registry, so the lookup is over them.
+  const byId = new Map<string, Rect>();
+  for (const e of entries) byId.set(e.id, e.bounds);
+  const boundsOf = (id: string): Rect | undefined => byId.get(id);
 
   for (const entry of entries) {
     const edges = anchorEdges(entry.anchor.region);
@@ -377,7 +427,7 @@ export function reachViolations(
     const frame = opts.frameFor?.(entry.id) ?? viewportRect;
     const margin = Math.max(0, entry.anchor.margin ?? 0);
     for (const edge of edges) {
-      const reserved = reservedPx(entry.id, edge, { frame, isTouch, fireCorner }, table);
+      const reserved = reservedPx(entry.id, edge, { frame, isTouch, fireCorner, boundsOf }, table);
       const allowed = margin + reserved;
       const gap = edgeGap(entry.bounds, frame, edge);
       if (gap > allowed + tolerance) {

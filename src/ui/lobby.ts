@@ -163,9 +163,10 @@ export const LOBBY_TITLE = 'CREW MUSTER';
  *
  * The rename is of the **string**, not of the model: {@link RoomCode}, `claim`
  * as a target kind, the wire and the session model are untouched, and the
- * fiction keeps the word everywhere it is theme rather than chrome — notably
- * `./end-of-match` `CLAIM HELD` / `CLAIM LOST`, which §4.7's accessibility
- * clause governs and which this change deliberately leaves alone.
+ * fiction kept the word wherever it was theme rather than chrome — notably the
+ * end-of-match headlines, which this change deliberately left alone. a0-108 has
+ * since taken those too: the developer made the same ruling a second time, for
+ * every screen at once.
  *
  * It is measured, not eyeballed: `JOIN CODE` is 80px of 11px Oxanium at the
  * phone's frame scale against a 113px cluster ({@link ROOM_CODE_WIDTH}), so the
@@ -194,14 +195,25 @@ export const RUSH_COUNTDOWN_SECONDS = 5;
  * principle has no cell for a device-specific instruction. It is also the shorter
  * word, and the strip it rides is 54px on the narrowest phone.
  *
- * The guest form is the arena's host rule in words: the same `CLAIM HOLDER` noun
- * the footer's `WAITING FOR THE CLAIM HOLDER` already uses (GDD §4.7 worked
- * examples — "claim holder", not "host"), so the roster teaches one word for the
- * person who owns the room rather than two.
+ * The guest form is the arena's host rule in words: the same `HOST` noun the
+ * footer's `WAITING FOR THE HOST` already uses (a0-108), so the roster teaches one
+ * word for the person who started the game rather than two.
  */
+/**
+ * The footer line a guest reads while the host is still setting up — the same
+ * `HOST` noun {@link MAP_PICK_GUEST_LABEL} uses, so one screen teaches one word.
+ *
+ * It lives on the model rather than inline in `./lobby-view` because a string
+ * only the view can produce is a string no test can read: `copy-audit.test.ts`
+ * walks what the pure modules export, and this was the one player-facing line on
+ * this screen it could not see (a0-108). Moving it changes nothing about what is
+ * drawn — the view still decides *when*.
+ */
+export const LOBBY_WAITING_FOR_HOST = 'WAITING FOR THE HOST';
+
 export const SHIP_PICK_LABEL = 'SHIP · CHANGE';
 export const MAP_PICK_LABEL = 'MAP · CHANGE';
-export const MAP_PICK_GUEST_LABEL = "MAP · CLAIM HOLDER'S";
+export const MAP_PICK_GUEST_LABEL = "MAP · HOST'S";
 
 /** The words a difficulty is shown as. The tier is named in full on the row —
  *  and since a0-06 it is **shown, not chosen** (GDD §2.1 amended 2026-08-07): the
@@ -1732,8 +1744,7 @@ export function activeTeams(state: LobbyState): number {
 
 /**
  * The slots on `player`'s **side** — the roster the end-of-match summary reads to
- * answer "did MY side take the claim?" (`./end-of-match` `MatchOutcome.allies`,
- * a0-09).
+ * answer "did MY side win?" (`./end-of-match` `MatchOutcome.allies`, a0-09).
  *
  * The lobby's twin of `art/audio/scope` `deriveAlarmAllies`, which builds the
  * identical set off live world truth for the under-attack alarm. This one exists

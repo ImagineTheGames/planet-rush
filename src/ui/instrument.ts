@@ -438,6 +438,73 @@ export const SCRIM_TAPER = 0.6;
 export type ScrimAnchor = 'top' | 'bottom' | 'center';
 
 /**
+ * How far a scrim's core is inset from its long edges — the taper, solved once
+ * so nothing downstream can disagree about where the darkness actually is.
+ * {@link scrimPlateau} is its only caller, and {@link drawScrim} and {@link
+ * scrimGround} both go through that, so the three agree by construction rather
+ * than by restating the same arithmetic.
+ */
+export function scrimTaper(w: number, h: number): number {
+  return Math.min(h * SCRIM_TAPER, (w * (1 - SCRIM_CORE)) / 2);
+}
+
+/**
+ * **The part of a scrim that is actually dark** — the innermost band, where the
+ * peak coverage the {@link SCRIM} constant advertises is reached and held.
+ *
+ * A scrim decays to nothing at every edge, so its rect is not its ground: only
+ * this plateau is. That distinction is the whole of a0-102. The top-left ore
+ * cluster's scrim was drawn on a rect **coincident with its own type** — same
+ * origin, same width — so `ORE` sat at 0.06–0.37 coverage and the banked
+ * numeral's leading column at 0.15, against a constant whose doc says 0.55 is
+ * the least that survives a lit asteroid. The scrim was there; the ground was
+ * not, which is exactly what QA saw and reported as "no plate, scrim or panel".
+ *
+ * Anchored scrims (`top`/`bottom`) hold their peak against the anchored edge, so
+ * the plateau reaches it; a `center` scrim's plateau is inset on both sides.
+ */
+export function scrimPlateau(rect: Rect, anchor: ScrimAnchor): Rect {
+  const taper = scrimTaper(rect.width, rect.height);
+  const height = rect.height * SCRIM_CORE;
+  const y =
+    anchor === 'top'
+      ? rect.y
+      : anchor === 'bottom'
+        ? rect.y + rect.height - height
+        : rect.y + (rect.height - height) / 2;
+  return { x: rect.x + taper, y, width: Math.max(0, rect.width - taper * 2), height };
+}
+
+/**
+ * The smallest `center`-anchored scrim rect whose {@link scrimPlateau} covers
+ * `ink` — i.e. **the ground a readout has to be given** for every glyph it draws
+ * to sit on the coverage its scrim promises, rather than in the falloff.
+ *
+ * The inflation is `1 / SCRIM_CORE` about the ink's own centre in both axes,
+ * which costs a third of the ink's extent as padding on each side. That padding
+ * is not decoration: it *is* the falloff, moved off the type and out to where a
+ * scrim is allowed to be soft. It also subsumes what {@link
+ * ../ui/hud-geometry} `SCRIM_BLEED` was buying by hand — the darkness now starts
+ * before the type and ends after the rule by construction.
+ *
+ * `scrimPlateau(scrimGround(ink))` contains `ink` for every finite ink box: the
+ * y solve is exact, and the x taper is `min`'d against the same
+ * `(1 - SCRIM_CORE) / 2` fraction this inflates by, so it can only come out
+ * smaller — never larger. Asserted in ./instrument.test.ts.
+ */
+export function scrimGround(ink: Rect): Rect {
+  const pad = (1 / SCRIM_CORE - 1) / 2;
+  const padX = ink.width * pad;
+  const padY = ink.height * pad;
+  return {
+    x: ink.x - padX,
+    y: ink.y - padY,
+    width: ink.width + padX * 2,
+    height: ink.height + padY * 2,
+  };
+}
+
+/**
  * Solve the per-band alpha for a set of **nested** translucent bands, given the
  * coverage each band should leave behind it.
  *
@@ -492,21 +559,17 @@ export function drawScrim(
   const alphas = nestedAlphas(scrimTargets(peak, bands));
   const n = alphas.length;
   if (n === 0) return;
-  // How far the innermost band shrinks: to `SCRIM_CORE` of the extent it decays
-  // along, so the stated peak lands on a plateau the readout actually sits on
-  // rather than on a sliver through the middle of it.
-  const shrink = 1 - SCRIM_CORE;
-  // The long-axis taper, bounded by the same plateau from the other side, so the
-  // core keeps `SCRIM_CORE` of the width however square the rect is — a corner
-  // cluster is nearly square, and it was the case the short-axis rule alone left
-  // with a 12px-wide core.
-  const taper = Math.min(h * SCRIM_TAPER, (w * (1 - SCRIM_CORE)) / 2);
+  // The bands interpolate from the full rect (faintest) to the plateau
+  // (strongest), so the shape the innermost band lands on is not restated here —
+  // it IS {@link scrimPlateau}, the same rect `scrimGround` sizes a readout's
+  // ground against. Stating it twice is how a scrim and the ground solved for it
+  // drift apart, which is the defect a0-102 was filed for.
+  const core = scrimPlateau({ x, y, width: w, height: h }, anchor);
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1); // 0 = outermost/faintest, 1 = core
-    const inset = taper * t;
-    const bx = x + inset;
-    const bw = w - inset * 2;
-    const bh = h * (1 - t * shrink);
+    const bx = x + (core.x - x) * t;
+    const bw = w + (core.width - w) * t;
+    const bh = h + (core.height - h) * t;
     const by =
       anchor === 'top' ? y : anchor === 'bottom' ? y + h - bh : y + (h - bh) / 2;
     if (bw <= 0 || bh <= 0) continue;

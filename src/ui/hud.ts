@@ -126,6 +126,9 @@ import {
   ALARM_FRAME_INSET,
   ALARM_FRAME_STROKE,
   HUD_PAD,
+  HUD_EYEBROW_TYPE,
+  ORE_BANK_TYPE,
+  oreCounterLayout,
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
@@ -141,14 +144,12 @@ import {
   RESPAWN_STROKE,
   RESPAWN_CENTER_Y,
   respawnWrapWidth,
-  SCRIM_BLEED,
   stationChromeHeight,
-  TOTAL_LABEL_H,
   waveClockLayout,
   wheelFootprint,
   wheelRadius,
 } from './hud-geometry';
-import type { ClockLayout } from './hud-geometry';
+import type { ClockLayout, OreCounterLayout } from './hud-geometry';
 import { exclusionViolations } from './layout-exclusions';
 import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
 import {
@@ -186,7 +187,10 @@ const PAD = HUD_PAD;
 /** Bottom strip's baseline offset from the screen bottom, CSS px. */
 const STRIP_ROW = 18;
 const STRIP_PAD = 12;
-/** Gap between the top-left ORE label and the banked number below it, CSS px. */
+/* The gap between the top-left ORE label and the banked number below it moved to
+ * `hud-geometry.ts` as `ORE_LABEL_LEADING` with a0-102: the whole cluster is a
+ * computed layout now (`oreCounterLayout`), because the ground under it has to be
+ * sized from where the type lands, and one file has to own that arithmetic. */
 
 // --- Gantry/Bone reference type sizes (u7-07) -------------------------------
 //
@@ -196,10 +200,12 @@ const STRIP_PAD = 12;
 // the whole HUD's type scale is one block a reader can check against
 // style-guide §7's 12px legibility floor.
 const TYPE = {
-  /** `ORE` / `HOME` / an eyebrow above a readout. */
-  eyebrow: 11,
+  /** `ORE` / `HOME` / an eyebrow above a readout. Owned by `hud-geometry.ts`
+   *  since a0-102 — the ore counter's ground is sized before any `Text` exists,
+   *  so the geometry has to know the size (the reason `PROMPT_TYPE` lives there). */
+  eyebrow: HUD_EYEBROW_TYPE,
   /** The banked ore total — the loudest number on the screen. */
-  bank: 22,
+  bank: ORE_BANK_TYPE,
   /** `WAVE 1/5 · Outer Drift`. */
   waveName: 15,
   /** `NEXT 2:28` / `COLLAPSE`. */
@@ -613,6 +619,11 @@ export class Hud extends Container {
   /** What the ore chrome was last drawn for, so it redraws on a change rather
    *  than every frame (a banked total moves seconds apart, not frames apart). */
   private oreChromeKey = '';
+  /** The cluster's placement as of that last draw ({@link ./hud-geometry}
+   *  `oreCounterLayout`) — the ground, the two lines inside it and the rule. The
+   *  cost floats aim at the numeral through this rather than at a remembered
+   *  offset, so the float and the number cannot end up in different places. */
+  private oreLayout: OreCounterLayout | null = null;
   /** The banked total the top-left last drew — read back by the ?debug=1
    *  live-stage seam to prove the total rises as the under-ship hold drains. */
   private lastBankedTotal = 0;
@@ -901,9 +912,10 @@ export class Hud extends Container {
     // branch's type scale, not re-sized by it. The `'eyebrow'` tier adds the
     // Gantry tracking; the word and its size are main's.
     this.totalLabel = this.makeText('ORE', FONT_HEADING, TYPE.eyebrow, TEXT_MUTED, 'normal', 'eyebrow');
-    this.totalLabel.y = 0;
     this.bankedText = this.makeText('', FONT_NUMERAL, TYPE.bank, PALETTE.signalYellow, 'bold', 'name');
-    this.bankedText.y = TOTAL_LABEL_H;
+    // Both lines are placed by `oreCounterLayout` in `updateOre`, from their own
+    // measured boxes — the ground has to be sized to the type before the type can
+    // be told where to sit, so neither line has a y until the first frame.
     this.oreGroup.addChild(this.oreChrome, this.totalLabel, this.bankedText);
     // Placed in `layout()` with the rest of the corner chrome — the top-LEFT
     // corner is the content box's, not the screen's, on an ultrawide (a0-74).
@@ -1129,12 +1141,11 @@ export class Hud extends Container {
     this.presence.setTypeScale(hudType(TYPE.presence, m));
     set(this.respawnText, TYPE.respawn, 'label');
 
-    // The ore cluster's two lines re-stack at the scaled sizes, so the leading
-    // follows the type instead of being pinned to desktop. The clock's three
-    // lines are placed by `waveClockLayout` in `updateWaveClock` instead — since
-    // a0-24 their arrangement depends on the open wheel as well as on the frame
-    // scale, and it is re-derived from measured metrics every frame.
-    this.bankedText.y = hudSpace(TOTAL_LABEL_H, m);
+    // The ore cluster re-stacks at the scaled sizes in `updateOre`, from
+    // `oreCounterLayout` — like the clock's three lines, and since a0-102 for the
+    // same reason: the arrangement depends on measured text, so it is re-derived
+    // rather than assigned here. `layout()` clears `oreChromeKey`, which is what
+    // makes the next frame redo it at the new scale.
   }
 
   /** Draw one frame. Pull the pure models, then update the Pixi children. */
@@ -1187,17 +1198,27 @@ export class Hud extends Container {
   // rather than hanging from the screen edge: a soft blot under the readout,
   // clear of the margin, invisible at its own boundary.
 
-  /** The top-left ore cluster's chrome, in the group's own space (origin at the
-   *  cluster's top-left, i.e. the HUD margin). Redrawn when the number changes
-   *  width, not per frame. */
-  private drawOreChrome(): void {
-    const m = this.metrics;
-    const width = Math.max(this.totalLabel.width, this.bankedText.width) + hudSpace(18, m);
-    const ruleY = this.bankedText.y + this.bankedText.height + hudSpace(4, m);
+  /**
+   * The top-left ore cluster's chrome, in the group's own space (origin at the
+   * ground's top-left, i.e. the HUD margin). Redrawn when the cluster's measured
+   * type changes, not per frame.
+   *
+   * **a0-102.** This used to size the scrim to `max(labelWidth, numeralWidth) +
+   * 18` from the type's own origin, so every pixel of slack sat to the right of
+   * the numeral and none above, below or left of it. A scrim decays to nothing at
+   * its edges, so that put `ORE` at 0.15 coverage and the numeral's leading column
+   * at 0.15 against a `SCRIM.corner` of 0.55 — chrome that was drawn and could not
+   * be seen, which is what QA photographed and filed as "no plate, scrim or panel
+   * behind it". The rect now comes from {@link ./hud-geometry} `oreCounterLayout`,
+   * which sizes the ground so the scrim's PLATEAU holds the type and the rule; the
+   * `SCRIM_BLEED` this used to add by hand is part of that inflation now.
+   */
+  private drawOreChrome(layout: OreCounterLayout): void {
     const g = this.oreChrome;
     g.clear();
-    drawScrim(g, 0, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
-    drawEdgeRule(g, 0, ruleY, width, 1, INSTRUMENT_RULE);
+    const { ground, rule } = layout;
+    drawScrim(g, ground.x, ground.y, ground.width, ground.height, 'center', SCRIM.corner);
+    drawEdgeRule(g, rule.x, rule.y, rule.width, rule.height, INSTRUMENT_RULE);
   }
 
   /** The top-centre wave clock's chrome, from the same {@link waveClockLayout}
@@ -1264,9 +1285,24 @@ export class Hud extends Container {
     // Top-left ORE: just the safe banked number the Build wheel spends.
     this.bankedText.text = `${model.banked}`;
     this.lastBankedTotal = model.banked;
-    const oreKey = `${model.banked}`;
+    // Keyed on the MEASURED boxes rather than on the number, because that is what
+    // the ground is sized from: a resize re-scales them (and `layout()` clears the
+    // key besides), and so does the real face landing after the boot fallback —
+    // `ORE` never changes, but its width does, and a cluster laid out against
+    // Trebuchet would keep that placement all match. Pixi caches text metrics, so
+    // reading the four numbers per frame is a dirty check, not a measure.
+    const label = { width: this.totalLabel.width, height: this.totalLabel.height };
+    const numeral = { width: this.bankedText.width, height: this.bankedText.height };
+    const oreKey =
+      `${label.width}x${label.height}|${numeral.width}x${numeral.height}|${this.metrics.scale}`;
     if (oreKey !== this.oreChromeKey) {
-      this.drawOreChrome();
+      const layout = oreCounterLayout(label, numeral, this.metrics);
+      this.totalLabel.x = layout.label.x;
+      this.totalLabel.y = layout.label.y;
+      this.bankedText.x = layout.numeral.x;
+      this.bankedText.y = layout.numeral.y;
+      this.drawOreChrome(layout);
+      this.oreLayout = layout;
       this.oreChromeKey = oreKey;
     }
 
@@ -2437,8 +2473,14 @@ export class Hud extends Container {
    *  a floating cost *is* ore (style-guide §2). */
   private updateCostFloats(frame: HudFrame): void {
     const floats = this.pressFeedback.floats(frame.time);
-    const bankX = PAD + 8;
-    const bankY = PAD + TOTAL_LABEL_H;
+    // Where the banked numeral actually is this frame, not where it used to be:
+    // a0-102 moved the type a third of its ink box in from the margin to make room
+    // for its own ground, and a float aimed at a remembered `PAD + 8` would now
+    // land above and left of the number it is flying into. Read off the ore
+    // group's own origin, so this also follows the content box on an ultrawide.
+    const ore = this.oreLayout;
+    const bankX = this.oreGroup.x + (ore ? ore.numeral.x : 0) + 8;
+    const bankY = this.oreGroup.y + (ore ? ore.numeral.y : 0);
     for (let i = 0; i < floats.length; i++) {
       const f = floats[i]!;
       const start = this.floatStart(f);

@@ -22,6 +22,7 @@ import { describe, it, expect } from 'vitest';
 import { BONE, MATERIAL_SHADES, TRACKING, trackingPx, TYPE_MIN } from '../art/materials';
 import type { PlateCanvas } from '../art/materials';
 import { PALETTE } from '../art/palette';
+import type { Rect } from '@platform/layout-registry';
 import {
   drawEdgeRule,
   drawScrim,
@@ -42,6 +43,8 @@ import {
   INSTRUMENT_TRACK,
   nestedAlphas,
   SCRIM,
+  scrimGround,
+  scrimPlateau,
   SCRIM_BANDS,
   SCRIM_COLOR,
   SCRIM_CORE,
@@ -235,7 +238,14 @@ describe('the rule: no plates over gameplay', () => {
     const cy = y + h / 2;
     expect(r.coverageAt(cx, cy)).toBeCloseTo(SCRIM.corner, 6);
     // …and, the point of the plateau, still the peak a quarter of the way out to
-    // each edge — which is where the label's own glyphs are.
+    // each edge.
+    //
+    // (This used to say "which is where the label's own glyphs are". It was not:
+    // `drawOreChrome` hung this rect off the type's own top-left corner, so the
+    // glyphs were in the falloff and not in the plateau this proves exists. That
+    // false premise is how a0-102 survived a suite that already measured the
+    // right number — see `scrimGround` below, and the ore counter's own contract
+    // in ./hud-geometry.test.ts.)
     for (const [dx, dy] of [
       [-0.29, -0.29],
       [0.29, -0.29],
@@ -588,5 +598,74 @@ describe('nestedAlphas — the solve behind every falloff here', () => {
   it('drops targets that would go backwards rather than painting a negative alpha', () => {
     expect(nestedAlphas([0.4, 0.2, 0.6])).toHaveLength(2);
     for (const a of nestedAlphas([0.4, 0.2, 0.6])) expect(a).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scrimGround / scrimPlateau — how big a scrim has to be to be a ground (a0-102)
+// ---------------------------------------------------------------------------
+
+describe('scrimGround — the size a readout has to give its own darkness', () => {
+  /** A handful of ink boxes across the shapes the HUD actually inks: the ore
+   *  cluster (nearly square), a wide one-line readout, and a tall narrow one. */
+  const INK: readonly Rect[] = [
+    { x: 0, y: 0, width: 42, height: 48 },
+    { x: -9, y: 0, width: 240, height: 20 },
+    { x: 4, y: 7, width: 18, height: 90 },
+    { x: 0, y: 0, width: 1, height: 1 },
+  ];
+
+  it("the plateau of the ground it returns covers the ink — that is the whole promise", () => {
+    for (const ink of INK) {
+      const plateau = scrimPlateau(scrimGround(ink), 'center');
+      expect(plateau.x, `${ink.width}×${ink.height}`).toBeLessThanOrEqual(ink.x + 1e-9);
+      expect(plateau.y).toBeLessThanOrEqual(ink.y + 1e-9);
+      expect(plateau.x + plateau.width).toBeGreaterThanOrEqual(ink.x + ink.width - 1e-9);
+      expect(plateau.y + plateau.height).toBeGreaterThanOrEqual(ink.y + ink.height - 1e-9);
+    }
+  });
+
+  it('and the DRAWN scrim really is at its peak over every corner of that ink', () => {
+    // Not the arithmetic this time: the bands `drawScrim` actually lays down,
+    // sampled at the ink's four corners. The plateau is a claim about coverage,
+    // so it is checked against coverage.
+    for (const ink of INK) {
+      const g = scrimGround(ink);
+      const r = new Recorder();
+      drawScrim(r, g.x, g.y, g.width, g.height, 'center', SCRIM.corner);
+      for (const [cx, cy] of [
+        [ink.x, ink.y],
+        [ink.x + ink.width, ink.y],
+        [ink.x, ink.y + ink.height],
+        [ink.x + ink.width, ink.y + ink.height],
+      ] as const) {
+        expect(
+          r.coverageAt(cx, cy),
+          `${ink.width}×${ink.height} ink corner (${cx}, ${cy})`,
+        ).toBeCloseTo(SCRIM.corner, 6);
+      }
+    }
+  });
+
+  it('costs a third of the ink on each side, and is centred on it', () => {
+    // The price of the promise, stated so a reader can see what padding a ground
+    // costs an element before they ask for one: `1 / SCRIM_CORE` about the
+    // centre, which at SCRIM_CORE = 0.6 is a third of the extent per side.
+    const ink: Rect = { x: 0, y: 0, width: 60, height: 30 };
+    const g = scrimGround(ink);
+    expect(g.width).toBeCloseTo(100, 9);
+    expect(g.height).toBeCloseTo(50, 9);
+    expect(g.x + g.width / 2).toBeCloseTo(ink.x + ink.width / 2, 9);
+    expect(g.y + g.height / 2).toBeCloseTo(ink.y + ink.height / 2, 9);
+    expect(1 / SCRIM_CORE).toBeCloseTo(g.width / ink.width, 9);
+  });
+
+  it('an anchored scrim keeps its peak against the edge it hangs from', () => {
+    const rect: Rect = { x: 0, y: 0, width: 200, height: 40 };
+    expect(scrimPlateau(rect, 'top').y).toBe(0);
+    const bottom = scrimPlateau(rect, 'bottom');
+    expect(bottom.y + bottom.height).toBeCloseTo(40, 9);
+    const centre = scrimPlateau(rect, 'center');
+    expect(centre.y).toBeCloseTo((40 - 40 * SCRIM_CORE) / 2, 9);
   });
 });

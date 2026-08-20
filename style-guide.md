@@ -569,8 +569,8 @@ mockup, board and HUD study carries strings: a label, a cost, a refusal.
 **What the voice IS:**
 
 1. **Procedural.** It states status, cost, condition, and — when it refuses — the reason. Nothing else.
-2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `CLAIM HELD`, not `GLORIOUS VICTORY`.
-3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (room, level, score), the authority reaches for the nouns of work and paperwork (claim, sector, yield, contract, seal, log).
+2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `VICTORY`, not `GLORIOUS VICTORY`. The register is carried by what is *left out* — a bare outcome word is already in voice.
+3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (level, score), the authority reaches for the nouns of work and paperwork (sector, yield, contract, seal, log). *(Amended 2026-08-19, a0-108 — `claim` left this list; see the vocabulary table.)*
 4. **Terse and present-tense.** Second person, imperative for instructions. The interface has a word budget and spends it on the reason, not the fiction.
 5. **Indifferent.** It is not on the operator's side. This — not jokes — is where the game's cheek lives in register 2.
 

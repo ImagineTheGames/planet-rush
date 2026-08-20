@@ -21,8 +21,8 @@ import {
   reservationsFor,
   reservedPx,
 } from './anchor-reach';
-import { stationChromeHeight, TOTAL_LABEL_H } from './hud-geometry';
-import { hudMetrics, hudSpace } from './instrument';
+import { ORE_LABEL_LEADING, stationChromeHeight } from './hud-geometry';
+import { hudMetrics, hudSpace, SCRIM_CORE } from './instrument';
 import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
 
@@ -231,11 +231,33 @@ describe('LAYOUT_RESERVATIONS — every declared gap, and every number it mirror
     }
   });
 
-  it('the banked total reserves exactly the TOTAL eyebrow above it', () => {
+  it("the banked total reserves the ore cluster's ground, plus the eyebrow above it", () => {
+    // Two elements, one corner: `ore-hud` is the scrim GROUND and reaches the
+    // margin; the numeral is a row inside it (a0-102 `oreCounterLayout`). The row
+    // reads its container's rect rather than restating the arithmetic — so a
+    // ground that grows because the player banked a fifth digit moves the
+    // reservation with it.
+    const m = hudMetrics(FRAME.width, FRAME.height);
+    const ground: Rect = { x: 16, y: 16, width: 120, height: 90 };
+    const ctx = { frame: FRAME, isTouch: true, boundsOf: (id: string) => (id === 'ore-hud' ? ground : undefined) };
+    const pad = (1 - SCRIM_CORE) / 2;
+    expect(reservedPx('banked-total', 'top', ctx)).toBeCloseTo(
+      ground.height * pad + hudSpace(ORE_LABEL_LEADING, m),
+      6,
+    );
+    expect(reservedPx('banked-total', 'left', ctx)).toBeCloseTo(ground.width * pad, 6);
+  });
+
+  it('a row whose container did not register reserves only what it can name', () => {
+    // `ore-hud` absent (the HUD is hidden, or a caller handed one entry in): the
+    // ground contributes nothing and the eyebrow still does. A rule about two
+    // elements has nothing to say when only one of them is there — the same way
+    // `./layout-exclusions` treats a missing half.
     const m = hudMetrics(FRAME.width, FRAME.height);
     expect(reservedPx('banked-total', 'top', { frame: FRAME, isTouch: true })).toBe(
-      hudSpace(TOTAL_LABEL_H, m),
+      hudSpace(ORE_LABEL_LEADING, m),
     );
+    expect(reservedPx('banked-total', 'left', { frame: FRAME, isTouch: true })).toBe(0);
   });
 
   it('an id with no row reserves nothing', () => {

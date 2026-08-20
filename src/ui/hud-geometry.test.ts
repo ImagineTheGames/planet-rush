@@ -22,7 +22,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
-import { hudMetrics, hudType } from './instrument';
+import { hudMetrics, hudSpace, hudType, scrimPlateau } from './instrument';
 import { collapsedRect } from './minimap';
 import { healthBarFill, healthBarModel, healthBarTrack } from './healthbar';
 import type { Combatant } from './healthbar';
@@ -49,6 +49,12 @@ import {
   PANEL_MAX_WIDTH,
   PANEL_EDGE_PAD,
   HUD_PAD,
+  SCRIM_BLEED,
+  HUD_EYEBROW_TYPE,
+  ORE_BANK_TYPE,
+  ORE_LABEL_LEADING,
+  ORE_RULE_GAP,
+  oreCounterLayout,
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
@@ -79,9 +85,11 @@ import {
   sectorOverflow,
   TOUCH_TARGET_MIN,
 } from './hud-geometry';
-import type { AnnularSector } from './hud-geometry';
+import type { AnnularSector, OreCounterLayout } from './hud-geometry';
+import { contentBox } from './viewport';
+import { pauseButtonRect } from './pause-menu';
 import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
-import { textWidth } from './font-metrics';
+import { textHeight, textWidth } from './font-metrics';
 import type { TypeSpec } from './font-metrics';
 import { TRACKING, WHEEL_HALO, wheelMetrics } from '../art/materials';
 import { buildWheelModel, segmentAngle, WHEEL_ORDER } from './build-wheel';
@@ -185,6 +193,208 @@ function expectWithin(bounds: Rect, anchor: AnchorSpec, vp: Viewport, label: str
       `for viewport ${vp.width}×${vp.height}`,
   ).toBe(true);
 }
+
+// ---------------------------------------------------------------------------
+// The banked-ore counter's GROUND (a0-102) — top-left, margin HUD_PAD
+// ---------------------------------------------------------------------------
+//
+// a0-99 failed the top-left of both profiles: the counter drawn "straight onto
+// whatever the world put there", with an ore-bearing asteroid under it and a gold
+// vein ring a few tens of pixels from the counter's own signal-yellow numeral.
+//
+// Signal yellow IS ore (style-guide §2, RESERVED), so the counter and the rock it
+// counts will always share a hue and the separation can only come from the
+// ground. The reason the counter had none is not that the HUD has no treatment —
+// it has one, and this counter was drawing it — but that the scrim was sized to
+// the type's own box, and a scrim decays to nothing at its edges. See the header
+// over `oreCounterLayout` for the measured coverage the shipped rect gave.
+//
+// So the assertion is not "a scrim is drawn". It is: **the part of the scrim that
+// is actually dark covers every glyph and the rule**.
+
+describe('the banked-ore counter', () => {
+  /** `ORE` as ./hud styles it: Audiowide at the frame-scaled eyebrow size with
+   *  the eyebrow tracking — the three numbers `makeText(FONT_HEADING,
+   *  TYPE.eyebrow, …, 'eyebrow')` puts on the `Text`. */
+  const labelSpec = (vp: Viewport): TypeSpec => ({
+    face: 'heading',
+    size: hudType(HUD_EYEBROW_TYPE, hudMetrics(vp.width, vp.height)),
+    tracking: TRACKING.eyebrow,
+  });
+
+  /** …and the banked total: the body face at `bold`, the bank size, `name`
+   *  tracking — `makeText(FONT_NUMERAL, TYPE.bank, …, 'name')`. */
+  const bankSpec = (vp: Viewport): TypeSpec => ({
+    face: 'bodyBold',
+    size: hudType(ORE_BANK_TYPE, hudMetrics(vp.width, vp.height)),
+    tracking: TRACKING.name,
+  });
+
+  const measure = (text: string, spec: TypeSpec) => ({
+    width: textWidth(text, spec),
+    height: textHeight(text, spec),
+  });
+
+  /** Every width the numeral takes across a match: the opening zero, a single
+   *  figure, and on up to a bank nobody will reach. The counter's ground is sized
+   *  from the number, so the number is what has to be swept. */
+  const BANKED = ['0', '3', '48', '250', '1204', '99999'];
+
+  const layoutFor = (vp: Viewport, banked: string): OreCounterLayout =>
+    oreCounterLayout(
+      measure('ORE', labelSpec(vp)),
+      measure(banked, bankSpec(vp)),
+      hudMetrics(vp.width, vp.height),
+    );
+
+  it('the ore counter is legible over any world behind it', () => {
+    for (const { name, vp } of PROFILES) {
+      for (const banked of BANKED) {
+        const l = layoutFor(vp, banked);
+        const where = `${name} / banked=${banked}`;
+
+        // 1. There is a ground at all, and it is the counter's OWN — drawn inside
+        //    the element, never bled out to the screen edge (`ore-hud` registers
+        //    what it draws, so a ground past the margin fails QA's layout
+        //    contract on a real device).
+        expect(l.ground.width, `${where}: no ground`).toBeGreaterThan(0);
+        expect(l.ground.height, `${where}: no ground`).toBeGreaterThan(0);
+        expect(l.ground.x, `${where}: ground left of the group origin`).toBe(0);
+        expect(l.ground.y, `${where}: ground above the group origin`).toBe(0);
+
+        // 2. The part of it that is actually dark — the plateau where the scrim
+        //    reaches the `SCRIM.corner` its own doc calls the least that survives
+        //    a lit asteroid — covers the glyphs and the rule. Not the scrim rect:
+        //    the rect is mostly falloff, and falloff is what a0-99 photographed.
+        const plateau = scrimPlateau(l.ground, 'center');
+        const inked: readonly [string, Rect][] = [
+          ['the ORE eyebrow', l.label],
+          ['the banked numeral', l.numeral],
+          ['the closing rule', l.rule],
+        ];
+        for (const [what, r] of inked) {
+          expect(
+            rectContains(plateau, r, 1e-6),
+            `${where}: ${what} ${fmt(r)} is outside the ground's full-strength ` +
+              `plateau ${fmt(plateau)} — it would be drawn on the scrim's falloff, ` +
+              `which is where the ore counter of a0-99 was drawn`,
+          ).toBe(true);
+        }
+
+        // 3. …and every one of them is inside the drawn scrim too, which is what
+        //    makes the cluster's registered footprint the ground rather than a
+        //    glyph poking out of it.
+        for (const [what, r] of inked) {
+          expect(rectContains(l.ground, r, 1e-6), `${where}: ${what} escapes the scrim`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('is the fix a0-102 filed — the shipped rect FAILED the assertion above', () => {
+    // The reproduction, kept so "failing today" stays checkable after today.
+    //
+    // `Hud.drawOreChrome` sized the scrim as
+    //   `width  = max(labelWidth, numeralWidth) + hudSpace(18)`
+    //   `height = ruleY + hudSpace(SCRIM_BLEED)`
+    // from the group origin — which is the type's own top-left. All the slack was
+    // to the right of the type and none above, below or left of it.
+    const vp = { width: 1280, height: 800 };
+    const m = hudMetrics(vp.width, vp.height);
+    const label = measure('ORE', labelSpec(vp));
+    const numeral = measure('3', bankSpec(vp));
+    const ruleY = hudSpace(ORE_LABEL_LEADING, m) + numeral.height + hudSpace(ORE_RULE_GAP, m);
+    const shipped: Rect = {
+      x: 0,
+      y: 0,
+      width: Math.max(label.width, numeral.width) + hudSpace(18, m),
+      height: ruleY + hudSpace(SCRIM_BLEED, m),
+    };
+    const shippedPlateau = scrimPlateau(shipped, 'center');
+
+    // The type started at the scrim's own corner, so the eyebrow was in the fade…
+    expect(rectContains(shippedPlateau, { x: 0, y: 0, ...label }, 1e-6)).toBe(false);
+    // …and so was the leading column of the numeral…
+    expect(
+      rectContains(
+        shippedPlateau,
+        { x: 0, y: hudSpace(ORE_LABEL_LEADING, m), ...numeral },
+        1e-6,
+      ),
+    ).toBe(false);
+    // …and so was the rule that closes the cluster.
+    expect(
+      rectContains(shippedPlateau, { x: 0, y: ruleY, width: shipped.width, height: 1 }, 1e-6),
+    ).toBe(false);
+
+    // The same three, against the ground this branch gives them.
+    const fixed = layoutFor(vp, '3');
+    const plateau = scrimPlateau(fixed.ground, 'center');
+    expect(rectContains(plateau, fixed.label, 1e-6)).toBe(true);
+    expect(rectContains(plateau, fixed.numeral, 1e-6)).toBe(true);
+    expect(rectContains(plateau, fixed.rule, 1e-6)).toBe(true);
+  });
+
+  it('leaves the corner PAUSE BUTTON alone — the other tenant of this corner', () => {
+    // The counter grew, and it grew into a corner that is not empty on touch:
+    // `PAUSE_BUTTON_LEFT` is 72 *precisely* to be "past the top-left ORE block",
+    // and an earlier cut of a0-102 (which kept a 9px rule overhang and then paid
+    // the ground's third on top of it) put `ORE` two pixels off that button on a
+    // landscape phone. The evidence shot caught it; this catches the next one.
+    //
+    // The assertion is on the counter's INK, not on its ground. The ground's outer
+    // fade may pass under the button — it is drawn beneath it and reaches ~zero
+    // coverage out there, so it covers nothing. A GLYPH under the button is the
+    // failure.
+    //
+    // ## The bound, stated
+    //
+    // A cluster sized from its number has no width until you say how big the
+    // number gets, so: **999**. Wheel prices run 1–14 (`src/sim/constants.ts`) and
+    // a hold is at most `CARGO_CAP_MAX` = 8 an trip, so a four-figure bank is not
+    // a state this economy reaches. `PAUSE_BUTTON_LEFT`'s own doc already assumed
+    // it ("a two-to-three digit banked number"); this is that assumption made
+    // checkable. If the economy ever does produce one, THIS test is what fails,
+    // and the fix is to re-derive that constant — not to widen this bound.
+    const WIDEST_BANK = '999';
+    for (const { name, vp, isTouch } of PROFILES) {
+      if (!isTouch) continue; // the button is the touch-only way in (pauseButtonVisible)
+      const button = pauseButtonRect(vp);
+      const box = contentBox({ width: vp.width, height: vp.height });
+      for (const banked of [...BANKED.filter((b) => b.length <= 3), WIDEST_BANK]) {
+        const l = layoutFor(vp, banked);
+        const inkRight =
+          box.x + HUD_PAD + Math.max(l.label.x + l.label.width, l.numeral.x + l.numeral.width);
+        expect(
+          inkRight,
+          `${name} / banked=${banked}: the counter's type reaches x=${inkRight.toFixed(1)}, ` +
+            `and the pause button starts at x=${button.x}`,
+        ).toBeLessThanOrEqual(button.x);
+      }
+    }
+  });
+
+  it('keeps the whole cluster inside its top-left anchor, on every profile', () => {
+    // The ground grew the element, so the thing to prove is that it grew INWARD:
+    // `ore-hud` still sits inside `top-left` with margin HUD_PAD, and so does the
+    // `banked-total` the same corner registers separately.
+    const ANCHOR: AnchorSpec = { region: 'top-left', margin: HUD_PAD };
+    for (const { name, vp } of PROFILES) {
+      const box = contentBox({ width: vp.width, height: vp.height });
+      for (const banked of BANKED) {
+        const l = layoutFor(vp, banked);
+        const at = (r: Rect): Rect => ({
+          x: box.x + HUD_PAD + r.x,
+          y: HUD_PAD + r.y,
+          width: r.width,
+          height: r.height,
+        });
+        expectWithin(at(l.ground), ANCHOR, vp, `${name} / banked=${banked}: ore-hud`);
+        expectWithin(at(l.numeral), ANCHOR, vp, `${name} / banked=${banked}: banked-total`);
+      }
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // The Build & Upgrade wheel (GDD §2.5) — registered `full`, margin 0

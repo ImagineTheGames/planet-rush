@@ -48,8 +48,17 @@ import {
 } from './anchor-reach';
 import { showControlsStrip } from './controls-strip';
 import { liveOnGlassControls } from './live-controls';
-import { HUD_PAD, TOTAL_LABEL_H, stationHpBounds } from './hud-geometry';
-import { hudMetrics, hudSpace } from './instrument';
+import {
+  HUD_EYEBROW_TYPE,
+  HUD_PAD,
+  ORE_BANK_TYPE,
+  oreCounterLayout,
+  stationHpBounds,
+} from './hud-geometry';
+import { TRACKING } from '../art/materials';
+import { textHeight, textWidth } from './font-metrics';
+import type { TypeSpec } from './font-metrics';
+import { hudMetrics, hudType } from './instrument';
 import { contentBox } from './viewport';
 import { ZOOM_CONTROL_ANCHOR, ZOOM_CONTROL_ID, zoomControlBounds } from './zoom-control';
 import { playerColor } from './station-hp';
@@ -1343,6 +1352,13 @@ const REACH_SCHEMES: ReadonlyArray<{ scheme: ControlScheme; mode: FireMode }> = 
   { scheme: 'sticks', mode: FireMode.Manual },
 ];
 
+/** One line of HUD type, measured headlessly out of the repo's own font data
+ *  (`./font-metrics`, a0-32) — the same path `hud-geometry.test.ts` measures the
+ *  ore counter with, so the cluster this sweep places is the one the view draws. */
+function measureLine(text: string, spec: TypeSpec): { width: number; height: number } {
+  return { width: textWidth(text, spec), height: textHeight(text, spec) };
+}
+
 /** Nominal text metrics for the two dev stamps, whose real size comes from a
  *  canvas. Only the HEIGHT reaches their placement (both are left-anchored at
  *  `BADGE_MARGIN` and hang from the bottom), so a plausible cap height is
@@ -1374,17 +1390,37 @@ function reachCatalogue(
 
   // --- HUD chrome, laid out in the content box (a0-74) ---------------------
 
-  // The ore cluster: the group's origin is the corner it hugs, and the banked
-  // numeral hangs one eyebrow row below it inside the same group (`./hud`).
+  // The ore cluster (a0-102): the group's origin is the corner it hugs and the
+  // GROUND's own top-left, with the two rows of type inset inside it. Measured
+  // headlessly with the same `font-metrics` path `hud-geometry.test.ts` uses, so
+  // these are the rects the view really registers rather than nominal boxes.
+  const ore = oreCounterLayout(
+    measureLine('ORE', {
+      face: 'heading',
+      size: hudType(HUD_EYEBROW_TYPE, m),
+      tracking: TRACKING.eyebrow,
+    }),
+    measureLine('1204', {
+      face: 'bodyBold',
+      size: hudType(ORE_BANK_TYPE, m),
+      tracking: TRACKING.name,
+    }),
+    m,
+  );
   entries.push({
     id: 'ore-hud',
     anchor: { region: 'top-left', margin: HUD_PAD },
-    bounds: { x: box.x + HUD_PAD, y: HUD_PAD, width: 90, height: 40 },
+    bounds: { x: box.x + HUD_PAD, y: HUD_PAD, width: ore.ground.width, height: ore.ground.height },
   });
   entries.push({
     id: 'banked-total',
     anchor: { region: 'top-left', margin: HUD_PAD },
-    bounds: { x: box.x + HUD_PAD, y: HUD_PAD + hudSpace(TOTAL_LABEL_H, m), width: 60, height: 20 },
+    bounds: {
+      x: box.x + HUD_PAD + ore.numeral.x,
+      y: HUD_PAD + ore.numeral.y,
+      width: ore.numeral.width,
+      height: ore.numeral.height,
+    },
   });
 
   // Own-station HP (GDD §2.2) — right-aligned on the HUD margin of the box.
@@ -1561,8 +1597,10 @@ describe('a0-103 — an element declared to an anchor reaches that anchor', () =
       }
     }
     expect([...raw].sort()).toEqual([
-      // Declared: the TOTAL eyebrow is on the top edge above the numeral.
+      // Declared: the ORE eyebrow is above the numeral, and a0-102's scrim
+      // ground pads the whole cluster inward on both axes.
       'banked-total/top',
+      'banked-total/left',
       // Declared: `BADGE_STRIP_LIFT` clears the desktop controls strip.
       'build-badge/bottom',
       // FIXED, then declared (a0-103): the FIRE column used to be taken on every

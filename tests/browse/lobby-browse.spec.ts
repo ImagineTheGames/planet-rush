@@ -27,7 +27,7 @@
  *  3. **The order is the MEASURED one.** The fixture answers Virginia's probe
  *     fast and São Paulo's slow, and Virginia sorts first — the row order a0-29
  *     had to land before this screen could be honest.
- *  4. **Empty is a state.** With no open claims the screen says so in a sentence
+ *  4. **Empty is a state.** With no open rooms the screen says so in a sentence
  *     and ENTER ROOM CODE is right there, reported at a pressable rect.
  *  5. **A stale row refuses honestly.** The fixture lets the list advertise a
  *     seat and then answers the join with 409 — the room filled up while the
@@ -137,7 +137,7 @@ const PROBE_DELAY_MS: Readonly<Record<string, number>> = { iad: 25, gru: 220 };
  *  spec asserts they never reach the screen. */
 const SECRET_CODES = ['B7GW', 'K4QP', 'ZR29'];
 
-/** A populated listing: three open claims, two regions, different occupancies. */
+/** A populated listing: three open rooms, two regions, different occupancies. */
 const POPULATED = {
   asOf: 1_760_000_000_000,
   rooms: [
@@ -376,7 +376,7 @@ test('the browse list draws a row per open claim, with owner, place and a measur
 // 2. Empty is a state, not a bug
 // ===========================================================================
 
-test('no open claims reads as a sentence, with ENTER ROOM CODE right there', async ({ page }) => {
+test('no open rooms reads as a sentence, with ENTER ROOM CODE right there', async ({ page }) => {
   budgetTest({
     work: 'clean boot → PLAY → JOIN → an EMPTY fixtured listing → shoot the frame and read the sentence and the segment rects',
     measuredSeconds: 20,
@@ -393,7 +393,7 @@ test('no open claims reads as a sentence, with ENTER ROOM CODE right there', asy
 
   const seam = await doors(page);
   expect(seam.browseRows, 'no rows').toHaveLength(0);
-  expect(seam.browseEmpty[0]).toBe('NO OPEN CLAIMS RIGHT NOW');
+  expect(seam.browseEmpty[0]).toBe('NO OPEN ROOMS RIGHT NOW');
   // …and the line names the way out, which is a control on THIS screen.
   expect(seam.browseEmpty[1]).toContain('ENTER ROOM CODE');
   // Not an error: nothing is wrong with an empty fleet.
@@ -466,7 +466,7 @@ test('a row that filled up refuses with a sentence, keeps the list, and marks th
 
   const after = await doors(page);
   // The exact words a player reads when the room fills up under them.
-  expect(after.error).toBe('That claim filled up while you were looking. Pick another.');
+  expect(after.error).toBe('That room filled up while you were looking. Pick another.');
   // Still the list — a refusal is not a dead end and never bounces the player back
   // to the doors (plan §3), and never to a modal.
   expect(after.screen).toBe('join');

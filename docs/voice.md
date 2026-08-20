@@ -96,6 +96,7 @@ configuration-dependent fact:
 - `src/ui/settings.test.ts` → `the fire help is true under every control scheme`
 - `src/ui/settings.test.ts` → `the controls help does not claim aiming the player does not do`
 - `src/ui/onboarding.test.ts` → `never names another device, in any configuration`
+- `src/ui/copy-audit.test.ts` → `no player-facing string says claim` (a0-108 — the banned-word net; add a row to its `BANNED` table when a ruling strikes another word)
 
 `tap` is **not** a device word: TAP COMMANDER is a scheme, and a tap is a tap
 whether it lands from a finger or a mouse. Nor is `stick` — it is true of the
@@ -251,11 +252,65 @@ and flattening them into helpdesk prose would be the opposite of the job.
 
 | String | Where | Why it stays |
 |---|---|---|
-| `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT` / "took the claim" | end of match | Theme, and the developer has an open ruling on it (a0-61). |
+| ~~`CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT` / "took the claim"~~ | end of match | **No longer true — see the section below.** a0-87 left these because the ruling on them was open (a0-61). It closed on 2026-08-19 and they are gone. |
 | "the collapse closed over your reactor." | end of match | Factual and in register; the collapse is a real mechanic. |
 | `OUTER DOOR SEALED · PRESSURE EQUALISED` | title gate | Pure theme — a condition in the nouns of work. It instructs nobody and is not pretending to. |
 | `PRESS ANYWHERE TO ENTER` | title gate | Four words, verb first, and it names no hardware — you press glass as readily as a key. Making it device-aware would mean threading `isTouch` through the markup builder for no gain. |
 | The in-match prompts | `onboarding.ts` | Already the right pattern: every reading is device-correct through the binding seam. a0-87 added the guard test rather than the copy. |
+
+### The word that came back twice (a0-108, 2026-08-19)
+
+The row above is the whole lesson. a0-87 read `CLAIM HELD` on the end screen,
+judged it theme rather than help, and left it — correctly, on the information it
+had, because the developer had an open ruling on it. What a0-87 could not see is
+that the *same* word was on eleven other strings across five more screens, and
+that three days earlier the developer had already struck it once:
+
+> *"we still have words like 'claim' no player is going to know what that means
+> just put it in everyday game terms like Visibility - Public … and Join Code
+> instead of claim"* (2026-08-16)
+
+That ruling was applied to the chip it was pointed at and nowhere else, so it had
+to be made a second time, for every screen at once:
+
+> *"remove alll this claim wording, its just Victory, Defeat, Draw,
+> Eliminated…"* (2026-08-19)
+
+**Theme is not instruction — but a noun the player does not know is not theme
+either.** `CLAIM HELD` is not flavour a player enjoys and moves past; it is a
+sentence they cannot parse in the one second the end screen has. The test from
+the section above applies unchanged and gives the answer directly: *what does the
+player do differently after reading this?* Nothing, because they do not know what
+it says. The register survived the change intact — `VICTORY` states an outcome
+and congratulates nobody, which is all §4.7 ever asked of that headline. The
+adjective was the thing in register; the noun never was.
+
+**The replacement vocabulary was not invented.** `ROOM` / `HOST` / `CODE` was
+already what `src/ui/online-copy.ts`, the JOIN screen's own segment label and the
+whole net layer said. `lobby-entry.ts` even carried a standing comment observing
+that *"one screen cannot hold both vocabularies"* — a keypad reading `ROOM CODE`
+two lines above `ENTER THE CLAIM CODE`. Picking the word already on the screen
+beat minting a second one, and the brief said so: do not invent a second piece of
+jargon to replace the first.
+
+**What actually stops it a fourth time.** Not this page. `src/ui/copy-audit.test.ts`
+→ `no player-facing string says claim`, which names no screen and no file: it
+walks the live `src/ui` exports, *runs* the pure model builders and audits what
+they return, and scans every string literal in the directory with comments
+stripped. All three nets are needed, and the middle one is why — `You took the
+claim.` was assembled inside `subheadFor()` and was never a constant, so an
+export walk alone would have called the end screen clean while it said the word
+in 48px type. This is the third sweep in this class (WASD, the alarm, and now
+this) and the first two also came back, both times because a ruling was carried
+out by hand and nothing held it.
+
+One string moved house to make this possible: `WAITING FOR THE HOST` was an
+inline literal in `lobby-view.ts`, and a string only the view can produce is a
+string no test can read. It now lives on the pure model as
+`LOBBY_WAITING_FOR_HOST`. The view still decides when to draw it; nothing about
+the screen changed.
+
+---
 
 **Two things worth doing that a0-87 did not, because they are not copy changes:**
 
