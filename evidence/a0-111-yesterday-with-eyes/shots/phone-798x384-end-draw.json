@@ -1,0 +1,38 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "asked": "draw",
+  "staging": "one lethal __planetRush.damageCore(p, 999) queued for all eight seats in a SINGLE call — retried together until spawn protection lapsed and it landed — so every core fell on the same tick (there is no draw seam)",
+  "screenReported": "result",
+  "result": {
+    "kind": "defeat",
+    "headline": "DEFEAT",
+    "subhead": "Player 8 won."
+  },
+  "buttons": [
+    "rematch",
+    "menu"
+  ],
+  "coreHp": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "elements": [
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "minimap"
+  ],
+  "subheadNamesAPlayer": true,
+  "subheadSaysWon": true,
+  "drawnTextCount": 67,
+  "claimHits": []
+}

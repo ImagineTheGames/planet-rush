@@ -1,0 +1,40 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "asked": "eliminated",
+  "staging": "__endScreenStage.eliminateLocal() — the local core destroyed through the sim's own destroyCore; the others fight on",
+  "screenReported": "defeated",
+  "result": {
+    "kind": "eliminated",
+    "headline": "ELIMINATED",
+    "subhead": "8th of 8 — your reactor was destroyed."
+  },
+  "buttons": [
+    "rematch",
+    "spectate"
+  ],
+  "coreHp": [
+    0,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100,
+    100
+  ],
+  "elements": [
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "nameplates",
+    "minimap",
+    "healthbars"
+  ],
+  "subheadNamesAPlayer": false,
+  "subheadSaysWon": false,
+  "drawnTextCount": 66,
+  "claimHits": []
+}

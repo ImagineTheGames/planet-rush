@@ -1,0 +1,71 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "stationState": "the local station ON screen",
+  "staging": "__oreHudStage.dock(0), plus a held siege: __planetRush.damageCore(0, 2) every 400ms above a 30 HP floor",
+  "alarmPolls": 20,
+  "prompt": {
+    "visible": false,
+    "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+    "wrapWidth": 328,
+    "width": 302.2,
+    "height": 42
+  },
+  "device": "touch",
+  "scheme": "tap",
+  "world": {
+    "left": 1775,
+    "top": 1008,
+    "right": 2573,
+    "bottom": 1392,
+    "width": 798,
+    "height": 384
+  },
+  "viewport": {
+    "width": 798,
+    "height": 384
+  },
+  "alarm": {
+    "local": 0,
+    "localPlayer": 0,
+    "allies": [
+      0
+    ],
+    "active": false,
+    "engagements": 0,
+    "sounds": 0
+  },
+  "coreHp": 76,
+  "ship": {
+    "x": 2174,
+    "y": 1200,
+    "vx": 0,
+    "vy": 0
+  },
+  "home": {
+    "x": 2174,
+    "y": 1200,
+    "vx": 0,
+    "vy": 0
+  },
+  "homeOnScreen": true,
+  "arrowDrawn": false,
+  "alarmFrameDrawn": true,
+  "promptDrawn": false,
+  "arrowRect": null,
+  "promptRect": null,
+  "elements": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap",
+    "alarm-frame",
+    "healthbars"
+  ]
+}

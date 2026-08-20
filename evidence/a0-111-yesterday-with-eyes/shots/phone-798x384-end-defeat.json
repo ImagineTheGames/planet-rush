@@ -1,0 +1,39 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "asked": "defeat",
+  "staging": "__endScreenStage.endMatch() — every core but one rival's destroyed, including the local one",
+  "screenReported": "result",
+  "result": {
+    "kind": "defeat",
+    "headline": "DEFEAT",
+    "subhead": "Player 2 won."
+  },
+  "buttons": [
+    "rematch",
+    "menu"
+  ],
+  "coreHp": [
+    0,
+    100,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "elements": [
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "onboarding",
+    "minimap"
+  ],
+  "subheadNamesAPlayer": true,
+  "subheadSaysWon": true,
+  "drawnTextCount": 67,
+  "claimHits": []
+}
