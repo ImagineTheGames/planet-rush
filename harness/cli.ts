@@ -35,6 +35,7 @@ import {
 } from './balance';
 import type { Sweep } from './balance';
 import {
+  castSection,
   classSection,
   mirrorSection,
   renderReport as renderMirrorsReport,
@@ -42,7 +43,7 @@ import {
   sliceSection,
   tierSection,
 } from './mirrors';
-import { A0107_SLICE_SEEDS } from './mirrors';
+import { A0105_DEATH_SEEDS, A0107_SLICE_SEEDS } from './mirrors';
 import type { MatchRow, PriorNumber, SectionRun } from './mirrors';
 import { digestDiff, stateDigest } from './hash';
 import { mirrorLineup, recordMatch, replay, roundRobinLineup, runMatch, seedRange } from './match';
@@ -451,7 +452,7 @@ function soak(matchCount: number, rotations: number): number {
  *  who distrusts a table can recompute it from the JSON without a run. */
 const A0112_DATA = 'tests/reports/a0-112-data';
 
-const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice'] as const;
+const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice', 'cast'] as const;
 type A0112Section = (typeof A0112_SECTIONS)[number];
 
 function a0112Path(section: string): string {
@@ -476,7 +477,8 @@ function readSection(section: A0112Section): SectionRun {
 function mirrors(section: A0112Section, seedCount: number): number {
   // The slice exists to be compared with a0-107's number, so it runs a0-107's
   // seeds rather than this report's range — same draw, same cast, same ceiling.
-  const seeds = section === 'slice' ? A0107_SLICE_SEEDS : seedRange(seedCount);
+  const seeds =
+    section === 'slice' ? A0107_SLICE_SEEDS : section === 'cast' ? A0105_DEATH_SEEDS : seedRange(seedCount);
   const started = performance.now();
   let last = started;
   const options = {
@@ -501,7 +503,9 @@ function mirrors(section: A0112Section, seedCount: number): number {
           ? tierSection(options)
           : section === 'class'
             ? classSection(options)
-            : sliceSection(options);
+            : section === 'cast'
+              ? castSection(options)
+              : sliceSection(options);
 
   const hangs = run.matches.filter((r) => r.failure === 'wall-clock' || r.failure === 'stalled').length;
   const timeouts = run.matches.filter((r) => r.failure === 'sim-timeout').length;
@@ -565,6 +569,7 @@ function mirrorsReport(outPath: string | null): number {
     tier: readSection('tier'),
     klass: readSection('class'),
     slice: readSection('slice'),
+    cast: readSection('cast'),
     prior: A0112_PRIOR,
   });
   const path = resolve(ROOT, outPath ?? 'tests/reports/a0-112-balance.md');
@@ -938,7 +943,7 @@ function pay(seedCount: number): number {
 
 function usage(): number {
   log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay|mirrors> [args]');
-  log('  mirrors <mirror|roster|tier|class|slice> [--seeds n]   # run one a0-112 section');
+  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n]   # run one a0-112 section');
   log('  mirrors report [--out FILE]                            # render the a0-112 report');
   return 2;
 }

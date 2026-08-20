@@ -104,7 +104,7 @@ export const rosterRotations = (): number => ROSTER.length;
 // The artifact — one JSON blob per section, small enough to commit
 // ---------------------------------------------------------------------------
 
-export type SectionId = 'mirror' | 'roster' | 'tier' | 'class' | 'slice';
+export type SectionId = 'mirror' | 'roster' | 'tier' | 'class' | 'slice' | 'cast';
 
 /** One match, reduced to what the report reads off it. Per-seat leaf censuses
  *  are pooled by character at the section level instead of stored per match: the
@@ -298,6 +298,27 @@ export function classSection(options: SectionOptions): SectionRun {
     })),
     options,
   );
+}
+
+/**
+ * The twelve seeds a0-105 measured its death count on
+ * (`src/bots/repair-honesty.test.ts` `SEEDS`, quoted in `tests/reports/a0-105-standoff.md`
+ * §4: "over twelve whole matches (seeds 1–12) bots die 25% more often — 1754 →
+ * 2184"). The `cast` section runs the same twelve on the same lineup, so the one
+ * deaths number a prior report published can be compared without a conversion.
+ */
+export const A0105_DEATH_SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+/**
+ * The shipped offline cast, in seat order, unrotated — the exact match a solo
+ * player gets (`fillEmptySlots`, GDD §2.9). It is not a contest and its win
+ * column means nothing (the seats are fixed); it is here because it is the
+ * lineup a0-105 counted deaths on.
+ */
+export function castSection(options: SectionOptions): SectionRun {
+  return runSection('cast', 'the shipped offline cast, unrotated (a0-105’s death sweep)', [
+    { lineup: 'cast:shipped', slots: rosterCast() },
+  ], options);
 }
 
 /** a0-107's decision-mix shape: the shipped cast in seat order, stopped at 180 s.
@@ -567,6 +588,7 @@ export interface MirrorsReportInput {
   readonly tier: SectionRun;
   readonly klass: SectionRun;
   readonly slice: SectionRun;
+  readonly cast: SectionRun;
   readonly prior: readonly PriorNumber[];
 }
 
@@ -660,9 +682,9 @@ const terminationOf = (run: SectionRun): { matches: number; decided: number; tim
  * `findings`) — the harness produces the numbers, QA produces the reading.
  */
 export function renderReport(input: MirrorsReportInput): string {
-  const { mirror, roster, tier, klass, slice } = input;
+  const { mirror, roster, tier, klass, slice, cast } = input;
   const out: string[] = [];
-  const everyMatch = [...mirror.matches, ...roster.matches, ...tier.matches, ...klass.matches];
+  const everyMatch = [...mirror.matches, ...roster.matches, ...tier.matches, ...klass.matches, ...cast.matches];
   const term = {
     matches: everyMatch.length,
     decided: everyMatch.filter((r) => r.ok).length,
@@ -744,7 +766,7 @@ export function renderReport(input: MirrorsReportInput): string {
   out.push(
     table(
       ['section', 'lineup', 'seeds', 'lineups', 'matches', 'decided', 'sim-timeout', 'hangs', 'ceiling'],
-      ([mirror, roster, tier, klass, slice] as const).map((run) => {
+      ([mirror, roster, tier, klass, cast, slice] as const).map((run) => {
         const t = terminationOf(run);
         return [
           `\`${run.section}\``,
@@ -833,6 +855,7 @@ export function renderReport(input: MirrorsReportInput): string {
       lengthRow('character mirrors', mirrorLen),
       lengthRow('equal-skill contests', lengthOf(tier.matches)),
       lengthRow('ship-class contest', lengthOf(klass.matches)),
+      lengthRow('shipped cast, unrotated (a0-105 seeds)', lengthOf(cast.matches)),
       lengthRow('**all decided matches**', lengthOf(everyMatch)),
     ]),
     '',
@@ -873,6 +896,7 @@ export function renderReport(input: MirrorsReportInput): string {
       ['shipped cast', poolCensus(roster)],
       ['equal-skill', poolCensus(tier)],
       ['ship-class', poolCensus(klass)],
+      ['cast, unrotated', poolCensus(cast)],
       [`a0-107 shape (${SLICE_SECONDS} s)`, poolCensus(slice)],
     ]),
     '',
@@ -946,6 +970,7 @@ export function renderReport(input: MirrorsReportInput): string {
       ['shipped cast', deathsOf(roster.matches, () => true)] as const,
       ['equal-skill contests', deathsOf(tier.matches, () => true)] as const,
       ['ship-class contest', deathsOf(klass.matches, () => true)] as const,
+      ['**shipped cast, unrotated — a0-105’s twelve seeds**', deathsOf(cast.matches, () => true)] as const,
     ]),
     '',
   );
