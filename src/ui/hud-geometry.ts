@@ -23,7 +23,7 @@
 import type { Rect } from '@platform/layout-registry';
 import { WHEEL_HALO } from '../art/materials';
 import type { HomeArrow } from './alarm';
-import { hudMetrics, hudSpace, hudType, hullBarFill } from './instrument';
+import { hudMetrics, hudSpace, hudType, hullBarFill, scrimGround } from './instrument';
 import { HEALTHBAR_MIN_FILL } from './healthbar';
 import { collapsedRect } from './minimap';
 import type { MinimapInsets } from './minimap';
@@ -313,6 +313,170 @@ export function panelBounds(
     y: viewportHeight / 2 - height / 2,
     width,
     height,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The banked-ore counter (GDD §2.2 — top-left) and the ground under it
+// ---------------------------------------------------------------------------
+//
+// ## What a0-99 photographed, and what was actually wrong
+//
+// QA failed the top-left of both profiles: *"THE ORE COUNTER HAS NO PLATE, SCRIM
+// OR PANEL BEHIND IT — the word ORE, the numeral, and a thin underline rule are
+// drawn straight onto whatever the world put there"*, with a yellow ore crystal
+// and a gold vein ring a few tens of pixels from the counter's own signal-yellow
+// numeral.
+//
+// The counter DID have chrome, and it was the HUD's own: a `SCRIM.corner` scrim
+// closed by a Bone rule ({@link ./instrument}, u7-07), the same treatment HOME
+// and the wave clock wear. So this is not "no other readout has one either" —
+// **every corner readout has the treatment, and the ore counter was drawing it
+// on a rect coincident with its own type**: `drawOreChrome` sized the scrim to
+// `max(labelWidth, numeralWidth) + 18` starting at the glyphs' own origin, so
+// all 18 px of slack sat to the RIGHT of the type and none above, below or left
+// of it.
+//
+// A scrim decays to nothing at every edge — that is what makes it a scrim rather
+// than a panel — so a rect coincident with the type puts the type in the
+// falloff. Measured on the shipped baseline at the desktop reference (42×54):
+//
+//   | where                    | coverage |
+//   |--------------------------|----------|
+//   | `ORE`, leading glyph     | 0.15     |
+//   | `ORE`, mid               | 0.37     |
+//   | banked numeral, leading  | 0.15     |
+//   | the closing rule         | 0.09–0.40|
+//   | the one point that peaks | 0.55     |
+//
+// against a constant whose own doc says 0.55 is *"enough that 11px Oxanium
+// survives a lit asteroid passing under it, **and no more**"*. By that file's
+// stated reasoning everything under 0.55 is not enough, and 0.55 was reached at
+// a point no glyph was standing on. QA read the frame correctly: there was no
+// ground there, whatever the draw call was named.
+//
+// ## The fix, and why the counter moved
+//
+// The ground is sized from {@link ../ui/instrument} `scrimGround`, so the
+// scrim's PLATEAU — the region that actually holds `SCRIM.corner` — covers the
+// two glyph boxes and the rule. The falloff has to go somewhere, and the only
+// two places it can go are onto the type or into padding; a0-102 puts it into
+// padding.
+//
+// It could not instead be bled outward past the group origin. `ore-hud`
+// registers at `top-left` with margin {@link HUD_PAD}, and an element's
+// registered footprint is what it DRAWS (`Hud.describeLayout` reads
+// `getBounds()`), so a ground reaching left of the margin fails QA's layout
+// contract on a real device — `tests/mobile/layout.spec.ts` failed on exactly
+// that when the corner scrims were first written. So the ground keeps the corner
+// and the type sits inside it: `ORE` starts a third of the ink box in from the
+// margin instead of on it.
+//
+// The 18 px the cluster always carried is still 18 px; it is split either side of
+// the type now ({@link ORE_RULE_OVERHANG}) instead of being spent entirely to the
+// right, where nothing was reading.
+
+/** The eyebrow above a corner readout (`ORE`, `HOME`), reference px. Here rather
+ *  than in ./hud for {@link PROMPT_TYPE}'s reason: the ore counter's ground has
+ *  to be sized before any text exists, so the geometry has to know the size. */
+export const HUD_EYEBROW_TYPE = 11;
+
+/** The banked ore total — the loudest number on the screen, reference px. */
+export const ORE_BANK_TYPE = 22;
+
+/** Air between the top of `ORE` and the top of the banked numeral, reference px —
+ *  the eyebrow's leading. Was `TOTAL_LABEL_H` in ./hud; it moved here when the
+ *  cluster's arrangement became a computed layout rather than two assignments. */
+export const ORE_LABEL_LEADING = 14;
+
+/** Air between the banked numeral and the rule that closes the cluster,
+ *  reference px — the same gap the clock keeps ({@link CLOCK_RULE_GAP}). */
+export const ORE_RULE_GAP = 4;
+
+/** How far the closing rule overhangs the widest line of type, each side,
+ *  reference px. Two of these is the 18 the cluster has always been drawn with. */
+export const ORE_RULE_OVERHANG = 9;
+
+/** The drawn thickness of the closing rule, CSS px — not scaled: a 1px edge is
+ *  1px on every screen, exactly as `drawEdgeRule` draws it. */
+export const ORE_RULE_THICKNESS = 1;
+
+/** One drawn line of the counter, as measured by the view (real text metrics) —
+ *  the same shape {@link ClockLine} takes, for the same reason. */
+export interface OreLine {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Where the view puts the counter's two lines, its rule, and the ground under
+ *  all three. Offsets are in the ore group's own space — origin at the ground's
+ *  top-left, which the view pins to `(contentBox.x + HUD_PAD, HUD_PAD)`. */
+export interface OreCounterLayout {
+  /** The `ORE` eyebrow's box. */
+  readonly label: Rect;
+  /** The banked numeral's box. */
+  readonly numeral: Rect;
+  /** The Bone rule that closes the cluster, at its drawn thickness. */
+  readonly rule: Rect;
+  /** Everything the counter puts ink on — the union of the three above. This is
+   *  the rect the ground has to hold at full coverage. */
+  readonly ink: Rect;
+  /** The scrim rect the view draws, `center`-anchored. Strictly larger than
+   *  {@link ink} on all four sides; its plateau covers `ink` exactly. */
+  readonly ground: Rect;
+}
+
+/** The smallest rect containing all of `rects` — the ore cluster's ink box, and
+ *  nothing else needs it yet. */
+function union(...rects: readonly Rect[]): Rect {
+  const left = Math.min(...rects.map((r) => r.x));
+  const top = Math.min(...rects.map((r) => r.y));
+  const right = Math.max(...rects.map((r) => r.x + r.width));
+  const bottom = Math.max(...rects.map((r) => r.y + r.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/**
+ * Lay the top-left ore counter out from its two measured lines.
+ *
+ * `label` is `ORE` at the eyebrow size; `numeral` is the banked total at the bank
+ * size. Both are measured by the caller (Pixi in the view, `font-metrics` in the
+ * test) so the model and the screen agree about a number whose width changes
+ * every time the player banks.
+ */
+export function oreCounterLayout(
+  label: OreLine,
+  numeral: OreLine,
+  scale: HudScale,
+): OreCounterLayout {
+  const overhang = hudSpace(ORE_RULE_OVERHANG, scale);
+  const widest = Math.max(label.width, numeral.width);
+
+  // Ink space first, with the type's left edge at x = 0 and the label's top at
+  // y = 0; the whole box is shifted into ground space at the end.
+  const numeralY = hudSpace(ORE_LABEL_LEADING, scale);
+  const ruleY = numeralY + numeral.height + hudSpace(ORE_RULE_GAP, scale);
+  // The union of the three, computed rather than assumed: the rule is the widest,
+  // leftmost and lowest of them at every size the HUD draws today, but "today" is
+  // what a re-scaled eyebrow would quietly change, and the ground is only correct
+  // if it is sized to everything the cluster actually inks.
+  const ink = union(
+    { x: 0, y: 0, width: label.width, height: label.height },
+    { x: 0, y: numeralY, width: numeral.width, height: numeral.height },
+    { x: -overhang, y: ruleY, width: widest + overhang * 2, height: ORE_RULE_THICKNESS },
+  );
+
+  // …then the ground that has to hold it, and the offset that puts the ground's
+  // own top-left at the group origin so the cluster still hangs off the margin.
+  const ground = scrimGround(ink);
+  const dx = -ground.x;
+  const dy = -ground.y;
+  return {
+    label: { x: dx, y: dy, width: label.width, height: label.height },
+    numeral: { x: dx, y: dy + numeralY, width: numeral.width, height: numeral.height },
+    rule: { x: ink.x + dx, y: dy + ruleY, width: ink.width, height: ORE_RULE_THICKNESS },
+    ink: { x: ink.x + dx, y: ink.y + dy, width: ink.width, height: ink.height },
+    ground: { x: 0, y: 0, width: ground.width, height: ground.height },
   };
 }
 

@@ -438,6 +438,71 @@ export const SCRIM_TAPER = 0.6;
 export type ScrimAnchor = 'top' | 'bottom' | 'center';
 
 /**
+ * How far a scrim's core is inset from its long edges — the taper, solved once
+ * so {@link drawScrim}, {@link scrimPlateau} and {@link scrimGround} cannot
+ * disagree about where the darkness actually is.
+ */
+export function scrimTaper(w: number, h: number): number {
+  return Math.min(h * SCRIM_TAPER, (w * (1 - SCRIM_CORE)) / 2);
+}
+
+/**
+ * **The part of a scrim that is actually dark** — the innermost band, where the
+ * peak coverage the {@link SCRIM} constant advertises is reached and held.
+ *
+ * A scrim decays to nothing at every edge, so its rect is not its ground: only
+ * this plateau is. That distinction is the whole of a0-102. The top-left ore
+ * cluster's scrim was drawn on a rect **coincident with its own type** — same
+ * origin, same width — so `ORE` sat at 0.06–0.37 coverage and the banked
+ * numeral's leading column at 0.15, against a constant whose doc says 0.55 is
+ * the least that survives a lit asteroid. The scrim was there; the ground was
+ * not, which is exactly what QA saw and reported as "no plate, scrim or panel".
+ *
+ * Anchored scrims (`top`/`bottom`) hold their peak against the anchored edge, so
+ * the plateau reaches it; a `center` scrim's plateau is inset on both sides.
+ */
+export function scrimPlateau(rect: Rect, anchor: ScrimAnchor): Rect {
+  const taper = scrimTaper(rect.width, rect.height);
+  const height = rect.height * SCRIM_CORE;
+  const y =
+    anchor === 'top'
+      ? rect.y
+      : anchor === 'bottom'
+        ? rect.y + rect.height - height
+        : rect.y + (rect.height - height) / 2;
+  return { x: rect.x + taper, y, width: Math.max(0, rect.width - taper * 2), height };
+}
+
+/**
+ * The smallest `center`-anchored scrim rect whose {@link scrimPlateau} covers
+ * `ink` — i.e. **the ground a readout has to be given** for every glyph it draws
+ * to sit on the coverage its scrim promises, rather than in the falloff.
+ *
+ * The inflation is `1 / SCRIM_CORE` about the ink's own centre in both axes,
+ * which costs a third of the ink's extent as padding on each side. That padding
+ * is not decoration: it *is* the falloff, moved off the type and out to where a
+ * scrim is allowed to be soft. It also subsumes what {@link
+ * ../ui/hud-geometry} `SCRIM_BLEED` was buying by hand — the darkness now starts
+ * before the type and ends after the rule by construction.
+ *
+ * `scrimPlateau(scrimGround(ink))` contains `ink` for every finite ink box: the
+ * y solve is exact, and the x taper is `min`'d against the same
+ * `(1 - SCRIM_CORE) / 2` fraction this inflates by, so it can only come out
+ * smaller — never larger. Asserted in ./instrument.test.ts.
+ */
+export function scrimGround(ink: Rect): Rect {
+  const pad = (1 / SCRIM_CORE - 1) / 2;
+  const padX = ink.width * pad;
+  const padY = ink.height * pad;
+  return {
+    x: ink.x - padX,
+    y: ink.y - padY,
+    width: ink.width + padX * 2,
+    height: ink.height + padY * 2,
+  };
+}
+
+/**
  * Solve the per-band alpha for a set of **nested** translucent bands, given the
  * coverage each band should leave behind it.
  *
@@ -500,7 +565,7 @@ export function drawScrim(
   // core keeps `SCRIM_CORE` of the width however square the rect is — a corner
   // cluster is nearly square, and it was the case the short-axis rule alone left
   // with a 12px-wide core.
-  const taper = Math.min(h * SCRIM_TAPER, (w * (1 - SCRIM_CORE)) / 2);
+  const taper = scrimTaper(w, h);
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1); // 0 = outermost/faintest, 1 = core
     const inset = taper * t;
