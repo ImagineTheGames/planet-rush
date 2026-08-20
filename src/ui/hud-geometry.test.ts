@@ -22,6 +22,14 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
+import type { Point } from './alarm';
+// a0-104's invariant is a claim about two modules at once — the geometry that
+// decides whether the screen-edge arrow is drawn, and the trigger machine that
+// decides whether the sentence naming it is shown. It is asserted here, where
+// the geometry lives, because the failing half was geometric: the prompt was up
+// in a screen state where its instruction could not be followed.
+import { Onboarding } from './onboarding';
+import type { OnboardingSignals } from './onboarding';
 import { hudMetrics, hudSpace, hudType, scrimPlateau } from './instrument';
 import { collapsedRect } from './minimap';
 import { healthBarFill, healthBarModel, healthBarTrack } from './healthbar';
@@ -1704,6 +1712,119 @@ describe('alarm-arrow placement', () => {
     const vp: Viewport = { width: 844, height: 390 };
     const arrow = homeArrow({ x: 0, y: 0 }, { x: 20, y: 10 }, vp, ARROW_EDGE_INSET);
     expect(arrow.onScreen).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The prompt that names the arrow, against the arrow (a0-104)
+// ---------------------------------------------------------------------------
+//
+// a0-99 photographed both viewports mid-siege: the onboarding band read "Your
+// station is under attack — Follow the arrow", the player's own station was the
+// large lit object at centre-right of that same frame, and there was no arrow on
+// either frame. QA named the two possible readings and would not pick between
+// them without the frame it had not captured.
+//
+// The code picks. `HomeArrow.onScreen` is documented as *"the arrow is a pointer
+// to somewhere you can't see; once you can see the station, the station is the
+// tell and the arrow is clutter — the view hides it"* (./alarm.ts), the view does
+// exactly that (`Hud.drawHomeArrow`: `if (visible.onScreen) return;`), and the
+// case directly above this one pins it. So the arrow is CORRECTLY absent while
+// home is on screen, and what was wrong is the sentence: it was shown in the one
+// state where the thing it names cannot be followed.
+//
+// Which makes this the invariant, and it belongs in this file because it is a
+// question about SCREEN GEOMETRY and not about copy: the words and the mark come
+// up together or not at all. It is asserted here against the very function that
+// decides the mark — not against a boolean a test made up — so it cannot pass by
+// agreeing with a second, drifting copy of the visibility rule.
+describe('the under-attack prompt and the mark it names', () => {
+  /** Home in 32 directions, far enough out that the arrow is always clamped to
+   *  an edge — the same sweep the placement cases above use. */
+  const DIRECTIONS_32 = Array.from({ length: 32 }, (_, i) => (i * Math.PI * 2) / 32);
+
+  /** The exact question the view asks before it draws (`Hud.drawHomeArrow`). */
+  const arrowIsDrawn = (ship: Point, home: Point, vp: Viewport): boolean =>
+    !homeArrow(ship, home, vp, ARROW_EDGE_INSET).onScreen;
+
+  /**
+   * One siege frame. Built as a typed value rather than inline at the call so
+   * the machine is asked the real question — a signals object is what the HUD
+   * hands it every tick (`Hud.updateOnboarding`).
+   */
+  const siege = (homeArrowUp: boolean): OnboardingSignals => ({
+    nearAsteroid: false,
+    cargo: 0,
+    cargoCap: 2,
+    underAttack: true,
+    homeArrowUp,
+    time: 1,
+  });
+
+  /** Every configuration a0-33's branch can resolve this sentence into. */
+  const READINGS: ReadonlyArray<readonly [DeviceKind, FireMode, ControlScheme]> = [
+    ['keyboard', FireMode.Manual, 'sticks'],
+    ['touch', FireMode.AutoAim, 'sticks'],
+    ['touch', FireMode.Manual, 'tap'],
+    ['gamepad', FireMode.Manual, 'sticks'],
+  ];
+
+  it('the prompt never names an arrow that is not drawn', () => {
+    // The premise, checked rather than assumed: this sentence really does name
+    // the mark, in every reading the scheme/fire-mode branch can produce. If a
+    // rewrite ever stops it naming the arrow, this whole gate is the wrong shape
+    // and should be re-argued rather than quietly kept passing.
+    for (const [device, mode, scheme] of READINGS) {
+      const text = resolvePromptText(PromptId.UnderAttack, device, mode, scheme);
+      expect(text.toLowerCase(), `${device}/${mode}/${scheme}`).toContain('arrow');
+    }
+
+    for (const { name, vp } of PROFILES) {
+      // Home a long way out in 32 directions — the arrow is drawn — and home
+      // within a few pixels of the ship — it is not. Same ship, same viewport,
+      // same function the view calls.
+      const ship = { x: 0, y: 0 };
+      const homes: ReadonlyArray<readonly [string, Point]> = [
+        ...DIRECTIONS_32.map(
+          (a, i) => [`far@${i}`, { x: Math.cos(a) * 4000, y: Math.sin(a) * 4000 }] as const,
+        ),
+        ['on-screen/centre', { x: 0, y: 0 }],
+        ['on-screen/near', { x: 20, y: 10 }],
+        // a0-99's own frame: the station lit at centre-right, comfortably inside
+        // the inset rect on the narrowest screen anyone has photographed.
+        ['on-screen/centre-right', { x: vp.width / 2 - ARROW_EDGE_INSET - 1, y: 0 }],
+      ];
+
+      for (const [where, home] of homes) {
+        const drawn = arrowIsDrawn(ship, home, vp);
+        const shown = new Onboarding().update(siege(drawn));
+        expect(shown === PromptId.UnderAttack, `${name} / ${where}: arrow drawn=${drawn}`).toBe(
+          drawn,
+        );
+      }
+    }
+  });
+
+  it('a siege the player never had to be told about does not retire the lesson', () => {
+    // The other half of the gate, and the half that decides whether the lesson
+    // survives at all. UNDER-ATTACK completes on a siege SURVIVED, and completion
+    // is permanent across matches (`./onboarding-memory`). A siege fought with
+    // home on screen shows nothing — so if it still completed the prompt, the
+    // fix for a0-99 would be "the player is never taught the arrow", forever.
+    //
+    // `not.toBe` rather than `toBeNull`, deliberately: withholding this prompt
+    // does not leave the band empty, it lets the next eligible one have it
+    // (OBJECTIVE, here). That is the right outcome and worth pinning as one — the
+    // claim is that the SIEGE sentence is absent, not that the HUD goes quiet.
+    const ob = new Onboarding();
+    expect(ob.update(siege(false))).not.toBe(PromptId.UnderAttack);
+    expect(ob.update({ ...siege(false), underAttack: false })).not.toBe(PromptId.UnderAttack);
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+
+    // …and the siege that DID need the arrow still teaches and still retires.
+    expect(ob.update(siege(true))).toBe(PromptId.UnderAttack);
+    expect(ob.update({ ...siege(true), underAttack: false })).not.toBe(PromptId.UnderAttack);
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
   });
 });
 

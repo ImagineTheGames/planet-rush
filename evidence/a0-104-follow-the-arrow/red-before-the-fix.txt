@@ -1,0 +1,55 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-1
+
+ ❯ src/ui/hud-geometry.test.ts (229 tests | 2 failed | 227 skipped) 13ms
+   × the under-attack prompt and the mark it names > the prompt never names an arrow that is not drawn 12ms
+     → iphone/portrait / on-screen/centre: arrow drawn=false: expected true to be false // Object.is equality
+   × the under-attack prompt and the mark it names > a siege the player never had to be told about does not retire the lesson 0ms
+     → expected 'under-attack' to be null
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/hud-geometry.test.ts > the under-attack prompt and the mark it names > the prompt never names an arrow that is not drawn
+AssertionError: iphone/portrait / on-screen/centre: arrow drawn=false: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/ui/hud-geometry.test.ts:1803:92
+    1801|         const drawn = arrowIsDrawn(ship, home, vp);
+    1802|         const shown = new Onboarding().update(siege(drawn));
+    1803|         expect(shown === PromptId.UnderAttack, `${name} / ${where}: ar…
+       |                                                                                            ^
+    1804|           drawn,
+    1805|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/hud-geometry.test.ts > the under-attack prompt and the mark it names > a siege the player never had to be told about does not retire the lesson
+AssertionError: expected 'under-attack' to be null
+
+- Expected: 
+null
+
++ Received: 
+"under-attack"
+
+ ❯ src/ui/hud-geometry.test.ts:1817:37
+    1815|     // fix for a0-99 would be "the player is never taught the arrow", …
+    1816|     const ob = new Onboarding();
+    1817|     expect(ob.update(siege(false))).toBeNull();
+       |                                     ^
+    1818|     expect(ob.update({ ...siege(false), underAttack: false })).toBeNul…
+    1819|     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 227 skipped (229)
+   Start at  06:05:44
+   Duration  8.17s (transform 1.82s, setup 0ms, collect 7.00s, tests 13ms, environment 0ms, prepare 718ms)
+

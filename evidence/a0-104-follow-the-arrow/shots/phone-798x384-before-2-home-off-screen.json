@@ -1,0 +1,225 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "tag": "before",
+  "boot": "?debug=1 on the production bundle, fresh context (no carried onboarding memory)",
+  "staged": "the frame a0-99 could not take: the ship at station + (900, 900) (__oreHudStage.mine(0))",
+  "damage": "damageCore(0, 2) every 400ms through the sim's own damage function on a tick boundary, held for the whole capture and floored at 30 core HP so the station survives",
+  "pollsToAlarm": 20,
+  "stillUpAfterTheShot": true,
+  "prompt": {
+    "visible": true,
+    "text": "Your station is under attack — follow the arrow",
+    "wrapWidth": 328,
+    "width": 321.12,
+    "height": 28
+  },
+  "device": "touch",
+  "scheme": "tap",
+  "world": {
+    "left": 1985,
+    "top": 1908,
+    "right": 2783,
+    "bottom": 2292,
+    "width": 798,
+    "height": 384
+  },
+  "viewport": {
+    "width": 798,
+    "height": 384
+  },
+  "alarm": {
+    "local": 0,
+    "localPlayer": 0,
+    "allies": [
+      0
+    ],
+    "active": false,
+    "engagements": 0,
+    "sounds": 0
+  },
+  "coreHp": 86,
+  "ship": {
+    "x": 2384,
+    "y": 2100
+  },
+  "home": {
+    "x": 1484,
+    "y": 1200
+  },
+  "homeOnScreen": false,
+  "arrowDrawn": true,
+  "alarmFrameDrawn": true,
+  "promptDrawn": true,
+  "elements": [
+    "ship-local",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "onboarding",
+    "minimap",
+    "alarm-frame",
+    "alarm-arrow",
+    "healthbars"
+  ],
+  "rows": [
+    {
+      "id": "ship-local",
+      "anchor": {
+        "region": "center",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 383,
+        "y": 176,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "id": "build-badge",
+      "anchor": {
+        "region": "bottom-left",
+        "margin": 8
+      },
+      "bounds": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      }
+    },
+    {
+      "id": "pause-button",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 72,
+        "y": 16,
+        "width": 48,
+        "height": 48
+      }
+    },
+    {
+      "id": "ore-hud",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      }
+    },
+    {
+      "id": "banked-total",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 26.573333333333334,
+        "y": 39,
+        "width": 10.000000000000004,
+        "height": 21
+      }
+    },
+    {
+      "id": "station-hp",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 628,
+        "y": 16,
+        "width": 154.5,
+        "height": 39
+      }
+    },
+    {
+      "id": "zoom-control",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      }
+    },
+    {
+      "id": "onboarding",
+      "anchor": {
+        "region": "full",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 223.44,
+        "y": 323,
+        "width": 351.11999999999995,
+        "height": 45
+      }
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      }
+    },
+    {
+      "id": "alarm-frame",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 798,
+        "height": 384
+      }
+    },
+    {
+      "id": "alarm-arrow",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 333.3082071483689,
+        "y": 13.866779645812892,
+        "width": 19.786508495861995,
+        "height": 24.717432041656117
+      }
+    },
+    {
+      "id": "healthbars",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 378.5,
+        "y": 162,
+        "width": 71.10000000000002,
+        "height": 12
+      }
+    }
+  ]
+}

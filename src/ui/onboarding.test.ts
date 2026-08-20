@@ -210,32 +210,100 @@ describe('oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2
 describe('Onboarding — UNDER-ATTACK prompt (GDD §2.2, §2.10)', () => {
   it('fires while the alarm is sounding', () => {
     const ob = new Onboarding();
-    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
   });
 
   it('outranks every other prompt — a siege beats a shopping tip', () => {
     const ob = new Onboarding();
     const shown = ob.update(
-      sig({ underAttack: true, wheelOpen: true, nearAsteroid: true, cargo: 2, cargoCap: 2 }),
+      sig({
+        underAttack: true,
+        homeArrowUp: true,
+        wheelOpen: true,
+        nearAsteroid: true,
+        cargo: 2,
+        cargoCap: 2,
+      }),
     );
     expect(shown).toBe(PromptId.UnderAttack);
   });
 
   it('stays up for the whole siege, then completes once it is survived', () => {
     const ob = new Onboarding();
-    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
-    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
     // Alarm falls silent — the lesson has been lived.
     expect(ob.update(sig({ underAttack: false }))).toBeNull();
     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
     // A second siege gets the alarm and the arrow, but not the tutorial text.
-    expect(ob.update(sig({ underAttack: true }))).toBeNull();
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBeNull();
   });
 
   it('does not fire on a quiet station', () => {
     const ob = new Onboarding();
     expect(ob.update(sig({ underAttack: false }))).toBeNull();
     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+  });
+
+  // --- a0-104: the sentence and the mark it names -------------------------
+  //
+  // Every case above staged `homeArrowUp: true` — a siege fought away from home,
+  // which is the state GDD §2.2 describes and the state the sentence was written
+  // for. These are the other state: the alarm is up and the player is already
+  // looking at their own station, so the view hides the arrow (`./alarm`
+  // `HomeArrow.onScreen`) and there is nothing to follow. The screen-geometry
+  // half of this contract is in `./hud-geometry.test.ts`, asserted against
+  // `homeArrow` itself so the two rules cannot become two.
+
+  it('does not fire while the arrow it names is hidden — home is on screen (a0-104)', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: false }))).not.toBe(
+      PromptId.UnderAttack,
+    );
+    // Absent is the same answer as false: a caller that cannot say whether the
+    // arrow is up is a caller that is not drawing one.
+    expect(ob.update(sig({ underAttack: true }))).not.toBe(PromptId.UnderAttack);
+  });
+
+  it('appears the moment the station leaves the screen, mid-siege (a0-104)', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: false }))).not.toBe(
+      PromptId.UnderAttack,
+    );
+    // The player flies off to mine; home slides off the edge and the arrow comes
+    // up. The words arrive with it — one alarm, one tell, two halves.
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
+    // …and back again if they turn round and the station is on screen once more.
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: false }))).not.toBe(
+      PromptId.UnderAttack,
+    );
+  });
+
+  it('a siege it was never shown for does not retire it (a0-104)', () => {
+    // Completion is permanent and crosses matches (`./onboarding-memory`), so a
+    // siege fought in sight of home must not spend a lesson it never taught.
+    const ob = new Onboarding();
+    ob.update(sig({ underAttack: true, homeArrowUp: false }));
+    ob.update(sig({ underAttack: false }));
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
+
+    // The siege the lesson is FOR still teaches and still retires it.
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
+    ob.update(sig({ underAttack: false }));
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
+  });
+
+  it('following the arrow all the way home still completes it (a0-104)', () => {
+    // The success case of the lesson, and the one the gate could plausibly have
+    // broken: the player obeys, flies back, the station comes on screen and the
+    // arrow goes down WHILE the alarm is still sounding. Release is still the
+    // alarm falling silent, so this retires exactly as it always did.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
+    ob.update(sig({ underAttack: true, homeArrowUp: false })); // home in sight now
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false); // siege still on
+    ob.update(sig({ underAttack: false }));
+    expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
   });
 });
 
@@ -309,8 +377,9 @@ describe('Onboarding — OBJECTIVE prompt (GDD §1 win condition, §2.10)', () =
     // not on screen is a tip nobody read.
     const ob = new Onboarding();
     expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Objective);
-    expect(ob.update(sig({ time: 1, underAttack: true }))).toBe(PromptId.UnderAttack);
-    expect(ob.update(sig({ time: 60, underAttack: true }))).toBe(PromptId.UnderAttack);
+    const siege = { underAttack: true, homeArrowUp: true };
+    expect(ob.update(sig({ time: 1, ...siege }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ time: 60, ...siege }))).toBe(PromptId.UnderAttack);
     expect(ob.update(sig({ time: 61 }))).toBe(PromptId.Objective);
     expect(ob.isCompleted(PromptId.Objective)).toBe(false);
   });
@@ -403,7 +472,7 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
     ob.update(sig({ cargo: 0, cargoCap: 2 })); // HAUL done
     ob.update(sig({ wheelOpen: true })); // SPEND shows
     ob.update(sig({ wheelOpen: true, hasSpent: true })); // SPEND done
-    ob.update(sig({ underAttack: true, time: 0 })); // UNDER-ATTACK shows
+    ob.update(sig({ underAttack: true, homeArrowUp: true, time: 0 })); // UNDER-ATTACK shows
     ob.update(sig({ underAttack: false, time: 0 })); // survived — done
     // …and the fifth, a0-33's CONTROLS tip: shown, then read (its dwell).
     expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Controls);
@@ -418,6 +487,7 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
           cargoCap: 2,
           wheelOpen: true,
           underAttack: true,
+          homeArrowUp: true,
           time: 21,
         }),
       ),
@@ -468,7 +538,7 @@ describe('Onboarding — remembers across matches and page loads (GDD §2.10)', 
     const ob = new Onboarding(fakeMemory(['mine', 'teleport']));
     expect(ob.isCompleted(PromptId.Mine)).toBe(true);
     expect(ob.allCompleted()).toBe(false);
-    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ underAttack: true, homeArrowUp: true }))).toBe(PromptId.UnderAttack);
   });
 
   it('writes each lesson through the port as it lands', () => {
@@ -831,7 +901,9 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
     flyTheLoop(ob);
     expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
     for (let t = 2; t <= 30; t++) {
-      expect(ob.update(sig({ time: t, underAttack: true }))).toBe(PromptId.UnderAttack);
+      expect(ob.update(sig({ time: t, underAttack: true, homeArrowUp: true }))).toBe(
+        PromptId.UnderAttack,
+      );
     }
     // The siege ends; the tip is still owed its read.
     expect(ob.update(sig({ time: 31 }))).toBe(PromptId.Controls);

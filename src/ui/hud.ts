@@ -2210,6 +2210,13 @@ export class Hud extends Container {
    * counts, which is exactly the "your station is being hurt" signal.
    */
   private updateAlarm(frame: HudFrame): boolean {
+    // Per-frame, and cleared before any of the early returns below (a0-104). The
+    // flag is read by `describeLayout` and now by `updateOnboarding`, and both
+    // ask it about THIS frame; leaving last frame's answer standing on a quiet
+    // one would register an `alarm-arrow` rect for a hidden graphic and let the
+    // prompt name a mark the view is no longer drawing. `drawHomeArrow` clears it
+    // again on the frames it does run, which is where it decides the answer.
+    this.arrowDrawn = false;
     const maxCore = frame.maxCoreHp ?? 0;
     if (maxCore <= 0 || frame.stationAlive === false) {
       this.alarmGroup.visible = false;
@@ -2537,6 +2544,12 @@ export class Hud extends Container {
       // pressed" (u15-01 half B).
       hasSpent: this.hasSpent,
       underAttack,
+      // ...and whether the mark that sentence names is on screen (a0-104). Not a
+      // second computation of the visibility rule — literally the flag
+      // `drawHomeArrow` sets when it draws, the same one `describeLayout` uses to
+      // decide whether `alarm-arrow` is registered at all. `updateAlarm` runs
+      // first in `update()`, so this is THIS frame's answer, not last frame's.
+      homeArrowUp: this.arrowDrawn,
       // Match time, for both dwell-retired prompts (a0-33's CONTROLS tip and
       // a0-34's OBJECTIVE): each teaches something no player action can confirm —
       // that the settings screen exists, and what winning is — so each retires on
