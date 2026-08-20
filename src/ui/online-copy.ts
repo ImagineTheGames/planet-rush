@@ -90,7 +90,7 @@ const ONLINE_ERROR_COPY: Readonly<Record<ResolveFailure, OnlineErrorCopy>> = {
   },
   'not-found': {
     reason: 'not-found',
-    message: 'No claim with that code. Check it and try again.',
+    message: 'No room with that code. Check it and try again.',
     action: 'edit-code',
   },
   network: {
@@ -134,12 +134,12 @@ export function resolveFailureMessage(reason: ResolveFailure): string {
  * other refusal is here: one place turns a network reason into a sentence, so the
  * browse screen and the front door cannot end up wording the same failure twice.
  *
- *   • `room-full` (409) — the claim is there and its last seat went to somebody
+ *   • `room-full` (409) — the room is there and its last seat went to somebody
  *     else while the player was looking at the card. **This is the answer to "what
  *     does a player see when they press JOIN on a room that filled up?"**
  *   • `not-found` (404) — on the code path this means *you mistyped it*, and the
  *     copy above says so ("Check it and try again"). On a ROW there is nothing to
- *     check: the player did not type anything, and a row that 404s is a claim that
+ *     check: the player did not type anything, and a row that 404s is a room that
  *     has ended or gone private. Same status, different fact, different sentence —
  *     which is exactly why this table exists instead of a cast.
  *
@@ -147,8 +147,8 @@ export function resolveFailureMessage(reason: ResolveFailure): string {
  * player as a blank line.
  */
 const LISTING_ERROR_COPY: Readonly<Record<ListingJoinFailure, string>> = {
-  'room-full': 'That claim filled up while you were looking. Pick another.',
-  'not-found': 'That claim has closed. Pick another, or press SOLO.',
+  'room-full': 'That room filled up while you were looking. Pick another.',
+  'not-found': 'That room has closed. Pick another, or press SOLO.',
   'no-capacity': ONLINE_ERROR_COPY['no-capacity'].message,
   network: ONLINE_ERROR_COPY.network.message,
   'bad-response': ONLINE_ERROR_COPY['bad-response'].message,

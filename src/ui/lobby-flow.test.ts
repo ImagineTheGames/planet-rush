@@ -495,10 +495,11 @@ describe('the room tells the server what it chose', () => {
    *     overruns its chrome is a golden failure rather than a cosmetic one
    *     (a0-32). Measured with the repo's own font metrics, not eyeballed.
    *
-   * What it deliberately does NOT touch: `./end-of-match`'s `CLAIM HELD` /
-   * `CLAIM LOST` / `You took the claim.`, which are theme rather than chrome and
-   * are governed by §4.7's accessibility clause — a question for the developer,
-   * not a thing to infer from a note about the lobby.
+   * What it deliberately did NOT touch at the time: the end-screen headlines,
+   * judged theme rather than chrome and left to §4.7's accessibility clause — a
+   * question for the developer, not a thing to infer from a note about the lobby.
+   * The developer answered it in a0-108, for that screen and eleven other strings
+   * at once, and `copy-audit.test.ts` now holds the answer.
    */
   it('says what it does in words a player already knows', () => {
     const online = inLobbyVia('create', 0, 0);
@@ -1205,7 +1206,7 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
    * The side is read off the lobby the match was built from — legal because
    * allegiance is static match config fixed at match start (GDD §2.1, §4.2).
    */
-  it('shows VICTORY in TEAMS when a TEAMMATE takes the claim', () => {
+  it('shows VICTORY in TEAMS when a TEAMMATE wins it', () => {
     // The host taps TEAMS on the real roster control, then RUSHes. Sides
     // alternate by slot (`defaultTeamForSlot`), so you at seat 0 hold side A with
     // seats 2, 4 and 6, and the odd seats hold side B.
@@ -1217,7 +1218,10 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     const allyWon = flowMatchEnded(state, 2);
     expect(allyWon.state.end!.allies).toEqual(new Set([0, 2, 4, 6]));
     expect(endOfMatchModel(allyWon.state.end!).kind).toBe('victory');
-    expect(endOfMatchModel(allyWon.state.end!).subhead).toContain('Your side');
+    // The line names the ally and says the win was your side's — the headline
+    // alone cannot, since an ally's VICTORY and your own read identically.
+    expect(endOfMatchModel(allyWon.state.end!).subhead).toContain('your side');
+    expect(endOfMatchModel(allyWon.state.end!).subhead).toContain('Player 3');
 
     // …and an enemy's win is still a defeat.
     expect(endOfMatchModel(flowMatchEnded(state, 1).state.end!).kind).toBe('defeat');

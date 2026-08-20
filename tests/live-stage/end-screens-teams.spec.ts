@@ -6,7 +6,8 @@
  *
  *   > *"i lost somehow but my team is the one that won..."*
  *
- * It read **DEFEAT** — *"Player 7 took the claim."* Player 7 was their teammate.
+ * It read **DEFEAT** over a line naming Player 7 the way the screen names an
+ * opponent. Player 7 was their teammate.
  *
  * `end-of-match.test.ts` proves the model reads a side correctly. It cannot prove
  * the shipped client HANDS it one — and that is the whole M2 dark-matter class
@@ -79,7 +80,7 @@ async function bootTeams(page: import('@playwright/test').Page): Promise<string[
   return pageErrors;
 }
 
-test('a TEAMS win taken by an ALLY reads VICTORY, and the line under it says your side took the claim', async ({
+test('a TEAMS win taken by an ALLY reads VICTORY, and the line under it says your side won', async ({
   page,
 }) => {
   const pageErrors = await bootTeams(page);
@@ -89,7 +90,7 @@ test('a TEAMS win taken by an ALLY reads VICTORY, and the line under it says you
   const side = await page.evaluate(() => window.__endScreenStage!.side());
   expect(side, 'the debug boot built a SIDED world — the local seat has allies').toEqual([0, 2, 4, 6]);
 
-  // --- The developer's match: your side takes the claim, an ally holds it. ---
+  // --- The developer's match: your side wins it, and an ally is who did. ---
   const staged = await page.evaluate(() => window.__endScreenStage!.winAlly());
   expect(staged, 'there was an ally left holding a core to crown').toBe(true);
 
@@ -102,17 +103,17 @@ test('a TEAMS win taken by an ALLY reads VICTORY, and the line under it says you
   }));
 
   // THE BUG, in one assertion. Before a0-09 this read 'defeat'.
-  expect(shown.result!.kind, 'your side took the claim — that is a VICTORY, not a DEFEAT').toBe(
-    'victory',
-  );
-  expect(shown.result!.headline, 'the headline is the win').toBe('CLAIM HELD');
+  expect(shown.result!.kind, 'your side won — that is a VICTORY, not a DEFEAT').toBe('victory');
+  expect(shown.result!.headline, 'the headline is the win').toBe('VICTORY');
 
-  // …and the other half of the screenshot: the line under it. "Player 7 took the
-  // claim." is an opponent's sentence; an ally win says whose side took it and
-  // then names who held it.
-  expect(shown.result!.subhead, 'the line reads as YOUR side taking the claim').toContain('Your side');
-  expect(shown.result!.subhead, 'and it still names who actually held it').toMatch(/Player \d/);
-  expect(shown.result!.subhead, 'never the opponent-shaped sentence').not.toMatch(/^Player \d+ took/);
+  // …and the other half of the screenshot: the line under it. A bare
+  // "Player 7 won." is an opponent's sentence; an ally win names them AND says
+  // the win was your side's. The headline cannot carry that — an ally's VICTORY
+  // and your own read identically (a0-108 made both plain, which did not change
+  // this: `CLAIM HELD` could not say who won either).
+  expect(shown.result!.subhead, 'the line reads as YOUR side winning').toContain('your side');
+  expect(shown.result!.subhead, 'and it still names who actually won it').toMatch(/Player \d/);
+  expect(shown.result!.subhead, 'never the opponent-shaped sentence').not.toMatch(/^Player \d+ won\.$/);
 
   // Ratified and unchanged (field report v0.1.2, GDD §4.7): the whole-match-over
   // screen offers REMATCH and BACK TO MENU, Rematch first.
@@ -151,7 +152,7 @@ test('eliminated → SPECTATE → your side wins: still VICTORY, never DEFEAT an
   // The ONE frame of this run that does not look like the other test's. The
   // end-of-match backdrop is opaque and covers the whole viewport
   // (`end-of-match-view.ts`), so both scenarios FINISH on pixel-identical
-  // screens — same CLAIM HELD, same subhead, same two plates, and the differing
+  // screens — same VICTORY, same subhead, same two plates, and the differing
   // world underneath painted over. A second photo of that frame proves nothing
   // the first already does. What is unique to this path is the middle of it:
   // ELIMINATED standing while the match is still live, offering SPECTATE. That
@@ -185,8 +186,8 @@ test('eliminated → SPECTATE → your side wins: still VICTORY, never DEFEAT an
   // The developer's screenshot in slow motion — and it ends on the right word.
   expect(shown!.kind, 'your side won while you spectated: VICTORY').toBe('victory');
   expect(shown!.kind, 'the match is over — ELIMINATED is a live-match state').not.toBe('eliminated');
-  expect(shown!.headline).toBe('CLAIM HELD');
-  expect(shown!.subhead).toContain('Your side');
+  expect(shown!.headline).toBe('VICTORY');
+  expect(shown!.subhead).toContain('your side');
 
   await page.screenshot({ path: 'tests/live-stage/teams-eliminated-then-side-wins-evidence.png' });
   expect(pageErrors, 'no page errors across the eliminate → spectate → win flow').toEqual([]);

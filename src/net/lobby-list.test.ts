@@ -127,7 +127,7 @@ describe('readLobbyList', () => {
   });
 
   it('reads an empty listing as empty, not as a failure', async () => {
-    // A fleet with nothing open is a *sentence* on screen ("NO OPEN CLAIMS RIGHT
+    // A fleet with nothing open is a *sentence* on screen ("NO OPEN ROOMS RIGHT
     // NOW"), and the screen can only say it if this is distinguishable from null.
     const { fetch } = stubFetch(listOf([]));
 

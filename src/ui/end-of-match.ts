@@ -239,7 +239,7 @@ export interface EndOfMatchModel {
    * 4px identity rule between the headline and its line — {@link ../art/materials}
    * `ROW_BAR_WIDTH`, the one place this direction puts an identity colour ("never
    * as a background wash — that was making identity read as chrome"). The screen
-   * still reports exactly who took the claim: the rule says it in colour, the line
+   * still reports exactly who won: the rule says it in colour, the line
    * under it says it in words.
    */
   readonly accent: number | null;
@@ -247,23 +247,28 @@ export interface EndOfMatchModel {
 }
 
 /**
- * The four end-screen headlines, in the interface voice (GDD §4.7 register 2):
- * the authority files a win and a loss in the same sentence shape and does not
- * congratulate either. `VICTORY` / `DEFEAT` were the scoreboard words the
- * ratification was aimed at.
+ * The four end-screen headlines — the words a player already has for how a match
+ * ended (a0-108). They read the same in any game they have played before, and
+ * that is the whole requirement: *"its just Victory, Defeat, Draw,
+ * Eliminated…"* (developer, 2026-08-19, ruling the fiction word off this screen
+ * for the second time).
  *
- * The swap is legal **only** because {@link subheadFor} states the outcome
- * plainly underneath — §4.7's accessibility clause permits an in-register
- * headline only above a plain one. `end-of-match.test.ts` encodes that as a
- * guard: if a future edit empties the subhead, the headline must revert.
+ * They replace three headlines in the interface voice that told a first-time
+ * player nothing about how the match had gone. §4.7 register 2 still holds: the authority files a win and a loss in the same sentence shape and
+ * congratulates neither — `VICTORY` states an outcome, it does not cheer one.
  *
- * `ELIMINATED` stays: it is plain, it does not celebrate, and the in-register
- * alternative (`CONTRACT TERMINATED`) is the corporate joke §4.7 forbids.
+ * §4.7's accessibility clause used to be the *permission* for the old words: an
+ * in-register headline was legal only above a plain line. With the headline now
+ * plain that condition no longer applies, but the line underneath still has a
+ * job — {@link subheadFor} names **who won**, which the headline does not say.
+ * `end-of-match.test.ts` guards that, not the reversion.
+ *
+ * `ELIMINATED` is unchanged; it was already plain.
  */
 const HEADLINES: Record<EndKind, string> = {
-  victory: 'CLAIM HELD',
-  defeat: 'CLAIM LOST',
-  draw: 'NO CLAIMANT',
+  victory: 'VICTORY',
+  defeat: 'DEFEAT',
+  draw: 'DRAW',
   eliminated: 'ELIMINATED',
 };
 
@@ -299,25 +304,27 @@ export function endOfMatchModel(outcome: MatchOutcome, pointer: EndPointer = {})
  * The line under the headline — and in TEAMS it has to change with the headline,
  * not just under it (a0-09).
  *
- * The developer's screenshot was a DEFEAT headline over *"Player 7 took the
- * claim."*, and **both halves were wrong**: Player 7 was their teammate, so the
+ * The developer's screenshot was a DEFEAT headline over a line naming Player 7 as
+ * the winner, and **both halves were wrong**: Player 7 was their teammate, so the
  * result was a win, and the sentence read like an opponent's win because that is
  * the only sentence a side-blind screen had. A victory taken by an ally is
- * therefore its own line: it says *your side* took the claim — the fact the
- * headline just stated — and then names who actually held it, because "an ally
- * won" without a name is a worse answer than the wrong one.
+ * therefore its own line: it names the ally who won and says the win was your
+ * side's, because "an ally won" without a name is a worse answer than the wrong
+ * one.
  *
- * The three shapes keep the same spine, `took the claim`, so §4.7 register 2
- * still files a win and a loss in one sentence shape and congratulates neither.
+ * The three shapes keep one spine, `won`, so §4.7 register 2 still files a win
+ * and a loss in one sentence shape and congratulates neither. a0-108 replaced the
+ * old spine, which was built on the fiction noun; the sentence shapes are
+ * unchanged, in words a player arrives already knowing.
  */
 function subheadFor(kind: EndKind, outcome: MatchOutcome): string {
   switch (kind) {
     case 'victory':
       return outcome.winner === null || outcome.winner === outcome.you
-        ? 'You took the claim.'
-        : `Your side took the claim — ${playerLabel(outcome.winner)} held it.`;
+        ? 'You won.'
+        : `${playerLabel(outcome.winner)} won it for your side.`;
     case 'defeat':
-      return `${playerLabel(outcome.winner)} took the claim.`;
+      return `${playerLabel(outcome.winner)} won.`;
     case 'draw':
       return 'No reactor survived the collapse.';
     case 'eliminated':
@@ -405,7 +412,7 @@ function ordinal(n: number): string {
  * colour. This rule is the end screen's identity surface, the HP bar's sibling,
  * so tinting it by side would break the one rule that keeps two enemies apart at
  * three and four sides. The side is carried where §2.1 carries it: **in words**,
- * by {@link subheadFor}'s "Your side took the claim".
+ * by {@link subheadFor}'s "won it for your side".
  */
 function accentFor(kind: EndKind, outcome: MatchOutcome): number | null {
   if (kind !== 'victory' && kind !== 'defeat') return null;

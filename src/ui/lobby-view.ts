@@ -83,6 +83,7 @@ import {
   DIFFICULTY_LABELS,
   LOBBY_EYEBROW,
   LOBBY_TITLE,
+  LOBBY_WAITING_FOR_HOST,
   MAP_PICK_GUEST_LABEL,
   MAP_PICK_LABEL,
   MODE_LABELS,
@@ -222,7 +223,7 @@ export class LobbyView extends Container {
    *  one-card layout built from the lobby's own rect. */
   private readonly mapPicker = new MapPickerView();
   /** The two eyebrows that make the cards read as controls rather than labels:
-   *  `SHIP · CHANGE` over one, `MAP · CHANGE` (or `MAP · CLAIM HOLDER'S`) over the
+   *  `SHIP · CHANGE` over one, `MAP · CHANGE` (or `MAP · HOST'S`) over the
    *  other. Drawn on the `plates` canvas below them. */
   private readonly pickPlates = new Graphics();
   private readonly shipEyebrow: Text;
@@ -533,15 +534,16 @@ export class LobbyView extends Container {
     // The host sees the shape of the match they are about to start — the head
     // count in FFA, and the always-visible per-side tally in TEAMS (ratified:
     // counts shown, never blocking a split).
-    // "Claim holder", not "host": the guest came through JOIN, so the
-    // claim is the noun already on screen, and "host" is the network's word for
-    // it (GDD §4.7 worked examples). Measured at 11px against the content box
-    // before it shipped — see tests/mobile/voice-copy-fit.spec.ts.
+    // "The host", in the everyday sense: the person who started the game
+    // (a0-108, overturning the §4.7 worked example that read the other way).
+    // Measured at 11px against the content box before it shipped — see
+    // tests/mobile/voice-copy-fit.spec.ts, and it is four characters shorter
+    // than the line it replaces.
     const text = model.countdown.active
       ? ''
       : model.hostControls
         ? hintText(model)
-        : 'WAITING FOR THE CLAIM HOLDER';
+        : LOBBY_WAITING_FOR_HOST;
     const px = typeSize(HINT_PX, m);
     this.rushHint.text = text;
     this.rushHint.style.fontSize = px;
@@ -585,7 +587,7 @@ export class LobbyView extends Container {
    * pressable is a control smaller than it looks.
    *
    * The arena's word is also where the **host rule** is told: a guest reads
-   * `MAP · CLAIM HOLDER'S` and the card drops to the `inert` surface, so the
+   * `MAP · HOST'S` and the card drops to the `inert` surface, so the
    * control looks unavailable rather than looking live and then refusing — the same
    * rule {@link drawSeatState} keeps, and the rule the brief names.
    */

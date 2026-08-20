@@ -139,10 +139,10 @@ describe('a guest reads the arena and cannot change it', () => {
   it('SAYS whose pick it is, before anything is pressed', () => {
     expect(mapSelectModel({ mapId: DEFAULT_MAP_ID, canPick: false }).hint).toBe(MAP_SELECT_GUEST_HINT);
     expect(mapSelectModel({ mapId: DEFAULT_MAP_ID, canPick: true }).hint).toBe(MAP_SELECT_HINT);
-    // …in the same noun the footer already uses for the room's owner ("claim
-    // holder", not "host" — GDD §4.7 worked examples), so the roster and this
-    // screen teach one word.
-    expect(MAP_SELECT_GUEST_HINT).toContain('CLAIM HOLDER');
+    // …in the same noun the footer already uses for the person who started the
+    // game ("host", a0-108 — overturning the §4.7 worked example that read the
+    // other way), so the roster and this screen teach one word.
+    expect(MAP_SELECT_GUEST_HINT).toContain('HOST');
   });
 
   it('reports the host rule on the LOBBY’s card too, so the tell is on both screens', () => {

@@ -14,6 +14,13 @@
  * shipped text that fit on desktop and overflowed on a phone. So the measurement
  * is a test, not a screenshot somebody once looked at.
  *
+ * a0-108 reversed most of that growth: the developer struck the fiction noun from
+ * every screen, so the headlines are back to `VICTORY` (7) / `DEFEAT` (6) /
+ * `DRAW` (4) and the guest hint back to `WAITING FOR THE HOST` (20). Every one of
+ * those is shorter than the string it replaced, and every one is still measured
+ * here — "shorter, so it must fit" is the assumption this file exists to refuse,
+ * and a headline is the largest text in the game.
+ *
  * a0-15 sent the entry doors back to plain words (`SOLO` / `HOST` / `JOIN`) on
  * the developer's ratification, which only ever makes them fit more easily — but
  * "shorter, so it must fit" is the assumption this file exists to refuse, and the
@@ -46,8 +53,9 @@
  * so that is a real possibility."
  *
  * **They were added, on 2026-08-11, and it was a real possibility.** Audiowide
- * measures ~14% wider than Trebuchet at the same size (`CLAIM HELD` at 16px:
- * 112.0px against 98.2px), which is a whole extra character on a headline. Every
+ * measured ~14% wider than Trebuchet at the same size (`CLAIM HELD` at 16px:
+ * 112.0px against 98.2px, taken while that was still the headline), which is a
+ * whole extra character on a headline. Every
  * label below was re-measured against the self-hosted faces and every one still
  * fits; the tightest is 36% headroom. The mechanism the caveat described is why
  * that is known rather than assumed — this spec measures the FULL declared stack,
@@ -138,9 +146,9 @@ const CASES: readonly FitCase[] = [
 
   // --- The end-screen headlines (end-of-match.ts HEADLINES, 48px heading) -----
   // The largest text in the game, in the narrowest band it is ever drawn in.
-  { where: 'HEADLINES.victory', text: 'CLAIM HELD', font: FONT_HEADING, size: 48, box: 812 },
-  { where: 'HEADLINES.defeat', text: 'CLAIM LOST', font: FONT_HEADING, size: 48, box: 812 },
-  { where: 'HEADLINES.draw', text: 'NO CLAIMANT', font: FONT_HEADING, size: 48, box: 812 },
+  { where: 'HEADLINES.victory', text: 'VICTORY', font: FONT_HEADING, size: 48, box: 812 },
+  { where: 'HEADLINES.defeat', text: 'DEFEAT', font: FONT_HEADING, size: 48, box: 812 },
+  { where: 'HEADLINES.draw', text: 'DRAW', font: FONT_HEADING, size: 48, box: 812 },
   { where: 'HEADLINES.eliminated', text: 'ELIMINATED', font: FONT_HEADING, size: 48, box: 812 },
 
   // --- The guest's rush hint (lobby-view.ts, 11px body) ----------------------
@@ -149,7 +157,7 @@ const CASES: readonly FitCase[] = [
   // button, not clipped to it.
   {
     where: 'lobby rushHint (guest)',
-    text: 'WAITING FOR THE CLAIM HOLDER',
+    text: 'WAITING FOR THE HOST',
     font: FONT_BODY,
     size: 11,
     box: 812,
@@ -166,7 +174,7 @@ const CASES: readonly FitCase[] = [
   // The longest of the four, which is the one that decides the set.
   {
     where: 'ENTRY_ERRORS.full',
-    text: 'That claim is full. Ask for a rematch, or press SOLO.',
+    text: 'That room is full. Ask for a rematch, or press SOLO.',
     font: FONT_BODY,
     size: 12,
     box: 812,
@@ -183,7 +191,7 @@ const CASES: readonly FitCase[] = [
   // are all well inside it; measured rather than assumed, which is the point.
   {
     where: 'DOOR_OPTIONS.campaign hint',
-    text: 'A run of linked contracts, one claim after another.',
+    text: 'A run of linked contracts.',
     font: FONT_BODY,
     size: 11,
     box: 420,
@@ -431,7 +439,7 @@ test('screenshots the voiced screens for review', async ({ page }, testInfo) => 
   await page.waitForTimeout(300);
   await page.screenshot({ path: `evidence/voice-${tag}-2-doors.png` });
 
-  // JOIN → the code pad, where ENTER THE CLAIM CODE is drawn.
+  // JOIN → the code pad, where ENTER THE ROOM CODE is drawn.
   const join = await page.evaluate(() => {
     const d = (
       window as unknown as {

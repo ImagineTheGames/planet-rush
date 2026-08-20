@@ -495,6 +495,8 @@ export {
   // returns with the pick exactly as it was, because a pick is applied when it is
   // made and there is nothing to cancel.
   LOBBY_SCREENS,
+  // The guest's footer line, on the model so the copy audit can read it (a0-108).
+  LOBBY_WAITING_FOR_HOST,
   MAP_PICK_GUEST_LABEL,
   MAP_PICK_LABEL,
   SHIP_PICK_LABEL,
@@ -519,7 +521,7 @@ export {
   SIDE_WORDS,
   sideRelation,
   // The slots on one player's side, off the lobby's own `team` table — the roster
-  // the end-of-match summary reads to answer "did MY side take the claim?"
+  // the end-of-match summary reads to answer "did MY side win?"
   // (a0-09). The lobby's twin of `art/audio/scope` `deriveAlarmAllies`.
   sideRosterOf,
   teamLabel,

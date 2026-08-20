@@ -68,8 +68,9 @@ import type { MapPickerLayout, MapPickerModel } from './map-picker';
 export const MAP_SELECT_TITLE = 'MAP SELECT';
 
 /** The eyebrow over it — the noun of work a board is, in the register's own
- *  vocabulary (a claim is worked in **sectors**). */
-export const MAP_SELECT_EYEBROW = 'CLAIM SECTOR';
+ *  vocabulary. `CLAIM SECTOR` until a0-108; `MINING` is the word §0's fiction
+ *  already gives the field, and it needs no glossary to read. */
+export const MAP_SELECT_EYEBROW = 'MINING SECTOR';
 
 /** The way out (§4.7's fixed-string list: `BACK` is not the voice's to revisit). */
 export const MAP_SELECT_BACK_LABEL = 'BACK';
@@ -80,12 +81,12 @@ export const MAP_SELECT_BACK_LABEL = 'BACK';
  *
  *  - the host is told the pick is one-per-room, which is why there is one card lit;
  *  - **a guest is told whose it is, before they press anything.** That is the half
- *    that matters. `WAITING FOR THE CLAIM HOLDER` is already this screen family's
- *    word for the host (`./lobby-view`; "claim holder", not "host" — GDD §4.7
- *    worked examples), so the same noun is used here rather than a second one.
+ *    that matters. `WAITING FOR THE HOST` is already this screen family's word for
+ *    the person who started the game (`./lobby-view`, a0-108), so the same noun is
+ *    used here rather than a second one.
  */
-export const MAP_SELECT_HINT = 'ONE ARENA PER CLAIM · LOCKED AT RUSH';
-export const MAP_SELECT_GUEST_HINT = "THE CLAIM HOLDER'S PICK — READ ONLY";
+export const MAP_SELECT_HINT = 'ONE MAP PER GAME · LOCKED AT RUSH';
+export const MAP_SELECT_GUEST_HINT = "THE HOST'S PICK — READ ONLY";
 
 // ---------------------------------------------------------------------------
 // The per-frame model
