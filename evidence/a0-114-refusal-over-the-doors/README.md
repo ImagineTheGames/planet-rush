@@ -45,8 +45,11 @@ what the panel lands on. This capture probes it explicitly.
 ### The gap closed for the next state too
 
 a0-98's own `1-offline-screens.spec.ts`, unchanged in scope, re-run with the extended
-probe against the fixed build — eleven states across two profiles, tables at
-`../a0-98-corner-collisions-everywhere-else/shots/a0-114-rerun/`:
+probe against the fixed build — eleven states across two profiles, tables AND the
+frames they were read off at
+`../a0-98-corner-collisions-everywhere-else/shots/a0-114-rerun/` (the two
+`*-offline-report.json` are the numbers; the 22 PNGs are the same states as
+a0-98's own `shots/broken` and `shots/fixed`, in that directory's convention):
 
 ```
 boot-failure … menu … doors-idle … doors-error … join-browse …
