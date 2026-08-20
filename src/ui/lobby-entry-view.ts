@@ -16,8 +16,8 @@
  * player touches after PLAY was still *"1px hairlines on black, which reads as a
  * wireframe rather than a product"* while the screen in front of it had been
  * re-skinned. It is now the same material as the title screen: a header beam
- * carrying the eyebrow cluster and the wordmark, a footer beam carrying BACK and
- * SETTINGS, and four door PLATES in the band between them. **None of that is drawn
+ * carrying the eyebrow cluster and the wordmark, a footer beam carrying BACK, and
+ * four door PLATES in the band between them. **None of that is drawn
  * here.** Every bevel, rivet, band and tone comes from {@link ../art/materials},
  * so this screen and the four already in the set speak one dialect.
  *
@@ -84,7 +84,7 @@ const EYEBROW_PX = 12;
 const LABEL_PX = { primary: 27, secondary: 21 } as const;
 /** The sub-line under a door's label — its hint, now inside the plate. */
 const SUB_PX = 13;
-/** The footer plates' labels: BACK, SETTINGS, ERASE, JOIN. */
+/** The footer plates' labels: BACK, ERASE, JOIN. */
 const FOOTER_PX = 18;
 /** The mode switch's two words (u17-01), at the codex tab chip's own size — this
  *  is the same control doing the same job, so it is drawn at the same size. */
@@ -168,8 +168,6 @@ export class LobbyEntryView extends Container {
   private readonly back: ButtonNodes;
   private readonly erase: ButtonNodes;
   private readonly submit: ButtonNodes;
-  /** The home screen's own trailing footer control. */
-  private readonly settings: ButtonNodes;
   /** The browse list — the JOIN screen's other half (u17-01). A child rather than
    *  a fourth pool of nodes here: it is a screen's worth of drawing with its own
    *  rules, and the beams, the switch and the footer above it are shared. */
@@ -208,7 +206,6 @@ export class LobbyEntryView extends Container {
     this.back = this.makeButton('BACK');
     this.erase = this.makeButton('⌫ ERASE');
     this.submit = this.makeButton('JOIN');
-    this.settings = this.makeButton('SETTINGS');
     // Last, so the list draws over the pad's rects rather than under them if a
     // very short screen ever brings the two modes' bands together.
     this.addChild(this.browser);
@@ -384,12 +381,11 @@ export class LobbyEntryView extends Container {
       if (typing) this.drawFooterPlate(nodes, rect, model, key, primary, enabled, metrics);
     }
 
-    // SETTINGS shares the beam's trailing end with JOIN, on the home screen only.
-    // `secondary`, never primary: SOLO is this screen's affirmative action.
-    setVisible(home, this.settings.body, this.settings.label);
-    if (home) {
-      this.drawFooterPlate(this.settings, this.layout.settings, model, 'settings', false, !model.connecting, metrics);
-    }
+    // The doors screen's footer carries BACK and nothing else (a0-100c): SETTINGS
+    // opens from the main menu and the pause menu, and nowhere else. BACK is not
+    // re-centred to fill the gap — it is bolted to the beam's leading end on BOTH
+    // screens (`./lobby-geometry` `entryLayout`), and a plate that slid to the
+    // middle on the doors would jump back when JOIN drew ERASE beside it.
 
     // Everything above is now on the display list; rasterise it once so the frames
     // between state changes cost one blit rather than the whole plate set
@@ -701,7 +697,7 @@ export class LobbyEntryView extends Container {
     return nodes;
   }
 
-  // --- The footer beam's plates: BACK / SETTINGS / ERASE / JOIN --------------
+  // --- The footer beam's plates: BACK / ERASE / JOIN -------------------------
 
   /**
    * One footer plate — a `compact` plate bolted into the beam, the shape the

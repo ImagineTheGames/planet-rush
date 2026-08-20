@@ -9278,10 +9278,14 @@ function openMainMenu(
         // this branch does not pre-empt it with a third sound.
         pressBrowseRowAt(target.index);
         return;
-      case 'settings':
-        ctx.cue('press');
-        openSettings();
-        return;
+      // There is no `settings` arm, and that is the ruling rather than an
+      // oversight (a0-100c): **SETTINGS opens from the main menu and the pause
+      // menu, and nowhere else.** The doors screen carried a third one that
+      // reached `openSettings()` here — a route `NAV_EDGES` never recorded, and
+      // one that did not come back: `closeSettings()` sets `screen = 'menu'`, so
+      // it put the player on the main menu rather than on the doors they pressed
+      // from. BACK is the doors' way out, and it reaches the menu where settings
+      // lives one press away.
     }
   }
 

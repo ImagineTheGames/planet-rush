@@ -449,14 +449,6 @@ export function flowTapEntry(state: FlowState, target: EntryTarget, rng: Rng): F
       return withEntry(state, backToDoors(state.entry).state);
     case 'submit':
       return resolve(state, submitJoin(state.entry));
-    case 'settings':
-      // …and the second target this seam deliberately does NOT carry (a0-95).
-      // SETTINGS opens a screen, not a room: no transport, no code, nothing the
-      // sequence owes anyone. The screen and the values on it belong to
-      // {@link ./settings} and the shell that renders it, which is where the two
-      // live settings screens already read and write them — answering here would
-      // mint the third copy this brief deleted.
-      return rest(state);
   }
 }
 

@@ -1,0 +1,13 @@
+{
+  "profile": "desktop-1280x800",
+  "mode": "before",
+  "pressedAt": {
+    "x": 1166,
+    "y": 754
+  },
+  "backCentre": {
+    "x": 114,
+    "y": 754
+  },
+  "landed": "settings"
+}
