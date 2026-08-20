@@ -113,9 +113,9 @@ Two things came along because they would otherwise have regressed:
 
   | | before | after |
   |---|---|---|
-  | ore crystals inside the counter's footprint (162 px) | **177.7** | **58.6** |
-  | the banked numeral itself | 187.1 | 187.1 |
-  | numeral ÷ crystal | **1.05×** | **3.19×** |
+  | ore crystals behind the counter (121 px) | **178.6** | **50.1** |
+  | the banked numeral itself | 187.8 | 187.7 |
+  | numeral ÷ crystal | **1.05×** | **3.75×** |
 
   QA's words were *"the same hue, at a similar size, with nothing separating
   them"*. At 1.05× there was nothing separating them. The numeral did not move a

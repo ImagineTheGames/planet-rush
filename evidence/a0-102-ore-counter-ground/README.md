@@ -58,9 +58,9 @@ and the counter's own numeral, in luminance:
 
 | | before | after |
 |---|---|---|
-| ore crystals inside the counter's footprint (162 px) | **177.7** | **58.6** |
-| the banked numeral itself | 187.1 | 187.1 |
-| numeral ÷ crystal | **1.05×** | **3.19×** |
+| ore crystals behind the counter (121 px) | **178.6** | **50.1** |
+| the banked numeral itself | 187.8 | 187.7 |
+| numeral ÷ crystal | **1.05×** | **3.75×** |
 
 That is the whole fix in one row. QA's complaint was *"the same hue, at a similar
 size, with nothing separating them"* — and at 1.05× there was nothing separating
@@ -68,11 +68,19 @@ them. The numeral did not move a shade; the ore behind it lost two thirds of its
 luminance, because the ground dims everything drawn under it and the readout is
 drawn on top of the ground.
 
-(The luminance drop is 0.67 where the scrim's coverage is 0.55 because the two
-compose over a crystal much brighter than the rock the constant was reasoned
-about. And it is not 0.55 exactly for the rock either — `SCRIM_COLOR` is
+(The drop is 0.72 where the scrim's coverage is 0.55 because a crystal is far
+brighter than the rock the constant was reasoned about, so the same coverage
+takes more of it. And it is not 0.55 for the rock either — `SCRIM_COLOR` is
 `PALETTE.vacuum`, not black, so 0.55 coverage of it costs a lit rock ~0.46 of its
-luminance, not 0.55.)
+luminance.)
+
+**The landscape-phone crop shows something different, and deliberately so.** At
+that tick the counter has open sky behind it, and a scrim over black is invisible
+— which is the rule the whole treatment is built on: the world reads through it,
+and where there is no world there is nothing to dim. What that crop is evidence
+of is the *placement*: `ORE` clears the corner pause button with air to spare.
+The first cut of this branch did not, and that shot is why the rule lost its
+overhang (`ORE_RULE_OVERHANG`, deleted).
 
 ## A note for QA on the golden gate
 
