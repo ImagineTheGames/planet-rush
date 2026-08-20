@@ -37,6 +37,18 @@
  * {@link nameplateClusterClearance} rather than kept private precisely so a unit
  * test can pin it without a GPU (nameplates.test.ts).
  *
+ * **The keep-out (a0-115).** A label is world-anchored — it goes wherever its ship
+ * goes — and the HUD's readouts are not, so on some camera positions the two are
+ * in the same pixels. QA measured it at roughly one stop in seven: the grey word
+ * `ORE` and a teal `Rusty (EASY)` on the same corner, the R drawn across the E.
+ * Draw order does not answer it (this layer is already UNDER the counter and the
+ * collision was photographed anyway — type is mostly holes), so the label yields:
+ * it steps sideways by the least that clears the readouts, as far as it can while
+ * still standing over its own ship, and stands down for the frame when there is no
+ * such position. The rule and the argument live in {@link ./layout-exclusions};
+ * what a stood-down plate leaves behind is a {@link WithheldNameplate} on the
+ * ?debug=1 seam, so a label that yields is never a label that just disappeared.
+ *
  * **Pooling (GDD §4.3, risk 5).** Text objects are allocated once and reused: a
  * frame with N labels touches the first N pooled Texts (set text/tint/position —
  * a Text re-rasterises only when its *string* changes, which is rare in a stable
@@ -60,6 +72,11 @@ import { Container, Text } from 'pixi.js';
 import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, HEALTHBAR_LOCAL_HEIGHT } from './healthbar';
+// a0-115: a label is world-anchored and a readout is not, so on some camera
+// positions the two are in the same pixels. The rule — who yields, how far, and
+// what happens when yielding is not enough — is stated once in the registry's own
+// vocabulary and applied here; see that module's keep-out section for the argument.
+import { labelYieldsToReadouts } from './layout-exclusions';
 import type { Nameplate, NameplateKind } from './nameplates';
 import { hudTracking } from './instrument';
 import { FONT_BODY } from './typography';
@@ -201,6 +218,24 @@ export function nameplateRowLayout(centerX: number, w: NameplateRowWidths): Name
   return { sideX, nameX, suffixX, left, right, width: right - left };
 }
 
+/** No readouts to clear — the default, and what every caller that predates
+ *  a0-115 gets. Shared so an omitted argument allocates nothing per frame. */
+const NO_READOUTS: readonly Rect[] = [];
+
+/** The same rigid row, `dx` px to the side. The row is a rigid body (see
+ *  {@link nameplateRowLayout}), so a step aside is one addition per edge and the
+ *  order of the three tokens is untouched by construction. */
+function shiftRow(row: NameplateRow, dx: number): NameplateRow {
+  return {
+    sideX: row.sideX + dx,
+    nameX: row.nameX + dx,
+    suffixX: row.suffixX + dx,
+    left: row.left + dx,
+    right: row.right + dx,
+    width: row.width,
+  };
+}
+
 /**
  * Vertical clearance from the entity centre to the label's bottom edge, so the
  * label clears the entity's status cluster (a ship's health bar, a station's HP
@@ -253,9 +288,15 @@ export interface DrawnNameplate {
    *  test (and the evidence capture) can show a fighting ship's name and a calm
    *  one's name at the same number, not merely assert it. */
   alpha: number;
-  /** Label centre-x in screen space, CSS px (the entity it tracks) — the NAME's
-   *  centre, which is what stays pinned to the entity now that the side tag leads
-   *  the row (a0-38). */
+  /** Label centre-x in screen space, CSS px — the NAME's centre, which is what
+   *  stays pinned to the entity now that the side tag leads the row (a0-38).
+   *
+   *  It is the centre the name was DRAWN at, which is the entity's own x on all
+   *  but the frames where the plate stepped out of a readout's way (a0-115). On
+   *  those it is the entity's x plus the step, because every other field here
+   *  reports where the ink went and a mixture would be unreadable: `nameX` is
+   *  always `x − name/2`, and `left ≤ x ≤ right` always holds. The entity's own
+   *  position is the caller's — it is what the caller passed in. */
   x: number;
   /**
    * The row's drawn geometry, CSS px: the left edge of each token and the span of
@@ -281,6 +322,39 @@ export interface DrawnNameplate {
   local: boolean;
 }
 
+/**
+ * One label the layer decided NOT to draw this frame, and why — the other half of
+ * {@link DrawnNameplate}, and the reason a0-115's fix is not itself a bug.
+ *
+ * A label that yields to a HUD readout can end up withheld (there is no position
+ * that clears the readout while the plate still stands over its own ship), and a
+ * nameplate that silently disappears is exactly the kind of defect QA cannot tell
+ * from a rendering fault. So the layer keeps the receipt: under
+ * {@link NameplateView.enableDebugCapture} every withheld plate is recorded with
+ * the entity it belonged to and the reason it stood down, readable through
+ * {@link NameplateView.debugWithheld}. Nothing vanishes without a line about it.
+ *
+ * Never written in a normal build.
+ */
+export interface WithheldNameplate {
+  owner: PlayerId;
+  kind: NameplateKind;
+  /** The text that would have drawn. */
+  text: string;
+  /**
+   * Why it did not:
+   *
+   *  - `offscreen` — the row would have spilled off the canvas, the cull this
+   *    layer has always applied ("a partial label reads worse than none").
+   *  - `readout` — every position that clears the fixed HUD readouts would put
+   *    the plate off the ship it names (a0-115).
+   */
+  reason: 'offscreen' | 'readout';
+  /** Where the entity was, screen space CSS px — the centre the row was built on. */
+  x: number;
+  y: number;
+}
+
 export class NameplateView extends Container {
   private readonly labels: Text[] = [];
   /** Parallel pool for the recessive difficulty suffix, one per name slot; a name
@@ -296,14 +370,30 @@ export class NameplateView extends Container {
   private debugCapture = false;
   private readonly debugDrawn: DrawnNameplate[] = [];
   private debugCount = 0;
+  private readonly debugHeld: WithheldNameplate[] = [];
+  private debugHeldCount = 0;
 
   /**
    * Draw one frame of labels into the given viewport. `plates` come from
    * {@link nameplateModel}; each is centred on its entity and floated above the
    * entity's status cluster.
+   *
+   * `readouts` are the fixed HUD readouts' drawn rects this frame — the caller
+   * pulls them straight off the elements the layout registry records (`./hud`
+   * `readoutKeepOut`), never off a hard-coded corner, because the next one to be
+   * landed in will not be the one that was photographed. A label that would be
+   * drawn inside one of them steps aside, and stands down if it cannot: the rule,
+   * and the argument for it, are in `./layout-exclusions` (a0-115). Omit it and
+   * the layer behaves exactly as it did before that brief.
    */
-  update(plates: readonly Nameplate[], viewportWidth: number, viewportHeight: number): void {
+  update(
+    plates: readonly Nameplate[],
+    viewportWidth: number,
+    viewportHeight: number,
+    readouts: readonly Rect[] = NO_READOUTS,
+  ): void {
     let drawn = 0;
+    let held = 0;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -353,21 +443,46 @@ export class NameplateView extends Container {
       // one piece — the side tag is not decoration a ship can be labelled without,
       // so a row that does not fit takes the whole plate with it.
       if (row.left < 0 || top < 0 || row.right > viewportWidth || top + height > viewportHeight) {
+        t.visible = false;
         tm.visible = false;
         st.visible = false;
+        if (this.debugCapture) this.recordWithheld(held, plate, 'offscreen');
+        held++;
         continue;
       }
+
+      // a0-115: the readouts are fixed furniture and this label is not, so the
+      // label is the one that moves. `dx` is the smallest sideways step that
+      // clears every readout while the row still stands over its own entity;
+      // `withheld` means there is no such step and the plate stands down for this
+      // frame rather than being drawn through the word ORE.
+      const yielded = labelYieldsToReadouts(
+        { left: row.left, right: row.right, top, bottom },
+        plate.x,
+        plate.radius,
+        readouts,
+        viewportWidth,
+      );
+      if (yielded.withheld) {
+        t.visible = false;
+        tm.visible = false;
+        st.visible = false;
+        if (this.debugCapture) this.recordWithheld(held, plate, 'readout');
+        held++;
+        continue;
+      }
+      const dx = yielded.dx;
 
       t.visible = true;
       // Centre-anchored, so it is drawn AT the entity — `row.nameX` is that same
       // point expressed as the name's left edge, which is what the two tags and
       // the cull are measured from.
-      t.position.set(plate.x, bottom);
+      t.position.set(plate.x + dx, bottom);
       if (hasTeam) {
         tm.visible = true;
         tm.tint = plate.teamColor;
         tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
-        tm.position.set(row.sideX, bottom);
+        tm.position.set(row.sideX + dx, bottom);
       } else {
         tm.visible = false;
       }
@@ -376,16 +491,21 @@ export class NameplateView extends Container {
         st.tint = plate.color;
         st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
         // Left-anchored past the name, sharing its baseline.
-        st.position.set(row.suffixX, bottom);
+        st.position.set(row.suffixX + dx, bottom);
       } else {
         st.visible = false;
       }
-      if (this.debugCapture) this.recordDebug(drawn, plate, top, row);
+      // Everything downstream — the debug readback and the registered bounds —
+      // reads the row where it was DRAWN, not where it would have been: a rect
+      // that ignored the step would report the plate inside the counter it just
+      // stepped out of.
+      const placed = dx === 0 ? row : shiftRow(row, dx);
+      if (this.debugCapture) this.recordDebug(drawn, plate, top, placed, plate.x + dx);
       drawn++;
 
-      if (row.left < minX) minX = row.left;
+      if (placed.left < minX) minX = placed.left;
       if (top < minY) minY = top;
-      if (row.right > maxX) maxX = row.right;
+      if (placed.right > maxX) maxX = placed.right;
       if (top + height > maxY) maxY = top + height;
     }
 
@@ -393,6 +513,7 @@ export class NameplateView extends Container {
     this.drawnBounds =
       drawn > 0 ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null;
     this.debugCount = this.debugCapture ? drawn : 0;
+    this.debugHeldCount = this.debugCapture ? held : 0;
   }
 
   // --- ?debug=1 live-stage seam --------------------------------------------
@@ -411,12 +532,46 @@ export class NameplateView extends Container {
     return this.debugDrawn.slice(0, this.debugCount).map((d) => ({ ...d }));
   }
 
+  /** The labels the layer decided NOT to draw last frame, and why (a0-115) —
+   *  the receipt that keeps "it yielded" distinguishable from "it broke". Empty
+   *  unless {@link enableDebugCapture} was called. */
+  debugWithheld(): WithheldNameplate[] {
+    return this.debugHeld.slice(0, this.debugHeldCount).map((d) => ({ ...d }));
+  }
+
+  /** Record one withheld label into the reusable pool at `i` (grows to fit),
+   *  pooled exactly like {@link recordDebug} and just as cold in a normal build. */
+  private recordWithheld(
+    i: number,
+    plate: Nameplate,
+    reason: WithheldNameplate['reason'],
+  ): void {
+    let d = this.debugHeld[i];
+    if (!d) {
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, reason, x: plate.x, y: plate.y };
+      this.debugHeld[i] = d;
+      return;
+    }
+    d.owner = plate.owner;
+    d.kind = plate.kind;
+    d.text = plate.text;
+    d.reason = reason;
+    d.x = plate.x;
+    d.y = plate.y;
+  }
+
   /** Record one drawn label into the reusable pool at `i` (grows to fit). Only
    *  reached under {@link debugCapture}, so it costs nothing in a normal build. */
-  private recordDebug(i: number, plate: Nameplate, top: number, row: NameplateRow): void {
+  private recordDebug(
+    i: number,
+    plate: Nameplate,
+    top: number,
+    row: NameplateRow,
+    centerX: number,
+  ): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: plate.x, y: top, local: plate.local, sideX: row.sideX, nameX: row.nameX, suffixX: row.suffixX, left: row.left, right: row.right };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: centerX, y: top, local: plate.local, sideX: row.sideX, nameX: row.nameX, suffixX: row.suffixX, left: row.left, right: row.right };
       this.debugDrawn[i] = d;
       return;
     }
@@ -428,7 +583,7 @@ export class NameplateView extends Container {
     d.teamColor = plate.teamColor;
     d.color = plate.color;
     d.alpha = plate.alpha;
-    d.x = plate.x;
+    d.x = centerX;
     d.y = top;
     d.local = plate.local;
     d.sideX = row.sideX;

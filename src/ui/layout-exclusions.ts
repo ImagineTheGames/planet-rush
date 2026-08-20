@@ -186,3 +186,206 @@ export function exclusionViolations(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// The keep-out (a0-115) — a world-anchored label vs the fixed readouts
+// ---------------------------------------------------------------------------
+//
+// The table above pairs two elements that are each *somewhere in particular*.
+// a0-115 is the other shape of the same problem, and a table cannot express it:
+// a nameplate follows a ship, so it is not anywhere in particular — it is
+// wherever the ship is, which on roughly one camera position in seven is inside
+// the ore counter. QA measured it: the grey word `ORE` and the teal `Rusty
+// (EASY)` on the same pixels, the R drawn across the E, legible only because the
+// two are different colours (a0-111, 4 of 28 sampled stops).
+//
+// **Why the two texts collide even though one is drawn after the other.** The
+// nameplate layer is added to the HUD *before* every piece of corner chrome
+// (`./hud`'s `addChild` list), so the ore counter already wins the z-order and
+// already draws over the label. That is the "readout wins" option, shipped, and
+// QA photographed the collision anyway — because type is mostly holes. A 22 px
+// numeral covers perhaps a third of its own box; the label underneath shows
+// through the counters and the sidebearings, and the eye reads two overlapping
+// words rather than one word over a texture. Draw order separates a readout from
+// the WORLD (that is what a0-102's ground is for); it cannot separate a readout
+// from other TEXT. So the label has to not be there.
+//
+// **Which one yields.** The label. The readout is fixed furniture the player
+// looks *to* — the counter is at (contentX + PAD, PAD) on every frame of every
+// match, and a player who wants their banked total looks at that corner without
+// searching. The label is attached to something that can simply be somewhere
+// else a second later. Moving the readout was ruled out by the brief and would
+// not help anyway: the next world-anchored thing finds it wherever it goes.
+//
+// **What happens to the label, exactly** — and this matters, because a nameplate
+// that silently vanishes is its own bug:
+//
+//  1. It **steps aside**, horizontally, by the smallest distance that clears
+//     every readout it touches. Horizontally and not vertically because the
+//     label's bottom edge is not free: it is pinned just above its entity's
+//     health-bar cluster ({@link ./nameplates-view} `nameplateClusterClearance`),
+//     and pushing a label DOWN puts it on the bar it exists to stay off
+//     (nameplates rule 3). Sideways keeps the whole stack intact.
+//  2. It steps aside **only as far as the hull it names** — the row must still
+//     overlap the entity's own span on screen, `x ± radius`. Past that the plate
+//     is captioning open space, and a name floating beside an unrelated ship is a
+//     worse lie than no name. The bound is the entity's OWN size rather than a
+//     constant, so a station's plate — which is a long way above a big disc — gets
+//     the reach its subject actually has.
+//  3. If no such position exists, it is **withheld for that frame** — the same
+//     answer the layer has always given a label that would spill off the canvas
+//     ("a partial label reads worse than none"), and it comes back the instant
+//     the camera moves. It is withheld *visibly*: the layer records every
+//     withheld plate and why, on the ?debug=1 seam, so "it vanished" is a
+//     readback and not a rumour.
+//
+// This lives here rather than in ./nameplates-view for the same reason the table
+// does: it is a rule about rects and registry ids, it names no HUD type, and it
+// lifts into `@platform/layout-registry` unchanged on the day that file's owner
+// wants it.
+
+/**
+ * The registry ids of the **fixed readouts** — the HUD elements a player looks
+ * *to*, at a place they do not have to search for, and which therefore no
+ * world-anchored label may be drawn inside.
+ *
+ * Every one of these is screen-space chrome pinned to the content box's corners
+ * or its top-centre by `./hud` `layout()`:
+ *
+ *  - `ore-hud` — the banked-ore cluster, top-left. The rect a0-111 photographed.
+ *  - `banked-total` — the numeral inside it, registered in its own right by
+ *    `./hud` `describeLayout`. Inside `ore-hud`, and listed anyway: the ids are
+ *    the contract, and a table that quietly relied on containment would stop
+ *    covering the numeral the day the cluster is re-arranged.
+ *  - `wave-clock` — top-centre. **a0-116 is this same defect on this element.**
+ *    Not currently registered by `describeLayout` (argued at length there: its
+ *    `top-center` zone is a third of the viewport and the strip is intrinsically
+ *    wider, so registering it would turn QA's suite red on a finding nobody has
+ *    ruled on). Named here regardless — this list is what a label must clear,
+ *    not what the registry happens to publish today, and the caller feeds the
+ *    strip's drawn rect straight in.
+ *  - `station-hp` — the HOME cluster, top-right (GDD §2.2).
+ *  - `zoom-control` — the VIEW chip under HOME on touch (a0-74).
+ *
+ * Deliberately NOT here: `minimap` (a map of the world is a world surface, and a
+ * name over it is a name over the thing it names), `controls-strip` and the
+ * touch affordances (furniture the thumb finds, not type the eye reads),
+ * `healthbars` and `nameplates` themselves (both world-anchored — see the note
+ * on the over-ship bar in the a0-115 PR: two things that travel together cannot
+ * be separated by a keep-out).
+ */
+export const HUD_READOUT_IDS: readonly string[] = [
+  'ore-hud',
+  'banked-total',
+  'wave-clock',
+  'station-hp',
+  'zoom-control',
+];
+
+/**
+ * Clear air a world label keeps from a readout's rect, CSS px.
+ *
+ * Not zero, unlike {@link LayoutExclusion.gap}'s default. A bare exclusion is
+ * about two rects covering each other, and edge-to-edge is enough for that; this
+ * is about two runs of TEXT being told apart, and glyphs that end exactly where
+ * the next begins read as one word. Two pixels is the smallest gap that survives
+ * antialiasing on a 1× display.
+ */
+export const READOUT_KEEPOUT_PAD = 2;
+
+/** The readout rects out of a frame's registry entries, in the order
+ *  {@link HUD_READOUT_IDS} names them — the "use the registry rather than
+ *  hard-code the counter's corner" the brief asks for. Ids the frame does not
+ *  carry are skipped: an element that is not drawn is not in the way. */
+export function readoutRects(
+  entries: readonly LayoutEntry[],
+  ids: readonly string[] = HUD_READOUT_IDS,
+): Rect[] {
+  const out: Rect[] = [];
+  for (const id of ids) {
+    for (const e of entries) if (e.id === id) out.push(e.bounds);
+  }
+  return out;
+}
+
+/** What a world label does about the readouts this frame. */
+export interface LabelYield {
+  /**
+   * How far the label steps sideways, CSS px — `0` when it was already clear,
+   * negative left, positive right. Meaningless when {@link withheld}.
+   */
+  readonly dx: number;
+  /** True when no position clears the readouts within the label's reach, so the
+   *  label is not drawn at all this frame. */
+  readonly withheld: boolean;
+}
+
+/** Already clear, nothing to do — the answer on the overwhelming majority of
+ *  frames, allocated once so the common path costs nothing. */
+const STANDS: LabelYield = { dx: 0, withheld: false };
+
+/**
+ * Decide what a world-anchored label does about the fixed readouts: stand where
+ * it is, step aside by the least it can, or stand down for this frame.
+ *
+ * `row` is the label's drawn span in screen space — for a nameplate, the rigid
+ * side/name/tag row ({@link ./nameplates-view} `nameplateRowLayout`) with its own
+ * top and bottom. `anchorX` / `anchorRadius` are the screen centre and radius of
+ * the thing the label names, and they are what bounds the step: the row must still
+ * overlap that span afterwards (see the note above). `viewportWidth` bounds it the
+ * other way — a step that pushes the row off the canvas is not a step, it is the
+ * cull. The two are passed as numbers rather than as an entity object on purpose:
+ * this runs once per label per frame, and a per-plate object literal is garbage
+ * the pooled layer above it goes to some trouble not to make.
+ *
+ * The search is exhaustive rather than iterative, because it is tiny: the only
+ * positions worth trying are "flush left of readout *i*" and "flush right of
+ * readout *i*" for each readout in the way, plus standing still. Five readouts
+ * make eleven candidates; each is checked against ALL of them, so a step out of
+ * the ore counter that would land in the wave clock is simply not offered. The
+ * smallest surviving |dx| wins, and a tie goes to the rightward step so the
+ * choice is deterministic rather than dependent on the readouts' order.
+ */
+export function labelYieldsToReadouts(
+  row: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
+  anchorX: number,
+  anchorRadius: number,
+  readouts: readonly Rect[],
+  viewportWidth: number,
+  pad: number = READOUT_KEEPOUT_PAD,
+): LabelYield {
+  if (readouts.length === 0) return STANDS;
+
+  const width = row.right - row.left;
+  const height = row.bottom - row.top;
+  const clears = (dx: number): boolean => {
+    const shifted: Rect = {
+      x: row.left + dx - pad,
+      y: row.top - pad,
+      width: width + 2 * pad,
+      height: height + 2 * pad,
+    };
+    for (const r of readouts) if (rectOverlap(shifted, r)) return false;
+    return true;
+  };
+
+  if (clears(0)) return STANDS;
+
+  // How far it may go, in each direction, and still stand over its entity.
+  const reach = Math.max(0, anchorRadius);
+  const maxRight = anchorX + reach - row.left;
+  const maxLeft = anchorX - reach - row.right;
+
+  let best: number | null = null;
+  for (const r of readouts) {
+    for (const dx of [r.x - pad - row.right, r.x + r.width + pad - row.left]) {
+      if (dx < maxLeft || dx > maxRight) continue;
+      if (row.left + dx < 0 || row.right + dx > viewportWidth) continue;
+      if (!clears(dx)) continue;
+      if (best === null || Math.abs(dx) < Math.abs(best) || (Math.abs(dx) === Math.abs(best) && dx > best)) {
+        best = dx;
+      }
+    }
+  }
+  return best === null ? { dx: 0, withheld: true } : { dx: best, withheld: false };
+}

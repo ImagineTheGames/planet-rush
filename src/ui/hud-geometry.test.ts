@@ -30,7 +30,7 @@ import type { Point } from './alarm';
 // in a screen state where its instruction could not be followed.
 import { Onboarding } from './onboarding';
 import type { OnboardingSignals } from './onboarding';
-import { hudMetrics, hudSpace, hudType, scrimPlateau } from './instrument';
+import { HUD_TRACKING, hudMetrics, hudSpace, hudType, scrimPlateau } from './instrument';
 import { collapsedRect } from './minimap';
 import { healthBarFill, healthBarModel, healthBarTrack } from './healthbar';
 import type { Combatant } from './healthbar';
@@ -97,6 +97,22 @@ import type { AnnularSector, OreCounterLayout } from './hud-geometry';
 import { contentBox } from './viewport';
 import { pauseButtonRect } from './pause-menu';
 import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
+// a0-115's keep-out: the rule that a world-anchored label is never drawn inside a
+// fixed readout's rect, stated in the registry's own vocabulary next door.
+import {
+  HUD_READOUT_IDS,
+  READOUT_KEEPOUT_PAD,
+  labelYieldsToReadouts,
+  readoutRects,
+  rectOverlap,
+} from './layout-exclusions';
+import {
+  NAMEPLATE_FONT_SIZE,
+  nameplateClusterClearance,
+  nameplateRowLayout,
+} from './nameplates-view';
+import type { Nameplate } from './nameplates';
+
 import { textHeight, textWidth } from './font-metrics';
 import type { TypeSpec } from './font-metrics';
 import { TRACKING, WHEEL_HALO, wheelMetrics } from '../art/materials';
@@ -2318,5 +2334,413 @@ describe('an upgrade wedge is a touch target first (GDD §2.4)', () => {
         TOUCH_TARGET_MIN,
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The world-label keep-out (a0-115) — nothing lands in a readout
+// ---------------------------------------------------------------------------
+//
+// a0-111 failed the top-left corner on 4 of 28 sampled camera positions: the grey
+// word `ORE` and the teal nameplate `Rusty (EASY)` on the same pixels, the R of
+// Rusty drawn across the E of ORE. Two pieces of TEXT in one rect — which is a
+// different defect from the one a0-102 fixed. That brief gave the counter a
+// ground so the *world* behind it could not swallow it; a ground is no use
+// against something drawn in the HUD's own layer, and no use even when the
+// readout wins the z-order, which it already does (`./hud`'s display list puts
+// every corner group above the nameplate layer). Type is mostly holes: the label
+// underneath shows through the counters and the sidebearings of a 22px numeral,
+// and the eye reads two words rather than one word over a texture.
+//
+// The rule this suite holds the HUD to is therefore about placement, not paint,
+// and it is deliberately NOT about the ore counter: the counter is where it is,
+// and the next world-anchored thing will find it there too. It is driven off the
+// registry's ids — `./layout-exclusions` `HUD_READOUT_IDS` — so the same
+// assertion covers the wave clock (a0-116 is this exact collision on that
+// element), the HOME cluster and the VIEW chip without a line of new test.
+
+describe('the fixed readouts and the world labels that pass over them', () => {
+  /** A nameplate's tokens, measured on the real face at the real size — Oxanium
+   *  at 12px with `name` tracking, which is what {@link NAMEPLATE_FONT_SIZE} and
+   *  the view's `Text` style spell. Same discipline as nameplates.test.ts. */
+  const PLATE_TYPE = { face: 'body', size: NAMEPLATE_FONT_SIZE, tracking: HUD_TRACKING.name } as const;
+  const tokenWidth = (text: string): number => (text.length > 0 ? textWidth(text, PLATE_TYPE) : 0);
+  const PLATE_LINE = textHeight('Rusty', PLATE_TYPE);
+
+  /**
+   * The two plates that have to clear the corner, both of them real:
+   *
+   *  - `Rusty (EASY)` in FFA — the plate QA actually photographed inside the ore
+   *    counter, character for character.
+   *  - `ENEMY B Warden (BRUTAL)` in teams — the widest row the game can build
+   *    (side tag first since a0-38), because a wider row is the harder case for
+   *    "step aside without leaving your ship" and must not pass by being narrow.
+   */
+  const PLATES: readonly { readonly what: string; readonly side: string; readonly name: string; readonly suffix: string }[] = [
+    { what: 'Rusty (EASY)', side: '', name: 'Rusty', suffix: '(EASY)' },
+    { what: 'ENEMY B Warden (BRUTAL)', side: 'ENEMY B', name: 'Warden', suffix: '(BRUTAL)' },
+  ];
+
+  /** A ship-kind plate at a screen position, for the clearance the view floats the
+   *  row by — read off the view's own function so the label's vertical extent here
+   *  is the one it draws with, not a restatement of it. */
+  const SHIP_RADIUS = 12;
+  const shipPlate = (x: number, y: number): Nameplate => ({
+    owner: 3,
+    kind: 'ship',
+    text: 'Rusty',
+    suffix: '(EASY)',
+    teamLabel: '',
+    teamColor: 0xffffff,
+    color: 0xffffff,
+    x,
+    y,
+    radius: SHIP_RADIUS,
+    alpha: 1,
+    local: false,
+  });
+
+  /** The row a plate draws at `(x, y)`, in screen space: the rigid side/name/tag
+   *  row from the view's own layout function, floated above the entity's health-bar
+   *  cluster by the view's own clearance. */
+  const rowAt = (
+    plate: (typeof PLATES)[number],
+    x: number,
+    y: number,
+  ): { left: number; right: number; top: number; bottom: number } => {
+    const row = nameplateRowLayout(x, {
+      side: tokenWidth(plate.side),
+      name: tokenWidth(plate.name),
+      suffix: tokenWidth(plate.suffix),
+    });
+    const bottom = y - nameplateClusterClearance(shipPlate(x, y));
+    return { left: row.left, right: row.right, top: bottom - PLATE_LINE, bottom };
+  };
+
+  const asRect = (row: { left: number; right: number; top: number; bottom: number }): Rect => ({
+    x: row.left,
+    y: row.top,
+    width: row.right - row.left,
+    height: row.bottom - row.top,
+  });
+
+  /** A rect grown by the keep-out pad on all four sides — the air two runs of type
+   *  need to read as two rather than as one word. */
+  const pad = (r: Rect): Rect => ({
+    x: r.x - READOUT_KEEPOUT_PAD,
+    y: r.y - READOUT_KEEPOUT_PAD,
+    width: r.width + 2 * READOUT_KEEPOUT_PAD,
+    height: r.height + 2 * READOUT_KEEPOUT_PAD,
+  });
+
+  /** The counter's group-space layout pinned where `./hud` `layout()` pins the
+   *  group — `(contentBox.x + HUD_PAD, HUD_PAD)`, the content box's top-left corner
+   *  and never the screen's (a0-74). This is the rect the registry records as
+   *  `ore-hud`, and QA measured it at 16,16 by 52.9×75 on the frame they failed. */
+  const oreScreenRect = (layout: OreCounterLayout, contentX: number): Rect => ({
+    x: contentX + HUD_PAD,
+    y: HUD_PAD,
+    width: layout.ground.width,
+    height: layout.ground.height,
+  });
+
+  /** The clock's three readouts at their longest, the same estimate the a0-24
+   *  clearance test uses — generous on purpose, since a wider strip is the harder
+   *  keep-out and cannot make this pass by accident. */
+  const CLOCK_LINES: readonly { chars: number; size: number }[] = [
+    { chars: `WAVE 5/5 · ${WAVE_NAMES.reduce((a, b) => (b.length > a.length ? b : a), '')}`.length, size: 15 },
+    { chars: 'FINAL WAVE'.length, size: 14 },
+    { chars: 'MATCH 12:00'.length, size: 13 },
+  ];
+
+  /**
+   * A frame's worth of readout registry entries for a profile, built from the same
+   * geometry the views draw with — this is the "drive it from the registry rather
+   * than hard-code the counter's corner" the brief asks for. Every id here is one
+   * `./hud` `describeLayout` pushes (`wave-clock` excepted, and argued there and in
+   * `HUD_READOUT_IDS`), and every rect is the element's DRAWN footprint.
+   */
+  const readoutEntries = (vp: Viewport, isTouch: boolean): LayoutEntry[] => {
+    const box = contentBox(vp);
+    const m = hudMetrics(box.width, box.height);
+    const ore = oreCounterLayout(
+      {
+        width: textWidth('ORE', { face: 'heading', size: hudType(HUD_EYEBROW_TYPE, m), tracking: TRACKING.eyebrow }),
+        height: textHeight('ORE', { face: 'heading', size: hudType(HUD_EYEBROW_TYPE, m), tracking: TRACKING.eyebrow }),
+      },
+      {
+        // A four-figure bank: the counter is at its widest late in a match, which
+        // is when the corner is most likely to be in the way.
+        width: textWidth('1204', { face: 'bodyBold', size: hudType(ORE_BANK_TYPE, m), tracking: TRACKING.name }),
+        height: textHeight('1204', { face: 'bodyBold', size: hudType(ORE_BANK_TYPE, m), tracking: TRACKING.name }),
+      },
+      m,
+    );
+    const clock = waveClockLayout(
+      vp.width,
+      vp.height,
+      CLOCK_LINES.map(({ chars, size }) => {
+        const px = hudType(size, m);
+        return { width: Math.ceil(chars * px * 0.85), height: Math.ceil(px * 1.3) };
+      }),
+      false,
+    );
+    const zoom = zoomControlBounds(box.width, box.height, isTouch);
+    const entries: LayoutEntry[] = [
+      { id: 'ore-hud', anchor: { region: 'top-left', margin: HUD_PAD }, bounds: oreScreenRect(ore, box.x) },
+      { id: 'wave-clock', anchor: { region: 'top-center', margin: HUD_PAD }, bounds: clock.bounds },
+      { id: 'station-hp', anchor: { region: 'top-right', margin: HUD_PAD }, bounds: stationHpBounds(vp.width, 40) },
+    ];
+    if (zoom) {
+      entries.push({
+        id: 'zoom-control',
+        anchor: { region: 'top-right', margin: HUD_PAD },
+        bounds: { ...zoom, x: zoom.x + box.x },
+      });
+    }
+    // Two things that are NOT readouts, carried through the same call so the
+    // filter is exercised rather than assumed: a label passing over the minimap or
+    // the controls strip is not a defect and must not be moved for one.
+    entries.push({ id: 'minimap', anchor: { region: 'bottom-right', margin: HUD_PAD }, bounds: collapsedRect(vp, isTouch, {}) });
+    entries.push({ id: 'alarm-frame', anchor: FULL, bounds: alarmFrameBounds(vp.width, vp.height) });
+    return entries;
+  };
+
+  it('no world label is drawn inside a HUD readout', () => {
+    // The sweep: a ship at every position on a 6px lattice over the whole
+    // viewport, on every profile, both device answers, with both plates. QA
+    // sampled 28 camera positions and 4 of them landed something in the counter;
+    // this samples tens of thousands and asserts on all of them, which is the
+    // point of doing it here rather than with a camera.
+    const STEP = 6;
+    let sampled = 0;
+    let collided = 0;
+    let stepped = 0;
+    let withheld = 0;
+    let maxStep = 0;
+
+    for (const { name, vp, isTouch } of PROFILES) {
+      const entries = readoutEntries(vp, isTouch);
+      const readouts = readoutRects(entries);
+      // The filter did its job: the minimap and the alarm frame are in the frame
+      // and are not keep-outs, so a label may cross them freely.
+      expect(readouts.length, `${name}: no readouts resolved out of the frame`).toBe(
+        entries.filter((e) => HUD_READOUT_IDS.includes(e.id)).length,
+      );
+
+      for (const plate of PLATES) {
+        for (let y = 0; y <= vp.height; y += STEP) {
+          for (let x = 0; x <= vp.width; x += STEP) {
+            const row = rowAt(plate, x, y);
+            // The layer's own edge cull runs first and is unchanged: a row that
+            // would spill off the canvas is not drawn at all, so it is not a
+            // candidate for anything this rule has to say.
+            if (row.left < 0 || row.top < 0 || row.right > vp.width || row.bottom > vp.height) continue;
+            sampled++;
+
+            // "In the way" is measured with the same pad the rule keeps, so a
+            // plate that merely grazes a readout counts as a collision here too —
+            // otherwise a legitimate step would look like a label moved for
+            // nothing.
+            const before = pad(asRect(row));
+            const wasIn = readouts.some((r) => rectsIntersect(before, r));
+            if (wasIn) collided++;
+
+            const yielded = labelYieldsToReadouts(row, x, SHIP_RADIUS, readouts, vp.width);
+            if (yielded.withheld) {
+              // Standing down is a legal answer, and only when the label really
+              // had nowhere to go: a plate that was already clear must never be
+              // withheld.
+              expect(wasIn, `${name} / ${plate.what} @ ${x},${y}: a clear label was withheld`).toBe(true);
+              // There are exactly two reasons a plate can have nowhere to go, and
+              // both are geometric facts about the frame rather than choices this
+              // rule makes: the ship is in a readout's own column (the step is
+              // horizontal, so a ship UNDER a readout has no side to step to), or
+              // it is in a gap between two readouts narrower than its row — the
+              // 844×390 landscape phone leaves 154px between the wave clock and
+              // the HOME cluster, and `ENEMY B Warden (BRUTAL)` is 175.6px wide.
+              // The single-readout case below pins the first exactly; here the
+              // claim is only that a label is never withheld while it was clear.
+              withheld++;
+              continue;
+            }
+            if (yielded.dx !== 0) {
+              stepped++;
+              maxStep = Math.max(maxStep, Math.abs(yielded.dx));
+              // It stepped aside, and it is still standing over the ship it names
+              // — the bound that stops "yield" from turning into "caption the
+              // wrong hull".
+              expect(row.left + yielded.dx, `${name} / ${plate.what} @ ${x},${y}`).toBeLessThanOrEqual(x + SHIP_RADIUS + 1e-6);
+              expect(row.right + yielded.dx, `${name} / ${plate.what} @ ${x},${y}`).toBeGreaterThanOrEqual(x - SHIP_RADIUS - 1e-6);
+              // …and it stayed on the canvas, so a step never becomes a clip.
+              expect(row.left + yielded.dx, `${name} / ${plate.what} @ ${x},${y}`).toBeGreaterThanOrEqual(-1e-6);
+              expect(row.right + yielded.dx, `${name} / ${plate.what} @ ${x},${y}`).toBeLessThanOrEqual(vp.width + 1e-6);
+            }
+
+            // THE ASSERTION. Wherever the label ended up, it is not in a readout —
+            // and not merely flush against one: the pad is the air two runs of
+            // type need to be read as two.
+            const after = asRect({ ...row, left: row.left + yielded.dx, right: row.right + yielded.dx });
+            const padded = pad(after);
+            for (let i = 0; i < readouts.length; i++) {
+              const r = readouts[i]!;
+              expect(
+                rectsIntersect(padded, r),
+                `${name} / ${plate.what}: a ship at (${x}, ${y}) draws its label at ` +
+                  `${fmt(after)}, inside the readout ${fmt(r)} — ` +
+                  `${yielded.dx === 0 ? 'it did not step aside at all' : `stepping ${yielded.dx.toFixed(1)}px was not enough`}`,
+              ).toBe(false);
+            }
+          }
+        }
+      }
+    }
+
+    // Not vacuous: a real share of the sampled positions put a label in a readout
+    // before the rule ran — QA found 4 in 28 by hand — and both answers the rule
+    // has are actually taken.
+    expect(sampled, 'nothing was sampled').toBeGreaterThan(10000);
+    expect(collided, 'no sampled position collided — the sweep is not exercising the rule').toBeGreaterThan(200);
+    expect(stepped + withheld).toBe(collided);
+    expect(stepped, 'no label ever stepped aside — the rule only knows how to drop').toBeGreaterThan(0);
+    expect(withheld, 'no label ever stood down — the floor of the rule is untested').toBeGreaterThan(0);
+    // A step is bounded by construction — the furthest a plate can travel is the
+    // distance from its own anchor to the far edge of its row, plus the hull's
+    // radius. Asserted against that derivation rather than against a number, so a
+    // longer name widens the bound honestly instead of failing here.
+    const widestReach = Math.max(
+      ...PLATES.map((p) => {
+        const r = nameplateRowLayout(0, {
+          side: tokenWidth(p.side),
+          name: tokenWidth(p.name),
+          suffix: tokenWidth(p.suffix),
+        });
+        return Math.max(-r.left, r.right);
+      }),
+    );
+    expect(maxStep).toBeLessThanOrEqual(widestReach + SHIP_RADIUS + 1e-6);
+
+    // WHICH answer a collision gets depends on how wide the readout is, and it is
+    // worth being exact rather than hopeful about that, because "yield" sounds
+    // like "move" and across the whole sweep it is mostly "stand down": the wave
+    // clock and the HOME cluster are 140–300px wide and a plate can travel about
+    // 50, so a ship dead behind either has nowhere to be. That is the right answer
+    // there — a name 150px from its hull names the wrong hull — and it is not the
+    // answer for the element this brief is about. Against the ore counter alone,
+    // on the phone QA photographed, stepping aside is what almost always happens.
+    const qa = PROFILES.find((p) => p.name === 'qa-phone/landscape')!;
+    const counterOnly = readoutRects(readoutEntries(qa.vp, qa.isTouch), ['ore-hud']);
+    expect(counterOnly).toHaveLength(1);
+    let counterStepped = 0;
+    let counterHeld = 0;
+    let counterHeldMaxX = -Infinity;
+    let counterStepMinX = Infinity;
+    for (let y = 0; y <= qa.vp.height; y += STEP) {
+      for (let x = 0; x <= qa.vp.width; x += STEP) {
+        const row = rowAt(PLATES[0]!, x, y);
+        if (row.left < 0 || row.top < 0 || row.right > qa.vp.width || row.bottom > qa.vp.height) continue;
+        if (!counterOnly.some((r) => rectsIntersect(pad(asRect(row)), r))) continue;
+        if (labelYieldsToReadouts(row, x, SHIP_RADIUS, counterOnly, qa.vp.width).withheld) {
+          counterHeld++;
+          counterHeldMaxX = Math.max(counterHeldMaxX, x);
+        } else {
+          counterStepped++;
+          counterStepMinX = Math.min(counterStepMinX, x);
+        }
+      }
+    }
+    expect(counterStepped + counterHeld, 'the counter is never in the way at all').toBeGreaterThan(50);
+    expect(counterStepped, 'no plate ever escaped the ore counter by stepping aside').toBeGreaterThan(0);
+    // Where the line falls, exactly, on the element QA photographed: a ship clear
+    // of the counter's own column keeps its name — every one of them — and a ship
+    // behind the counter loses it, which is the case where there was never a
+    // reading of the plate to preserve. `counterHeldMaxX` is the rightmost ship
+    // that stood down and it is inside the counter; `counterStepMinX` is the
+    // leftmost that stepped and it is outside.
+    expect(counterHeldMaxX, 'a ship clear of the counter still lost its name').toBeLessThan(
+      counterOnly[0]!.x + counterOnly[0]!.width,
+    );
+    expect(counterStepMinX, 'a ship under the counter kept a name it had no room for').toBeGreaterThan(
+      counterOnly[0]!.x,
+    );
+  });
+
+  it('the frame QA photographed, before and after', () => {
+    // a0-111's own numbers, not a recomputation of them: the ore counter's
+    // registered rect on the 798×384 phone was 16,16 by 52.9×75 logical, and the
+    // largest nameplate intersection measured inside it was 20.3 × 16.
+    const counter: Rect = { x: 16, y: 16, width: 52.9, height: 75 };
+    const vp: Viewport = { width: 798, height: 384 };
+    expect(oreScreenRect(
+      oreCounterLayout(
+        { width: textWidth('ORE', { face: 'heading', size: hudType(HUD_EYEBROW_TYPE, hudMetrics(vp.width, vp.height)), tracking: TRACKING.eyebrow }), height: 11 },
+        { width: textWidth('3', { face: 'bodyBold', size: hudType(ORE_BANK_TYPE, hudMetrics(vp.width, vp.height)), tracking: TRACKING.name }), height: 22 },
+        hudMetrics(vp.width, vp.height),
+      ),
+      contentBox(vp).x,
+    ).x, 'the counter is pinned to the content box corner, as QA measured it').toBeCloseTo(counter.x, 6);
+
+    // A `Rusty (EASY)` plate placed to reproduce that overlap exactly: its row
+    // starts 20.3px inside the counter's right edge and its 16px line sits wholly
+    // inside the counter's 75px depth.
+    const plate = PLATES[0]!;
+    const row0 = nameplateRowLayout(0, {
+      side: 0,
+      name: tokenWidth(plate.name),
+      suffix: tokenWidth(plate.suffix),
+    });
+    // Put the row's left edge at 48.6 so it overlaps the counter by 20.3px.
+    const x = 48.6 - row0.left;
+    const row = { left: 48.6, right: 48.6 + row0.width, top: 40, bottom: 40 + 16 };
+
+    // BEFORE: exactly the frame in the verdict — the two rects share 20.3 × 16.
+    const overlapBefore = rectOverlap(asRect(row), counter)!;
+    expect(overlapBefore.width, 'QA measured 20.3 logical px of shared width').toBeCloseTo(20.3, 1);
+    expect(overlapBefore.height, 'and 16 of shared height — the whole label line').toBeCloseTo(16, 6);
+
+    // AFTER: the label steps out to the counter's right edge plus the keep-out
+    // pad, and shares nothing with it. It does NOT vanish — the ship at x is far
+    // enough right that the row still stands over it.
+    const yielded = labelYieldsToReadouts(row, x, SHIP_RADIUS, [counter], vp.width);
+    expect(yielded.withheld, 'this plate had somewhere to go and should have gone there').toBe(false);
+    expect(yielded.dx, 'flush past the counter, plus the pad').toBeCloseTo(
+      counter.x + counter.width + READOUT_KEEPOUT_PAD - row.left,
+      6,
+    );
+    const after = asRect({ ...row, left: row.left + yielded.dx, right: row.right + yielded.dx });
+    expect(rectOverlap(after, counter), `label ${fmt(after)} still shares pixels with ${fmt(counter)}`).toBeNull();
+    expect(after.x, 'and it clears the counter by the pad, not by a hair').toBeCloseTo(
+      counter.x + counter.width + READOUT_KEEPOUT_PAD,
+      6,
+    );
+    // …and it is still standing over the hull it names — the row overlaps the
+    // ship's own span on screen, which is the bound the step is allowed up to.
+    expect(after.x).toBeLessThanOrEqual(x + SHIP_RADIUS);
+    expect(after.x + after.width).toBeGreaterThanOrEqual(x - SHIP_RADIUS);
+  });
+
+  it('a label that cannot step aside stands down, and only then', () => {
+    // The floor of the rule, stated as its own case because it is the part that
+    // could become a silent disappearance. A ship dead behind a wide readout has
+    // no position that clears it while still standing over the hull, so its plate
+    // is withheld — and the layer records the fact (nameplates-view
+    // `WithheldNameplate`), which is what keeps this from being indistinguishable
+    // from a rendering fault.
+    const wide: Rect = { x: 0, y: 0, width: 400, height: 100 };
+    const row = { left: 150, right: 250, top: 40, bottom: 56 };
+    expect(labelYieldsToReadouts(row, 200, SHIP_RADIUS, [wide], 800)).toEqual({ dx: 0, withheld: true });
+
+    // …and it is genuinely the reach that binds, not the readout: the same plate
+    // beside a narrow readout steps out instead of standing down.
+    const narrow: Rect = { x: 120, y: 0, width: 60, height: 100 };
+    const out = labelYieldsToReadouts(row, 200, SHIP_RADIUS, [narrow], 800);
+    expect(out.withheld).toBe(false);
+    expect(out.dx).toBeCloseTo(narrow.x + narrow.width + READOUT_KEEPOUT_PAD - row.left, 6);
+
+    // A step out of one readout is never a step into the next: with the wave clock
+    // where the ore counter's exit would have put it, the plate stands down rather
+    // than swapping which readout it is drawn through.
+    const secondReadout: Rect = { x: 182, y: 0, width: 200, height: 100 };
+    expect(labelYieldsToReadouts(row, 200, SHIP_RADIUS, [narrow, secondReadout], 800).withheld).toBe(true);
   });
 });
