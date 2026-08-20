@@ -1,0 +1,558 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "capturedAgainst": "origin/main @ e498b831, which INCLUDES a0-116 (PR #493, merged). This is a test of that fix: the arrow-vs-clock frames here were all taken against a bundle built from e498b831.",
+  "staging": "__oreHudStage.mine(0) — the local station left standing and the ship parked at station + (900, 900), so home is off screen; plus a held siege: __planetRush.damageCore(0, 2) every 400ms above a 30 HP floor",
+  "alarmPolls": 20,
+  "waveClockInTheRegistry": false,
+  "waveClockNote": "src/ui/hud.ts describeLayout still does not register `wave-clock` (its top-center zone is a third of the viewport and the strip is wider). a0-115 added it to HUD_READOUT_IDS as a nameplate keep-out, which is a rule inside the HUD, not a rect a harness can read. So there is no intersection number for this element and this note does not invent one — the verdict is read off the magnified crop.",
+  "a0111Bearing": {
+    "shot": "desktop-1280x800-arrow-0-a0111-bearing.png",
+    "prompt": {
+      "visible": true,
+      "text": "Your station is under attack — follow the arrow",
+      "wrapWidth": 904,
+      "width": 545.76,
+      "height": 19
+    },
+    "world": {
+      "left": 1744,
+      "top": 1700,
+      "right": 3024,
+      "bottom": 2500,
+      "width": 1280,
+      "height": 800
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "coreHp": 64,
+    "ship": {
+      "x": 2384,
+      "y": 2100,
+      "vx": 0,
+      "vy": 0
+    },
+    "arrowDrawn": true,
+    "arrowRect": {
+      "x": 525.6444632743022,
+      "y": 84.99999999999997,
+      "width": 19.78650849586188,
+      "height": 24.71743204165611
+    },
+    "arrowCentre": {
+      "x": 535.5377175222332,
+      "y": 97.35871602082803
+    },
+    "arrowDistanceFromHorizontalCentre": 104.5,
+    "alarmFrameDrawn": true,
+    "promptDrawn": true,
+    "elements": [
+      "ship-local",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "controls-strip",
+      "station-hp",
+      "onboarding",
+      "nameplates",
+      "minimap",
+      "healthbars",
+      "alarm-frame",
+      "alarm-arrow"
+    ]
+  },
+  "nearestTopCentre": {
+    "stop": 1,
+    "tappedAt": {
+      "x": 640,
+      "y": 720
+    },
+    "shot": "desktop-1280x800-arrow-sweep-1.png",
+    "prompt": {
+      "visible": true,
+      "text": "Your station is under attack — follow the arrow",
+      "wrapWidth": 904,
+      "width": 545.76,
+      "height": 19
+    },
+    "world": {
+      "left": 1212.457697606473,
+      "top": 1984,
+      "right": 2492.4576976064727,
+      "bottom": 2784,
+      "width": 1279.9999999999998,
+      "height": 800
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "coreHp": 30,
+    "ship": {
+      "x": 1852.457697606473,
+      "y": 2384,
+      "vx": 0.000004792713212728782,
+      "vy": 0
+    },
+    "arrowDrawn": true,
+    "arrowRect": {
+      "x": 681.9865892891554,
+      "y": 85,
+      "width": 20.672635353112128,
+      "height": 23.9960160605214
+    },
+    "arrowCentre": {
+      "x": 692.3229069657115,
+      "y": 96.9980080302607
+    },
+    "arrowDistanceFromHorizontalCentre": 52.3,
+    "alarmFrameDrawn": true,
+    "promptDrawn": true,
+    "elements": [
+      "ship-local",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "controls-strip",
+      "station-hp",
+      "onboarding",
+      "minimap",
+      "healthbars",
+      "alarm-frame",
+      "alarm-arrow",
+      "tap-waypoint-marker"
+    ]
+  },
+  "sweep": [
+    {
+      "stop": 0,
+      "tappedAt": {
+        "x": 128,
+        "y": 400
+      },
+      "shot": "desktop-1280x800-arrow-sweep-0.png",
+      "prompt": {
+        "visible": true,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1212.459841757976,
+        "top": 1700,
+        "right": 2492.459841757976,
+        "bottom": 2500,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 34,
+      "ship": {
+        "x": 1852.459841757976,
+        "y": 2100,
+        "vx": -0.012606473734091168,
+        "vy": 0
+      },
+      "arrowDrawn": true,
+      "arrowRect": {
+        "x": 698.667876378723,
+        "y": 84.99999999999997,
+        "width": 20.44292051073944,
+        "height": 24.305575839785476
+      },
+      "arrowCentre": {
+        "x": 708.8893366340927,
+        "y": 97.15278791989272
+      },
+      "arrowDistanceFromHorizontalCentre": 68.9,
+      "alarmFrameDrawn": true,
+      "promptDrawn": true,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "onboarding",
+        "minimap",
+        "healthbars",
+        "alarm-frame",
+        "alarm-arrow"
+      ]
+    },
+    {
+      "stop": 1,
+      "tappedAt": {
+        "x": 640,
+        "y": 720
+      },
+      "shot": "desktop-1280x800-arrow-sweep-1.png",
+      "prompt": {
+        "visible": true,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1212.457697606473,
+        "top": 1984,
+        "right": 2492.4576976064727,
+        "bottom": 2784,
+        "width": 1279.9999999999998,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 1852.457697606473,
+        "y": 2384,
+        "vx": 0.000004792713212728782,
+        "vy": 0
+      },
+      "arrowDrawn": true,
+      "arrowRect": {
+        "x": 681.9865892891554,
+        "y": 85,
+        "width": 20.672635353112128,
+        "height": 23.9960160605214
+      },
+      "arrowCentre": {
+        "x": 692.3229069657115,
+        "y": 96.9980080302607
+      },
+      "arrowDistanceFromHorizontalCentre": 52.3,
+      "alarmFrameDrawn": true,
+      "promptDrawn": true,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "onboarding",
+        "minimap",
+        "healthbars",
+        "alarm-frame",
+        "alarm-arrow",
+        "tap-waypoint-marker"
+      ]
+    },
+    {
+      "stop": 2,
+      "tappedAt": {
+        "x": 1152,
+        "y": 400
+      },
+      "shot": "desktop-1280x800-arrow-sweep-2.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1743.9978569867358,
+        "top": 1984,
+        "right": 3023.9978569867358,
+        "bottom": 2784,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 2383.9978569867358,
+        "y": 2384,
+        "vx": 0.01260647364109084,
+        "vy": 0
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "minimap",
+        "healthbars"
+      ]
+    },
+    {
+      "stop": 3,
+      "tappedAt": {
+        "x": 640,
+        "y": 80
+      },
+      "shot": "desktop-1280x800-arrow-sweep-3.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1743.9999995274134,
+        "top": 1644.2403878646921,
+        "right": 3023.9999995274134,
+        "bottom": 2444.240387864692,
+        "width": 1280,
+        "height": 799.9999999999998
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 2383.9999995274134,
+        "y": 2044.2403878646921,
+        "vx": -1.852388827532356e-12,
+        "vy": -0.0013055008541768688
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "nameplates",
+        "minimap",
+        "healthbars"
+      ]
+    },
+    {
+      "stop": 4,
+      "tappedAt": {
+        "x": 192,
+        "y": 680
+      },
+      "shot": "desktop-1280x800-arrow-sweep-4.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1279.2870502389574,
+        "top": 1934.6857670159193,
+        "right": 2559.2870502389574,
+        "bottom": 2734.6857670159193,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 1919.2870502389574,
+        "y": 2334.6857670159193,
+        "vx": -0.006030529505691277,
+        "vy": 0.0037690842859200917
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "minimap",
+        "healthbars"
+      ]
+    },
+    {
+      "stop": 5,
+      "tappedAt": {
+        "x": 1088,
+        "y": 680
+      },
+      "shot": "desktop-1280x800-arrow-sweep-5.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1727.6949760735856,
+        "top": 1984,
+        "right": 3007.6949760735856,
+        "bottom": 2784,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 2367.6949760735856,
+        "y": 2384,
+        "vx": -1.1393888226260305,
+        "vy": 0
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "minimap",
+        "healthbars",
+        "tap-waypoint-marker"
+      ]
+    },
+    {
+      "stop": 6,
+      "tappedAt": {
+        "x": 1088,
+        "y": 120
+      },
+      "shot": "desktop-1280x800-arrow-sweep-6.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1744,
+        "top": 1708.1526287140723,
+        "right": 3024,
+        "bottom": 2508.1526287140723,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 2384,
+        "y": 2108.1526287140723,
+        "vx": 0,
+        "vy": -4.003433344922785
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "nameplates",
+        "minimap",
+        "healthbars",
+        "tap-waypoint-marker"
+      ]
+    },
+    {
+      "stop": 7,
+      "tappedAt": {
+        "x": 192,
+        "y": 120
+      },
+      "shot": "desktop-1280x800-arrow-sweep-7.png",
+      "prompt": {
+        "visible": false,
+        "text": "Your station is under attack — follow the arrow",
+        "wrapWidth": 904,
+        "width": 545.76,
+        "height": 19
+      },
+      "world": {
+        "left": 1279.204962627853,
+        "top": 1416.8127244294938,
+        "right": 2559.204962627853,
+        "bottom": 2216.8127244294938,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "coreHp": 30,
+      "ship": {
+        "x": 1919.204962627853,
+        "y": 1816.8127244294938,
+        "vx": -0.012983053598523123,
+        "vy": -0.008076840386086033
+      },
+      "arrowDrawn": false,
+      "arrowRect": null,
+      "arrowCentre": null,
+      "arrowDistanceFromHorizontalCentre": null,
+      "alarmFrameDrawn": false,
+      "promptDrawn": false,
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "ore-hud",
+        "banked-total",
+        "controls-strip",
+        "station-hp",
+        "nameplates",
+        "minimap",
+        "healthbars"
+      ]
+    }
+  ]
+}

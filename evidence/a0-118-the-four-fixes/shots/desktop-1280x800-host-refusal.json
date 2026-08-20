@@ -1,0 +1,438 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?gate=0 on the production bundle — the front door, walked (no ?freeze: the build stamp is in frame)",
+  "route": "front door -> PLAY -> the doors -> a REAL press on HOST, with no allocator on this box to reach",
+  "pressedHostAt": {
+    "x": 640,
+    "y": 483.5
+  },
+  "doorsBeforeThePress": [
+    {
+      "door": "campaign",
+      "centre": {
+        "x": 640,
+        "y": 301.5
+      },
+      "bounds": {
+        "x": 240,
+        "y": 265.5,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "solo",
+      "centre": {
+        "x": 640,
+        "y": 392.5
+      },
+      "bounds": {
+        "x": 240,
+        "y": 352.5,
+        "width": 800,
+        "height": 80
+      }
+    },
+    {
+      "door": "create",
+      "centre": {
+        "x": 640,
+        "y": 483.5
+      },
+      "bounds": {
+        "x": 240,
+        "y": 447.5,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "join",
+      "centre": {
+        "x": 640,
+        "y": 570.5
+      },
+      "bounds": {
+        "x": 240,
+        "y": 534.5,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "back",
+      "centre": {
+        "x": 114,
+        "y": 754
+      },
+      "bounds": {
+        "x": 44,
+        "y": 726,
+        "width": 140,
+        "height": 56
+      }
+    }
+  ],
+  "doors": [
+    {
+      "door": "campaign",
+      "centre": {
+        "x": 640,
+        "y": 350.1875
+      },
+      "bounds": {
+        "x": 240,
+        "y": 314.1875,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "solo",
+      "centre": {
+        "x": 640,
+        "y": 441.1875
+      },
+      "bounds": {
+        "x": 240,
+        "y": 401.1875,
+        "width": 800,
+        "height": 80
+      }
+    },
+    {
+      "door": "create",
+      "centre": {
+        "x": 640,
+        "y": 532.1875
+      },
+      "bounds": {
+        "x": 240,
+        "y": 496.1875,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "join",
+      "centre": {
+        "x": 640,
+        "y": 619.1875
+      },
+      "bounds": {
+        "x": 240,
+        "y": 583.1875,
+        "width": 800,
+        "height": 72
+      }
+    },
+    {
+      "door": "back",
+      "centre": {
+        "x": 114,
+        "y": 754
+      },
+      "bounds": {
+        "x": 44,
+        "y": 726,
+        "width": 140,
+        "height": 56
+      }
+    }
+  ],
+  "reach": [
+    {
+      "door": "campaign",
+      "at": {
+        "x": 640,
+        "y": 350.1875
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "solo",
+      "at": {
+        "x": 640,
+        "y": 441.1875
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "create",
+      "at": {
+        "x": 640,
+        "y": 532.1875
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "join",
+      "at": {
+        "x": 640,
+        "y": 619.1875
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "back",
+      "at": {
+        "x": 114,
+        "y": 754
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    }
+  ],
+  "domElementsCoveringADoor": [
+    {
+      "tag": "div",
+      "text": "",
+      "zIndex": "auto",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800
+      },
+      "coversDoors": [
+        {
+          "door": "campaign",
+          "intersection": {
+            "x": 240,
+            "y": 314.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "solo",
+          "intersection": {
+            "x": 240,
+            "y": 401.1875,
+            "width": 800,
+            "height": 80
+          }
+        },
+        {
+          "door": "create",
+          "intersection": {
+            "x": 240,
+            "y": 496.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "join",
+          "intersection": {
+            "x": 240,
+            "y": 583.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "back",
+          "intersection": {
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
+          }
+        }
+      ]
+    }
+  ],
+  "domElementsDrawn": 6,
+  "allDomOverlays": [
+    {
+      "tag": "div",
+      "text": "",
+      "zIndex": "auto",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800
+      },
+      "coversDoors": [
+        {
+          "door": "campaign",
+          "intersection": {
+            "x": 240,
+            "y": 314.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "solo",
+          "intersection": {
+            "x": 240,
+            "y": 401.1875,
+            "width": 800,
+            "height": 80
+          }
+        },
+        {
+          "door": "create",
+          "intersection": {
+            "x": 240,
+            "y": 496.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "join",
+          "intersection": {
+            "x": 240,
+            "y": 583.1875,
+            "width": 800,
+            "height": 72
+          }
+        },
+        {
+          "door": "back",
+          "intersection": {
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
+          }
+        }
+      ]
+    },
+    {
+      "tag": "div",
+      "text": "#pr-connect-trace{position:fixed;z-index:2147483646;pointer-",
+      "zIndex": "2147483646",
+      "rect": {
+        "x": 400,
+        "y": 192,
+        "width": 480,
+        "height": 69.375
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "p",
+      "text": "DOWNLOAD LOG to report this.",
+      "zIndex": "auto",
+      "rect": {
+        "x": 547,
+        "y": 192,
+        "width": 186,
+        "height": 18.1875
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "div",
+      "text": "RETRYDOWNLOAD LOG",
+      "zIndex": "auto",
+      "rect": {
+        "x": 490.609375,
+        "y": 217.375,
+        "width": 298.78125,
+        "height": 44
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "button",
+      "text": "RETRY",
+      "zIndex": "auto",
+      "rect": {
+        "x": 490.609375,
+        "y": 217.375,
+        "width": 100.1875,
+        "height": 44
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "button",
+      "text": "DOWNLOAD LOG",
+      "zIndex": "auto",
+      "rect": {
+        "x": 600.390625,
+        "y": 217.375,
+        "width": 189,
+        "height": 44
+      },
+      "coversDoors": []
+    }
+  ],
+  "online": {
+    "screen": "home",
+    "status": "error",
+    "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+    "notice": "",
+    "messageBounds": {
+      "x": 44,
+      "y": 120,
+      "width": 1192,
+      "height": 44
+    }
+  },
+  "doorsCoveredByADomElement": [
+    "campaign",
+    "solo",
+    "create",
+    "join",
+    "back"
+  ],
+  "doorsThatDoNotReceiveTheirOwnPress": [],
+  "screenText": [
+    "A run of linked contracts.",
+    "BACK",
+    "CAMPAIGN",
+    "CODEX",
+    "CONTRACT OPEN · SECTOR 04",
+    "Controls, audio, visual effects",
+    "DEEP FIELD MINING AUTHORITY",
+    "e498b83*",
+    "FAILED: no allocator configured",
+    "HANGAR",
+    "HOST",
+    "JOIN",
+    "MINE · DEFEND · ATTACK",
+    "Objective, Bots, Ships, Systems, Strategy",
+    "Open a rig and take the field",
+    "PLANET RUSH",
+    "PLAY",
+    "Play on your own against bots. No internet needed.",
+    "SETTINGS",
+    "SOLO",
+    "Start a new game and get a code for friends to join.",
+    "Type in a friend’s code to join their game.",
+    "Your ship, your level, what you have unlocked"
+  ],
+  "retryHits": [],
+  "downloadHits": []
+}

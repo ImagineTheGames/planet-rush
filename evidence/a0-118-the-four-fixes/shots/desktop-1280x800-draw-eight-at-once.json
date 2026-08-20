@@ -1,0 +1,41 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "experiment": "eight-at-once",
+  "staging": "a0-111 reproduced exactly: one lethal __planetRush.damageCore(p, 999) queued for all EIGHT seats in a SINGLE call, retried as a batch until spawn protection lapsed and it landed, so every core fell on the same tick",
+  "burstLanded": true,
+  "hpBeforeTheLastBurst": null,
+  "coreHpAfter": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "everyCoreDown": true,
+  "screenReported": "result",
+  "headline": "DRAW",
+  "subhead": "No reactor survived the collapse.",
+  "result": {
+    "kind": "draw",
+    "headline": "DRAW",
+    "subhead": "No reactor survived the collapse."
+  },
+  "buttons": [
+    "rematch",
+    "menu"
+  ],
+  "subheadNamesAPlayer": false,
+  "subheadSaysWon": false,
+  "elements": [
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "minimap"
+  ]
+}
