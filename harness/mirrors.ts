@@ -43,6 +43,7 @@ import { MATCH_TIMEOUT_S } from './match';
 import type { BotMatchResult, BotSlot } from './soak';
 import {
   CLASSES,
+  HARD_POOL,
   LENGTH_TARGET_MAX_S,
   LENGTH_TARGET_MIN_S,
   WIN_RATE_CEILING,
@@ -104,7 +105,7 @@ export const rosterRotations = (): number => ROSTER.length;
 // The artifact — one JSON blob per section, small enough to commit
 // ---------------------------------------------------------------------------
 
-export type SectionId = 'mirror' | 'roster' | 'tier' | 'class' | 'slice' | 'cast';
+export type SectionId = 'mirror' | 'roster' | 'tier' | 'class' | 'slice' | 'cast' | 'a0107';
 
 /** One match, reduced to what the report reads off it. Per-seat leaf censuses
  *  are pooled by character at the section level instead of stored per match: the
@@ -196,6 +197,11 @@ function foldMatch(
 export interface LineupSpec {
   readonly lineup: string;
   readonly slots: readonly BotSlot[];
+  /** Seeds for **this** lineup, when the section is not a clean cross product of
+   *  lineups × seeds. Only the a0-107 replay needs it: that instrument draws a
+   *  different world for every rotation, and reproducing a published number means
+   *  reproducing its draw, not improving on it. */
+  readonly seeds?: readonly number[];
 }
 
 /** How a section is run. `maxSeconds` exists for `slice`, which deliberately
@@ -221,9 +227,9 @@ export function runSection(
     'leavesBy' | 'decisionsBy' | 'deathsBy' | 'seatMatchesBy'
   >;
   const matches: MatchRow[] = [];
-  const total = lineups.length * options.seeds.length;
+  const total = lineups.reduce((n, spec) => n + (spec.seeds ?? options.seeds).length, 0);
   for (const spec of lineups) {
-    for (const seed of options.seeds) {
+    for (const seed of spec.seeds ?? options.seeds) {
       const result = runBotMatch(seed, spec.slots, {
         telemetry: true,
         ...(options.maxSeconds !== undefined ? { maxSeconds: options.maxSeconds } : {}),
@@ -319,6 +325,36 @@ export function castSection(options: SectionOptions): SectionRun {
   return runSection('cast', 'the shipped offline cast, unrotated (a0-105’s death sweep)', [
     { lineup: 'cast:shipped', slots: rosterCast() },
   ], options);
+}
+
+/**
+ * **a0-107's own draw, replayed.** `evidence/a0-107-dead-band/win-rates.ts` seeds
+ * rotation `r` of contest seed `s` with `s × 1000 + r`, so each rotation plays a
+ * *different world*; this section reproduces that exactly — same lineups, same
+ * seeds, same counts — because the point is to check a published number, and a
+ * better draw would answer a different question.
+ *
+ * `src/sim` and `src/bots` have not changed since the a0-107 merge, so anything
+ * other than an exact reproduction of a0-107 §4 is a finding in itself.
+ */
+export function a0107Section(options: SectionOptions): SectionRun {
+  const seedsFor = (rot: number): number[] => options.seeds.map((s) => s * 1000 + rot);
+  const lineups: LineupSpec[] = [];
+  for (let rot = 0; rot < HARD_POOL.length; rot++) {
+    lineups.push({
+      lineup: `a0107-strategy:rot${rot}`,
+      slots: strategyLineup(HARD_POOL, ShipClass.Vanguard, rot),
+      seeds: seedsFor(rot),
+    });
+  }
+  for (let rot = 0; rot < CLASSES.length; rot++) {
+    lineups.push({
+      lineup: `a0107-class:rot${rot}`,
+      slots: classLineup(HARD_POOL[0]!, rot),
+      seeds: seedsFor(rot),
+    });
+  }
+  return runSection('a0107', 'a0-107’s own contests, on a0-107’s own seeds', lineups, options);
 }
 
 /** a0-107's decision-mix shape: the shipped cast in seat order, stopped at 180 s.
@@ -447,6 +483,23 @@ export function seatsByTier(r: MatchRow): Record<string, number> {
 }
 
 /**
+ * Per-hull seat table for a lineup where each character flies its **own** hull
+ * (the mirrors, the roster contest, the shipped cast). This is the cut that
+ * separates "which character won" from "which silhouette won", and the roster
+ * contest needs it: two of the seven characters fly the same hull, so a
+ * character table alone cannot tell a good tree from a good hull.
+ */
+export function seatsByOwnHull(r: MatchRow): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [p, n] of Object.entries(r.seats)) add(out, String(PERSONALITIES[p as PersonalityId].shipClass), n);
+  return out;
+}
+
+/** The hull a winning character was flying, when the lineup flies own hulls. */
+export const ownHullOf = (r: MatchRow): string | null =>
+  r.winner === null ? null : String(PERSONALITIES[r.winner].shipClass);
+
+/**
  * Per-hull seat table. It cannot come off a {@link MatchRow} — the row records
  * characters, and the class contest holds the character fixed — so it comes off
  * the lineup, which deals every hull exactly `MATCH_SLOTS / CLASSES.length`
@@ -457,6 +510,21 @@ export function classSeats(): Record<string, number> {
   const out: Record<string, number> = {};
   for (const s of classLineup(CLASS_CONTEST_BEHAVIOUR, 0)) add(out, String(s.shipClass), 1);
   return out;
+}
+
+/**
+ * The turn as a share of the **retreat family** — `turn-and-fight` over
+ * (`turn-and-fight` + `retreat`).
+ *
+ * This is the number that makes the per-tier spread readable. The turn is an
+ * *exit from a retreat* (a0-105: patience `tier × caution`, clamped to
+ * [0.5 s, 5 s]), so a tier that rarely retreats rarely turns, and a raw share
+ * cannot tell "this tier turns reluctantly" from "this tier never had to".
+ */
+export function turnOfRetreat(census: Record<string, number>): number {
+  const turn = census[FIGHT_LEAF] ?? 0;
+  const family = turn + (census['retreat'] ?? 0);
+  return family ? turn / family : 0;
 }
 
 /** Share of all observed decisions that went to one leaf. */
@@ -589,6 +657,7 @@ export interface MirrorsReportInput {
   readonly klass: SectionRun;
   readonly slice: SectionRun;
   readonly cast: SectionRun;
+  readonly a0107: SectionRun;
   readonly prior: readonly PriorNumber[];
 }
 
@@ -654,12 +723,16 @@ function censusTable(columns: readonly (readonly [string, Record<string, number>
 }
 
 function deathsTable(rows: readonly (readonly [string, Deaths])[]): string {
+  // "seats" is printed because "deaths per match" is only the whole board's
+  // number when the row holds all eight of them. A tier that holds two seats of
+  // the shipped cast contributes two seats' worth, and a table that hid that
+  // would read as if Easy died a third as often as it does.
   return table(
-    ['run', 'matches', 'bot-matches', 'deaths', 'per match (8 seats)', 'per bot per match', 'per bot per minute'],
+    ['run', 'matches', 'seats / match', 'deaths', 'deaths per match', 'per bot per match', 'per bot per minute'],
     rows.map(([label, d]) => [
       label,
       String(d.matches),
-      String(d.seatMatches),
+      d.matches ? (d.seatMatches / d.matches).toFixed(2) : '0',
       String(d.deaths),
       `**${d.perMatch.toFixed(1)}**`,
       d.perSeatMatch.toFixed(2),
@@ -682,9 +755,16 @@ const terminationOf = (run: SectionRun): { matches: number; decided: number; tim
  * `findings`) — the harness produces the numbers, QA produces the reading.
  */
 export function renderReport(input: MirrorsReportInput): string {
-  const { mirror, roster, tier, klass, slice, cast } = input;
+  const { mirror, roster, tier, klass, slice, cast, a0107 } = input;
   const out: string[] = [];
-  const everyMatch = [...mirror.matches, ...roster.matches, ...tier.matches, ...klass.matches, ...cast.matches];
+  const everyMatch = [
+    ...mirror.matches,
+    ...roster.matches,
+    ...tier.matches,
+    ...klass.matches,
+    ...cast.matches,
+    ...a0107.matches,
+  ];
   const term = {
     matches: everyMatch.length,
     decided: everyMatch.filter((r) => r.ok).length,
@@ -698,6 +778,14 @@ export function renderReport(input: MirrorsReportInput): string {
     classSeats(),
   );
   const topChar = charWins[0];
+  // The §3.8 target proper is the equal-skill one: the top character inside its
+  // own tier's pool, hull held fixed. The cast contest is reported beside it and
+  // not instead of it, because a mixed-tier board answers a different question.
+  const equalSkill = TIERS.flatMap((t) => {
+    const rows = tier.matches.filter((r) => r.lineup.startsWith(`${t}:`));
+    return rows.length ? winsBy(rows, (r) => r.winner, seatsByCharacter, nameOf).map((w) => ({ ...w, tier: t })) : [];
+  }).sort((a, b) => b.rate - a.rate);
+  const topEqual = equalSkill[0];
   const topClass = classWins[0];
   const rosterLen = lengthOf(roster.matches);
   const mirrorLen = lengthOf(mirror.matches);
@@ -730,8 +818,14 @@ export function renderReport(input: MirrorsReportInput): string {
             : '**FAIL**',
         ],
         [
-          'No strategy > 55% win rate',
+          'No strategy > 55% — at equal skill (§2.3)',
           'GDD §3.8',
+          `top: ${topEqual?.name ?? '—'} ${pct(topEqual?.rate ?? 0)} of ${topEqual?.decided ?? 0} decided in the ${topEqual?.tier ?? '—'} pool`,
+          (topEqual?.rate ?? 0) <= WIN_RATE_CEILING ? '**PASS**' : '**FAIL**',
+        ],
+        [
+          'No character > 55% — across the whole cast (§2.1)',
+          'GDD §3.8, read on the shipped lobby',
           `top: ${topChar?.name ?? '—'} ${pct(topChar?.rate ?? 0)} of ${topChar?.decided ?? 0} decided`,
           (topChar?.rate ?? 0) <= WIN_RATE_CEILING ? '**PASS**' : '**FAIL**',
         ],
@@ -766,7 +860,7 @@ export function renderReport(input: MirrorsReportInput): string {
   out.push(
     table(
       ['section', 'lineup', 'seeds', 'lineups', 'matches', 'decided', 'sim-timeout', 'hangs', 'ceiling'],
-      ([mirror, roster, tier, klass, cast, slice] as const).map((run) => {
+      ([mirror, roster, tier, klass, cast, a0107, slice] as const).map((run) => {
         const t = terminationOf(run);
         return [
           `\`${run.section}\``,
@@ -846,6 +940,54 @@ export function renderReport(input: MirrorsReportInput): string {
     winTable(classWins),
     '',
   );
+  out.push(
+    '### 2.5 · The cast contest, cut by hull instead of by character',
+    '',
+    'The same 224 matches as §2.1, attributed to the silhouette the winner was flying',
+    'rather than to its name. Two of the seven characters fly an excavator and two fly a',
+    'hauler (GDD §2.11), so a character table on its own cannot separate a good tree from',
+    'a good hull — and §2.4 says the hull is worth a great deal.',
+    '',
+    winTable(winsBy(roster.matches, ownHullOf, seatsByOwnHull)),
+    '',
+    '### 2.6 · a0-107’s own contests, replayed on a0-107’s own seeds',
+    '',
+    '`src/sim` and `src/bots` have not changed since the a0-107 merge, so these tables',
+    'should reproduce `a0-107-dead-band.md` §4 exactly. They are here because a report',
+    'whose whole subject is "the lane that changed it also checked it" owes the check a',
+    'check. The seeding is a0-107’s (`s × 1000 + rotation`, a different world per',
+    'rotation), not this report’s.',
+    '',
+    `**Strategy contest** — Hard pool on vanguard, ${a0107.matches.filter((r) => r.lineup.startsWith('a0107-strategy')).length} matches:`,
+    '',
+    winTable(
+      winsBy(
+        a0107.matches.filter((r) => r.lineup.startsWith('a0107-strategy')),
+        (r) => r.winner,
+        seatsByCharacter,
+        nameOf,
+      ),
+    ),
+    '',
+    `**Class contest** — \`${CLASS_CONTEST_BEHAVIOUR}\`, four hulls, ${a0107.matches.filter((r) => r.lineup.startsWith('a0107-class')).length} matches:`,
+    '',
+    winTable(
+      winsBy(
+        a0107.matches.filter((r) => r.lineup.startsWith('a0107-class')),
+        (r) => (r.winnerClass !== null ? String(r.winnerClass) : null),
+        () => classSeats(),
+      ),
+    ),
+    '',
+    table(LENGTH_HEAD, [
+      lengthRow(
+        'a0-107 replay — strategy',
+        lengthOf(a0107.matches.filter((r) => r.lineup.startsWith('a0107-strategy'))),
+      ),
+      lengthRow('a0-107 replay — class', lengthOf(a0107.matches.filter((r) => r.lineup.startsWith('a0107-class')))),
+    ]),
+    '',
+  );
 
   // --- §3 length ---
   out.push('---', '', '## 3 · Match length', '');
@@ -856,6 +998,7 @@ export function renderReport(input: MirrorsReportInput): string {
       lengthRow('equal-skill contests', lengthOf(tier.matches)),
       lengthRow('ship-class contest', lengthOf(klass.matches)),
       lengthRow('shipped cast, unrotated (a0-105 seeds)', lengthOf(cast.matches)),
+      lengthRow('a0-107 replay (a0-107 seeds)', lengthOf(a0107.matches)),
       lengthRow('**all decided matches**', lengthOf(everyMatch)),
     ]),
     '',
@@ -903,23 +1046,31 @@ export function renderReport(input: MirrorsReportInput): string {
     '### 4.2 · `turn-and-fight` share per character and per tier',
     '',
     table(
-      ['character', 'tier', 'mirror', 'shipped cast', 'equal-skill'],
+      ['character', 'tier', 'mirror', 'shipped cast', 'equal-skill', 'retreat (cast)', 'turn ÷ (turn + retreat), cast'],
       ROSTER.map((p) => [
         nameOf(p),
         String(tierOf(p)),
         pct(leafShare(mirror.leavesBy[p] ?? {}, FIGHT_LEAF), 2),
         pct(leafShare(roster.leavesBy[p] ?? {}, FIGHT_LEAF), 2),
         p in tier.leavesBy ? pct(leafShare(tier.leavesBy[p] ?? {}, FIGHT_LEAF), 2) : '—',
+        pct(leafShare(roster.leavesBy[p] ?? {}, 'retreat'), 2),
+        `**${pct(turnOfRetreat(roster.leavesBy[p] ?? {}))}**`,
       ]),
     ),
     '',
+    'The last column is the one that makes the spread readable. The turn is an *exit*',
+    'from a retreat, so a tier that rarely retreats rarely turns — and the raw share',
+    'cannot tell "turns reluctantly" from "never had to".',
+    '',
     table(
-      ['tier', 'mirror', 'shipped cast', 'equal-skill'],
+      ['tier', 'mirror', 'shipped cast', 'equal-skill', 'retreat (cast)', 'turn ÷ (turn + retreat), cast'],
       TIERS.map((t) => [
         String(t),
         pct(leafShare(poolByTier(mirror.leavesBy)[t] ?? {}, FIGHT_LEAF), 2),
         pct(leafShare(poolByTier(roster.leavesBy)[t] ?? {}, FIGHT_LEAF), 2),
         pct(leafShare(poolByTier(tier.leavesBy)[t] ?? {}, FIGHT_LEAF), 2),
+        pct(leafShare(poolByTier(roster.leavesBy)[t] ?? {}, 'retreat'), 2),
+        `**${pct(turnOfRetreat(poolByTier(roster.leavesBy)[t] ?? {}))}**`,
       ]),
     ),
     '',

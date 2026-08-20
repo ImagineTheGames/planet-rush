@@ -35,6 +35,7 @@ import {
 } from './balance';
 import type { Sweep } from './balance';
 import {
+  a0107Section,
   castSection,
   classSection,
   mirrorSection,
@@ -452,7 +453,7 @@ function soak(matchCount: number, rotations: number): number {
  *  who distrusts a table can recompute it from the JSON without a run. */
 const A0112_DATA = 'tests/reports/a0-112-data';
 
-const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice', 'cast'] as const;
+const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice', 'cast', 'a0107'] as const;
 type A0112Section = (typeof A0112_SECTIONS)[number];
 
 function a0112Path(section: string): string {
@@ -505,7 +506,9 @@ function mirrors(section: A0112Section, seedCount: number): number {
             ? classSection(options)
             : section === 'cast'
               ? castSection(options)
-              : sliceSection(options);
+              : section === 'a0107'
+                ? a0107Section(options)
+                : sliceSection(options);
 
   const hangs = run.matches.filter((r) => r.failure === 'wall-clock' || r.failure === 'stalled').length;
   const timeouts = run.matches.filter((r) => r.failure === 'sim-timeout').length;
@@ -531,21 +534,246 @@ function mirrors(section: A0112Section, seedCount: number): number {
  * `balance` uses for `BALANCE_01_TUNING`).
  */
 const A0112_HEADLINE =
-  '**The 10–15 minute window HOLDS. The 55% band HOLDS for characters and tiers and ' +
-  'is BROKEN by one ship class — `excavator`, which was already over before either ' +
-  'retreat change and is over by more now.**';
+  '**The 10–15 minute window HOLDS — yes. The 55% band does NOT — no.** 1164 matches, ' +
+  'median 13:43, 99.7% inside 10–15 minutes, every one decided, zero hangs. Three ' +
+  'contestants sit over 55%: the `excavator` hull (77.3% of the ship-class contest, ' +
+  '88.4% of the cast contest), Bolt (73.4% inside the Easy pool at a fixed hull) and ' +
+  'Warden (73.2% across the cast). **None of it is new to the retreat rewrite** — ' +
+  'a0-107’s own contests, replayed on a0-107’s own seeds, reproduce its published ' +
+  'numbers digit for digit (§2.6).';
 
 const A0112_READING = [
-  'PLACEHOLDER — written once the numbers are in.',
+  '*Hand-written. Every number it quotes is in a table below.*',
+  '',
+  '### The check checks out — and that is the first finding',
+  '',
+  '`src/sim` and `src/bots` have not changed since the a0-107 merge (`git diff`',
+  '`38a0107b..HEAD -- src/sim src/bots` is empty; everything since is UI and copy). So',
+  'the honest first job was not "has it drifted" but "was it right", and an independently',
+  'written instrument re-deriving the same numbers is the only way to answer that.',
+  'It does, exactly:',
+  '',
+  '- the decision mix in a0-107’s own run shape — `turn-and-fight` **3.00%**, `retreat`',
+  '  **11.49%**, `dead` **18.64%**, `attack` 17.52%, `mine` 15.51%, `defend` 14.90%,',
+  '  `cornered-fight` 1.70% over 432 000 decisions (§4.1, last column) — is a0-107 §3’s',
+  '  "after" column to the last digit;',
+  '- its strategy contest replays as **Vulture 38/96, Warden 35/96, Sable 23/96** (§2.6)',
+  '  — a0-107 §4’s exact counts, not just its percentages;',
+  '- its class contest replays as **excavator 97/128 (75.8%)**, vanguard 21, hauler 6,',
+  '  interceptor 4 — likewise exact, and the match lengths (mean 13:29 and 13:26, min',
+  '  12:48 and 5:22, max 13:57 and 14:08) match its §4 line for line.',
+  '',
+  'Both retreat branches asserted the two bands still held. On the numbers they',
+  'published, they were telling the truth. What they could not see is what a *different*',
+  'lineup does, and that is the rest of this report.',
+  '',
+  '### Shorter, bloodier, or both? **Bloodier. Not shorter.**',
+  '',
+  'The brief asks the honest question about a0-105 turning a bot that held position into',
+  'one that commits. The answer is in two numbers:',
+  '',
+  '- **Length did not move.** Median 13:43 over 1164 matches, 99.7% inside the target,',
+  '  and every section’s median lands between 13:33 and 13:56 (§3). On a0-105’s own',
+  '  twelve cast seeds the mean is **13:52** against the 13:32 that report quotes — +20 s,',
+  '  under 3%, and in the *longer* direction.',
+  '- **Deaths rose again.** On those same twelve seeds the board now takes **2460**',
+  '  deaths against a0-105’s published **2184** (+12.6%) and the **1754** it measured',
+  '  before its own change (+40%). a0-107 is the only sim or bot change between those two',
+  '  numbers, and its own `dead` share moving 16.10% → 18.64% predicts exactly this.',
+  '',
+  'That is the ruling working, not a regression: *"ship lives are cheap. enemies should',
+  'not fear death"* (GDD §2.3, §2.7 — respawn is free). It is reported here as a fact',
+  'either way, and the fact is that a match is now **25.6 deaths per bot**, one every',
+  '32 seconds of a bot’s match (§5.3).',
+  '',
+  '### The turn is smaller over a whole match than the first three minutes suggested',
+  '',
+  '**This is the number nobody had.** Every prior measurement of `turn-and-fight` is a',
+  '180-second slice; over whole matches the leaf takes **2.01%** of decisions on the',
+  'shipped cast (1.47%–2.52% across sections, §4.1) against **3.00%** in the first three',
+  'minutes. The turn is an early- and mid-match behaviour: late decisions go to',
+  '`last-stand` (15.97% of the cast’s, against 2.94% in the slice) and to `dead`.',
+  '',
+  'Per tier the raw share spreads 24× — Easy 5.46% of mirror decisions, Hard 0.23% — and',
+  '**that spread is not a difference in how the tiers turn.** It is a difference in how',
+  'often they retreat at all: Hard retreats on 3.75% of its decisions where Easy retreats',
+  'on 10.22%. Normalised against the retreat family, every tier ends **14–16%** of its',
+  'retreat decisions in a turn (§4.2, last column). The personality spread a0-105 built',
+  'is intact and the tiers are not diverging in the one behaviour it added.',
+  '',
+  '### Who wins is mostly which hull, and the hull was already out of band',
+  '',
+  'Warden takes **73.2%** of the cast contest (§2.1) — a number no prior report has, and',
+  'far outside the band. Read it with §2.5 before reading it as a character result: cut',
+  'the *same* 224 matches by silhouette and the **excavator wins 88.4%** of them, which is',
+  'the two excavator characters (Warden 73.2% + Foreman 15.2%) taking almost every match',
+  'between them. Hold the character fixed and rotate the hulls instead (§2.4) and the',
+  'excavator alone reads **77.3%** of 256. The character table is largely a hull table.',
+  '',
+  '**The hull result is not this rewrite’s doing.** a0-105 measured it at 78.1% *before*',
+  'its own change and 68.8% after; a0-107 measured 72.7% → 78.5% at 256 matches. It sits',
+  'at 77.3% now, inside one standard error of a0-107’s reading. The §2.11 class',
+  'multipliers are gameplay’s lane, and this is the fourth report in a row to say so.',
+  '',
+  '**One win-rate result is *not* explained by the hull.** In the Easy pool at a fixed',
+  'vanguard — same tier, same silhouette, so only the tree and the personality differ —',
+  '**Bolt beats Rusty 47–17, 73.4%** (§2.3). That is 4.2 standard errors above the 50%',
+  'fair share of a two-character pool, so it is not the draw. Medium’s 59.4% (Patch over',
+  'Foreman) is 1.5 SE and is not yet evidence of anything. The Hard pool — the only one',
+  'any prior report measured — is the healthy one: 37.5 / 34.4 / 28.1, all under.',
+  '',
+  '**A caveat that belongs with the Easy number, not hidden under it:** a two-character',
+  'pool has a 50% fair share, so the 55% ceiling is a five-point test there and a',
+  'thirty-point one in the four-hull contest. Bolt would clear a ceiling stated as "no',
+  'more than 1.5× fair share"; it does not clear the one the GDD actually states. Both',
+  'facts are above; which one binds is the Director’s call.',
+  '',
+  '### Two observations for the lanes that own them',
+  '',
+  '- **The Easy tree never runs `attack`** — 0.00% of Rusty’s and Bolt’s decisions in',
+  '  every section measured, where Medium runs it at 25.6–28.8% and Hard at 7.7–48.3%',
+  '  (§4.1 is pooled; the per-character censuses are in `tests/reports/a0-112-data/`).',
+  '  Bolt fights through `potshot` instead — 32–42% of its decisions, its most common',
+  '  leaf everywhere — while Rusty mostly mines, roams and defends and turns to fight',
+  '  more often than any other character. Stated as a census fact, not a defect: it may',
+  '  be exactly what the Easy tree is meant to be.',
+  '- **A Rusty mirror is the quietest board measured** (58.4 deaths per match, median',
+  '  12:55) and a Foreman mirror the bloodiest (**314.3**, 39.3 per bot). A five-fold',
+  '  spread in how lethal a lobby is, purely from which character fills it, is worth',
+  '  knowing before anyone tunes a constant against a single cast.',
 ].join('\n');
 
-const A0112_OUT_OF_BAND = ['PLACEHOLDER — written once the numbers are in.'].join('\n');
+const A0112_OUT_OF_BAND = [
+  '*Hand-written.*',
+  '',
+  '**Three things are out of band, and this brief tunes none of them.**',
+  '',
+  '| what | where | owner | already known? |',
+  '|---|---|---|---|',
+  '| `excavator` 77.3% (class contest), 88.4% (cast contest) | §2.4, §2.5 | GDD §2.11 class multipliers — Gameplay | **Yes** — reported by a0-105 (78.1% *before* it), a0-107 and balance-01 |',
+  '| Bolt 73.4% over Rusty at equal skill and equal hull | §2.3 | the Easy tree / personality dials — Bots | **No** — no prior report contests the Easy pool |',
+  '| Warden 73.2% across the shipped cast | §2.1 | mostly the hull above; the residue is Bots | **No** — no prior report measures a per-character rate |',
+  '',
+  'QA owns the *values* in `src/sim/constants.ts` and a tuning pass is a legitimate',
+  'thing for QA to do. It is not a legitimate thing to do **here**: a measurement that',
+  'arrives already acted upon cannot be checked, and the lane that made a change',
+  'checking its own change is the exact failure this brief exists to correct. Doing it',
+  'in the same commit would repeat that mistake with QA’s name on it.',
+  '',
+  'So: no constant moved, no file under `src/` changed. Two of the three are outside the',
+  'values QA owns in any case — a class multiplier is a design ratio and a behaviour tree',
+  'is not a number — and the third needs the Director to say which reading of the 55%',
+  'ceiling binds in a two-character pool before anyone touches a dial.',
+  '',
+  'The instrument is committed and re-runnable, so whoever acts on this can re-measure',
+  'the same way: `npx vite-node harness/cli.ts mirrors <section>` then `mirrors report`.',
+].join('\n');
 
-const A0112_COMPARISON = ['PLACEHOLDER — written once the numbers are in.'].join('\n');
+const A0112_COMPARISON = [
+  '*Hand-written.* **What moved, and by how much:**',
+  '',
+  '| number | prior | this run | move |',
+  '|---|---|---|---|',
+  '| `turn-and-fight`, a0-107’s run shape | 3.00% | **3.00%** | **exact reproduction** |',
+  '| `retreat` / `dead`, same run | 11.49% / 18.64% | **11.49% / 18.64%** | **exact** |',
+  '| Strategy contest, a0-107’s seeds | 39.6 / 36.5 / 24.0 | **39.6 / 36.5 / 24.0** | **exact**, counts included |',
+  '| Class contest 128, a0-107’s seeds | excavator 75.8% | **75.8%** | **exact** |',
+  '| Class contest 256, this report’s seeds | excavator 78.5% | **77.3%** | −1.2 pts (0.4 SE — a different draw, not a move) |',
+  '| Match length, contests | mean 13:29 / 13:26 | **13:29 / 13:26** replayed; 13:49 on this report’s draws | unmoved |',
+  '| Match length, twelve cast seeds | mean 13:32 (a0-105) | **13:52** | +20 s (+2.5%), *longer* |',
+  '| Deaths, twelve cast seeds | 2184 (a0-105), 1754 before it | **2460** | **+12.6%** since a0-105, +40% since before it |',
+  '| `turn-and-fight` over a **whole** match | *not measured* | **2.01%** (cast) | new |',
+  '| Win rate per character / per tier | *not measured* | §2.1, §2.2 | new |',
+  '| Deaths per tier, length per character | *not measured* | §5.2, §3.1 | new |',
+  '',
+  '**Read the reproductions first.** Six published numbers were re-derived by a',
+  'separately written instrument and came back identical, which is what makes the two',
+  'numbers that *did* move worth trusting. Both are deaths-shaped, both point the same',
+  'way, and both are the ordered trade rather than a regression: closing the dead band',
+  '(a0-107) cost another 12.6% in hulls on top of a0-105’s 25%, and matches got very',
+  'slightly **longer** while doing it — a bot that turns and dies is off the board for',
+  '`RESPAWN_S` instead of parked in a corner holding a stalemate open.',
+  '',
+  '**Two caveats, stated rather than buried.** a0-105 does not publish how it counted a',
+  'death, so 2184 → 2460 is a comparison of magnitudes on the same seeds and lineup, not',
+  'of two identical procedures; and its "mean 812 s" sits in a paragraph that could be',
+  'read as the twelve-seed sweep or as the contest beside it, so treat the +20 s as',
+  'directional. Neither caveat touches the reproductions, which are exact.',
+  '',
+  '**And the one that has no prior at all:** no report before this one gives a win rate',
+  'per character or per tier, a whole-match fight share, or deaths per tier. Those',
+  'sections are not a comparison; they are a baseline, and the next brief to change how',
+  'bots fight now has one to be checked against by somebody other than itself.',
+].join('\n');
 
-/** The prior run this one is compared against, transcribed from the report that
- *  produced it. Nothing here re-runs an old build. */
-const A0112_PRIOR: PriorNumber[] = [];
+/**
+ * The prior runs this one is compared against, **transcribed from the reports
+ * that produced them**. Nothing here re-runs an old build: a comparison against
+ * a prior run is a comparison against what that run published, and it says so on
+ * every row. The rows marked *not measured* are the point of the brief.
+ */
+const A0112_PRIOR: PriorNumber[] = [
+  {
+    what: 'Match length — strategy contest, 96 matches',
+    value: 'mean **809 s** (13:29), min 768, max 837, 0 unfinished',
+    source: '`a0-107-dead-band.md` §4, "after"',
+  },
+  {
+    what: 'Match length — class contest, 128 matches',
+    value: 'mean **806 s** (13:26), min 322, max 848, 0 unfinished',
+    source: '`a0-107-dead-band.md` §4, "after"',
+  },
+  {
+    what: 'Match length — the shipped cast',
+    value: 'mean **812 s** (13:32), "unmoved" against 813 s before',
+    source: '`a0-105-standoff.md` §4',
+  },
+  {
+    what: 'Strategy contest — Hard pool on vanguard, 96 matches',
+    value: 'vulture **39.6%**, warden 36.5%, sable 24.0% — inside the band',
+    source: '`a0-107-dead-band.md` §4, "after"',
+  },
+  {
+    what: 'Class contest — sable, 256 matches',
+    value: 'excavator **78.5% OVER**, vanguard 13.7%, hauler 5.5%, interceptor 2.3%',
+    source: '`a0-107-dead-band.md` §4, "after"',
+  },
+  {
+    what: '`turn-and-fight` share — 5 × 180 s of the shipped cast',
+    value: '**3.00%** (0.82% before a0-107; 0.57% at a0-105)',
+    source: '`a0-107-dead-band.md` §3, "after"',
+  },
+  {
+    what: '`retreat` / `dead` share — same run',
+    value: '**11.49%** / **18.64%** (23.15% / 16.10% before a0-107)',
+    source: '`a0-107-dead-band.md` §3, "after"',
+  },
+  {
+    what: 'Deaths — 12 whole matches of the shipped cast, seeds 1–12',
+    value: '**2184** (1754 before a0-105) — 182 per match, 22.8 per bot',
+    source: '`a0-105-standoff.md` §4 (counting method not published)',
+  },
+  {
+    what: 'Win rate **per character** across the whole cast',
+    value: '*not measured* — every prior contest holds a tier or a hull fixed',
+    source: '—',
+  },
+  {
+    what: 'Win rate **per tier**',
+    value: '*not measured*',
+    source: '—',
+  },
+  {
+    what: '`turn-and-fight` share over a **whole match**',
+    value: '*not measured* — both priors measure the first 180 s',
+    source: '—',
+  },
+  {
+    what: 'Deaths **per tier**, and match length **per character**',
+    value: '*not measured*',
+    source: '—',
+  },
+];
 
 /** Render `tests/reports/a0-112-balance.md` from the five committed artifacts. */
 function mirrorsReport(outPath: string | null): number {
@@ -570,6 +798,7 @@ function mirrorsReport(outPath: string | null): number {
     klass: readSection('class'),
     slice: readSection('slice'),
     cast: readSection('cast'),
+    a0107: readSection('a0107'),
     prior: A0112_PRIOR,
   });
   const path = resolve(ROOT, outPath ?? 'tests/reports/a0-112-balance.md');
