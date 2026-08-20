@@ -4,7 +4,8 @@ Scratch memory for THIS brief, across retries and resumes. Keep it current as
 you work; a future you reads it first. This is a working note, not evidence —
 "done" is still the DoD, the PR and QA's attestation, never a line written here.
 
-Branch: `agent/ui/a0-103-minimap-finds-its-corner`. PR: (pending).
+Branch: `agent/ui/a0-103-minimap-finds-its-corner`. PR
+[#484](https://github.com/ImagineTheGames/planet-rush/pull/484).
 
 ## BUILT
 
@@ -41,8 +42,14 @@ Branch: `agent/ui/a0-103-minimap-finds-its-corner`. PR: (pending).
   the gate is CI-blocking; §4.13 in `docs/dark-matter-scan.md` is the verdict
   (SURFACE, the §4.7 shape) and the allowlist points at it.
 
-Green: `npx tsc --noEmit`, `npm test -- --run` (315 files / 5870 tests),
-`npm run dark-matter:check`, `goldens.spec.ts` iphone + desktop.
+- `c392768` — **merge origin/main** (a0-102 + a0-108 landed mid-brief). See
+  DECISIONS §9 — it is a real reconciliation, not a text merge.
+- `2b3fbb1` — `describeReachViolation` stops interpolating a variable named
+  `claims`: a0-108's copy audit sweeps every string literal under `src/ui`.
+- (evidence retaken at the new merge base `e2888ca9`.)
+
+Green: `npx tsc --noEmit`, `npm test -- --run` (316 files / 5880 tests),
+`npm run dark-matter:check`, `goldens.spec.ts` 50 passed (iphone + desktop).
 
 ## DECISIONS
 
@@ -149,6 +156,27 @@ docs/dark-matter-scan.md): inside `collapsedRect` it asserts the arithmetic
 against itself; `Hud.describeLayout` reports PHYSICAL bounds so a HUD-side check
 would be wrong under the landscape lock; and the honest caller is
 `installLayoutHook`'s `placement()`, upstairs in Platform's file.
+
+### 9. The merge with a0-102 is the interesting one
+
+a0-102 landed the ore counter's scrim GROUND while this branch was open, and it
+moved `TOTAL_LABEL_H` -> `hud-geometry.ts` as `ORE_LABEL_LEADING` — the same
+move this branch had made, with a better name. Theirs wins; ours is deleted.
+
+The substantive part: the ground's falloff is PADDING, so the two rows of type
+now start a third of the ink box in from the corner the group hugs. `ore-hud`
+registers the ground and still reaches; `banked-total` is a row inside it and is
+inset on BOTH axes — a new reach gap neither branch's tests could have caught
+alone.
+
+So `ReservationContext` gained `boundsOf(id)` and the `banked-total` rows read
+`scrimPad(ore-hud's own drawn rect)` rather than restating `scrimGround`. A
+ground that grows because the player banked a fifth digit moves the reservation
+with it. Rejected: hard-coding the pad fraction against a nominal ink box — that
+is the "number nothing explains" this brief exists to retire, one level down.
+
+The sweep's catalogue now measures the cluster through `font-metrics`, the same
+path `hud-geometry.test.ts` uses, so it places the rects the view registers.
 
 ## NEXT
 
