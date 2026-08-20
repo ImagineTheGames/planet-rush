@@ -92,6 +92,9 @@ export interface BotMatchResult {
   readonly wavesSpawned: number;
   /** The wave interval this match actually ran on (`world.economy.waveInterval`). */
   readonly waveInterval: number;
+  /** What the bots spent the match doing, or `null` unless `telemetry` was asked
+   *  for (a0-112). */
+  readonly telemetry: MatchTelemetry | null;
 }
 
 /** How a soak match is run. Defaults are the probe harness's ceilings, so the
@@ -110,10 +113,120 @@ export interface SoakRunOptions {
    *  `world.economy.waveInterval` is the one number every consumer reads
    *  (`waveIntervalOf`, a0-16) and wave 1 lands at t=0 regardless. */
   readonly waveIntervalOverride?: number;
+  /**
+   * Record {@link MatchTelemetry} alongside the result (a0-112). Off by default,
+   * because it costs a pass over eight bots and eight ships per tick and every
+   * caller before a0-112 wanted neither.
+   *
+   * It is **observation only** — it reads `Brain.lastBehavior` and `Ship.alive`
+   * after the tick has already been taken and writes nothing back, so a
+   * telemetry run and a plain run step identically and hash identically (GDD
+   * §4.8) — asserted in `tests/harness/soak-telemetry.test.ts`, because a
+   * measuring instrument that changes what it measures is not one.
+   */
+  readonly telemetry?: boolean;
 }
 
 /** Wall-clock guard cadence — mirrors `./match`. */
 const WALL_CLOCK_CHECK_TICKS = 256;
+
+// ---------------------------------------------------------------------------
+// Telemetry — what the match was spent doing (a0-112)
+// ---------------------------------------------------------------------------
+
+/**
+ * One seat's account of its own match: which leaf won each tick, and how many
+ * times it died. Both are read off the running match rather than inferred, and
+ * both are per *seat*, so a mixed lineup can be attributed to a character and a
+ * character to its difficulty tier (GDD §2.9).
+ */
+export interface SeatTelemetry {
+  readonly id: PlayerId;
+  readonly personality: PersonalityId;
+  readonly shipClass: ShipClass;
+  /** Ticks this seat's winning behaviour-tree leaf was X (`Brain.lastBehavior`
+   *  — the bot's own account of what it was doing, the same read a0-105 and
+   *  a0-107 measured the standoff on). */
+  readonly leafTicks: Record<string, number>;
+  /** Ticks observed for this seat — the denominator of every share below. */
+  readonly decisions: number;
+  /**
+   * Alive→dead transitions over the whole match, including the last one if the
+   * seat was eliminated. "Ship lives are cheap" (a0-105 developer ruling, GDD
+   * §2.3, §2.7), so this is a design number, not a defect number.
+   */
+  readonly deaths: number;
+  /** Whether this seat's home core fell — the death that does not respawn. */
+  readonly eliminated: boolean;
+}
+
+/** Everything a telemetry run recorded, pooled and per seat. */
+export interface MatchTelemetry {
+  readonly decisions: number;
+  readonly leafTicks: Record<string, number>;
+  readonly seats: readonly SeatTelemetry[];
+}
+
+/** Mutable accumulator behind {@link MatchTelemetry}. */
+interface TelemetryAcc {
+  readonly leafTicks: Record<string, number>;
+  readonly deaths: number[];
+  readonly decisions: number[];
+  readonly seatLeaves: Record<string, number>[];
+  readonly wasAlive: boolean[];
+  /** Slot i's ship, by index into `world.ships` — resolved once by **id**, never
+   *  assumed to be `i`, so a world that ever reorders its ships still attributes
+   *  a death to the seat that died. `-1` for a slot with no ship. */
+  readonly shipOf: number[];
+  total: number;
+}
+
+function newTelemetry(slots: readonly BotSlot[], world: World): TelemetryAcc {
+  return {
+    leafTicks: {},
+    deaths: slots.map(() => 0),
+    decisions: slots.map(() => 0),
+    seatLeaves: slots.map(() => ({}) as Record<string, number>),
+    wasAlive: slots.map(() => true),
+    shipOf: slots.map((s) => world.ships.findIndex((sh) => sh.id === s.id)),
+    total: 0,
+  };
+}
+
+/** Read one taken tick. Pure observation: nothing here touches `world`. */
+function observeTick(acc: TelemetryAcc, world: World, bots: readonly Bot[]): void {
+  for (let i = 0; i < bots.length; i++) {
+    const leaf = bots[i]!.brain.lastBehavior;
+    acc.leafTicks[leaf] = (acc.leafTicks[leaf] ?? 0) + 1;
+    const seat = acc.seatLeaves[i]!;
+    seat[leaf] = (seat[leaf] ?? 0) + 1;
+    acc.decisions[i]! += 1;
+    acc.total++;
+  }
+  for (let i = 0; i < acc.shipOf.length; i++) {
+    const si = acc.shipOf[i]!;
+    if (si < 0) continue;
+    const alive = world.ships[si]!.alive;
+    if (acc.wasAlive[i] && !alive) acc.deaths[i]! += 1;
+    acc.wasAlive[i] = alive;
+  }
+}
+
+function sealTelemetry(acc: TelemetryAcc, world: World, slots: readonly BotSlot[]): MatchTelemetry {
+  return {
+    decisions: acc.total,
+    leafTicks: acc.leafTicks,
+    seats: slots.map((s, i) => ({
+      id: s.id,
+      personality: s.personality,
+      shipClass: s.shipClass,
+      leafTicks: acc.seatLeaves[i]!,
+      decisions: acc.decisions[i]!,
+      deaths: acc.deaths[i]!,
+      eliminated: (acc.shipOf[i]! >= 0 && world.ships[acc.shipOf[i]!]!.eliminated) || false,
+    })),
+  };
+}
 
 /**
  * Run one eight-slot match of the *real* trees to its ending — or to whichever
@@ -147,6 +260,7 @@ export function runBotMatch(
   const startedAt = performance.now();
   let failure: SoakFailure | null = null;
   let ticks = 0;
+  const acc = options.telemetry ? newTelemetry(slots, world) : null;
 
   while (!isOver(world)) {
     if (world.time >= maxSeconds) {
@@ -163,6 +277,7 @@ export function runBotMatch(
     }
     step(world, botInputs(world, bots, dt), dt);
     ticks++;
+    if (acc) observeTick(acc, world, bots);
   }
 
   const wallClockMs = performance.now() - startedAt;
@@ -189,6 +304,7 @@ export function runBotMatch(
     collapseTime: world.match.collapseTime,
     wavesSpawned: world.match.wavesSpawned,
     waveInterval: waveIntervalOf(world),
+    telemetry: acc ? sealTelemetry(acc, world, slots) : null,
   };
 }
 

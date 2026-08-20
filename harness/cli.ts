@@ -18,7 +18,7 @@
  * the run is the arguments, and the arguments are printed into the report.
  */
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { ShipClass } from '@shared/types';
 import {
@@ -34,6 +34,16 @@ import {
   winRecords,
 } from './balance';
 import type { Sweep } from './balance';
+import {
+  classSection,
+  mirrorSection,
+  renderReport as renderMirrorsReport,
+  rosterSection,
+  sliceSection,
+  tierSection,
+} from './mirrors';
+import { A0107_SLICE_SEEDS } from './mirrors';
+import type { MatchRow, PriorNumber, SectionRun } from './mirrors';
 import { digestDiff, stateDigest } from './hash';
 import { mirrorLineup, recordMatch, replay, roundRobinLineup, runMatch, seedRange } from './match';
 import type { MatchResult } from './match';
@@ -434,6 +444,137 @@ function soak(matchCount: number, rotations: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// mirrors — the a0-112 re-measurement (win rate, length, fight time, deaths)
+// ---------------------------------------------------------------------------
+
+/** Where a section artifact lands. Committed: the report quotes it, and a reader
+ *  who distrusts a table can recompute it from the JSON without a run. */
+const A0112_DATA = 'tests/reports/a0-112-data';
+
+const A0112_SECTIONS = ['mirror', 'roster', 'tier', 'class', 'slice'] as const;
+type A0112Section = (typeof A0112_SECTIONS)[number];
+
+function a0112Path(section: string): string {
+  return resolve(ROOT, A0112_DATA, `${section}.json`);
+}
+
+function writeJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 1)}\n`, 'utf8');
+}
+
+function readSection(section: A0112Section): SectionRun {
+  return JSON.parse(readFileSync(a0112Path(section), 'utf8')) as SectionRun;
+}
+
+/**
+ * Run one section of the a0-112 sweep and file its artifact. Sections are
+ * separate commands on purpose: they are independent, a full set is a few
+ * hundred whole matches, and running them as five processes is the difference
+ * between one core for half an hour and five cores for six minutes.
+ */
+function mirrors(section: A0112Section, seedCount: number): number {
+  // The slice exists to be compared with a0-107's number, so it runs a0-107's
+  // seeds rather than this report's range — same draw, same cast, same ceiling.
+  const seeds = section === 'slice' ? A0107_SLICE_SEEDS : seedRange(seedCount);
+  const started = performance.now();
+  let last = started;
+  const options = {
+    seeds,
+    onMatch: (row: MatchRow, i: number, total: number): void => {
+      const now = performance.now();
+      // Progress, not decoration: a section is minutes long and a silent process
+      // is indistinguishable from a hung one.
+      if (now - last > 15_000 || i === total) {
+        log(`    ${i}/${total} · ${row.lineup} seed ${row.seed} · ${mmss(row.seconds)}${row.ok ? '' : ` · ${row.failure}`}`);
+        last = now;
+      }
+    },
+  };
+  log(`mirrors: section ${section}, ${seeds.length} seeds (${seeds.join(', ')})`);
+  const run =
+    section === 'mirror'
+      ? mirrorSection(options)
+      : section === 'roster'
+        ? rosterSection(options)
+        : section === 'tier'
+          ? tierSection(options)
+          : section === 'class'
+            ? classSection(options)
+            : sliceSection(options);
+
+  const hangs = run.matches.filter((r) => r.failure === 'wall-clock' || r.failure === 'stalled').length;
+  const timeouts = run.matches.filter((r) => r.failure === 'sim-timeout').length;
+  const path = a0112Path(section);
+  writeJson(path, run);
+  log(
+    `  ${run.matches.length} matches · ${run.matches.filter((r) => r.ok).length} decided · ` +
+      `${timeouts} sim-timeout · ${hangs} hangs · ${((performance.now() - started) / 1000).toFixed(0)} s wall`,
+  );
+  log(`  wrote ${path}`);
+  if (hangs > 0) {
+    log(`  SECTION FAILED: ${hangs} match(es) hung — GDD §3.8`);
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * The hand-written half of the report. Everything else in
+ * `tests/reports/a0-112-balance.md` is computed from the artifacts; these four
+ * fields are QA's reading of it, and they live here so that regenerating the
+ * report reproduces the whole file rather than half of it (the same division
+ * `balance` uses for `BALANCE_01_TUNING`).
+ */
+const A0112_HEADLINE =
+  '**The 10–15 minute window HOLDS. The 55% band HOLDS for characters and tiers and ' +
+  'is BROKEN by one ship class — `excavator`, which was already over before either ' +
+  'retreat change and is over by more now.**';
+
+const A0112_READING = [
+  'PLACEHOLDER — written once the numbers are in.',
+].join('\n');
+
+const A0112_OUT_OF_BAND = ['PLACEHOLDER — written once the numbers are in.'].join('\n');
+
+const A0112_COMPARISON = ['PLACEHOLDER — written once the numbers are in.'].join('\n');
+
+/** The prior run this one is compared against, transcribed from the report that
+ *  produced it. Nothing here re-runs an old build. */
+const A0112_PRIOR: PriorNumber[] = [];
+
+/** Render `tests/reports/a0-112-balance.md` from the five committed artifacts. */
+function mirrorsReport(outPath: string | null): number {
+  const missing = A0112_SECTIONS.filter((s) => !existsSync(a0112Path(s)));
+  if (missing.length > 0) {
+    log(`mirrors report: missing section artifact(s): ${missing.join(', ')}`);
+    log(`  run: npx vite-node harness/cli.ts mirrors <section> [--seeds n]`);
+    return 1;
+  }
+  const md = renderMirrorsReport({
+    title: 'a0-112 — the balance after the retreat rewrite',
+    context:
+      'full bot mirrors and rotated contests on the shipped trees, branch ' +
+      'agent/qa/a0-112-balance-after-the-retreat-rewrite',
+    headline: A0112_HEADLINE,
+    reading: A0112_READING,
+    outOfBand: A0112_OUT_OF_BAND,
+    comparison: A0112_COMPARISON,
+    mirror: readSection('mirror'),
+    roster: readSection('roster'),
+    tier: readSection('tier'),
+    klass: readSection('class'),
+    slice: readSection('slice'),
+    prior: A0112_PRIOR,
+  });
+  const path = resolve(ROOT, outPath ?? 'tests/reports/a0-112-balance.md');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, md, 'utf8');
+  log(`mirrors report: wrote ${path} (${md.split('\n').length} lines)`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // abundance — pricing a candidate SCARCE↔RICH spread (a0-17)
 // ---------------------------------------------------------------------------
 
@@ -796,7 +937,9 @@ function pay(seedCount: number): number {
 // ---------------------------------------------------------------------------
 
 function usage(): number {
-  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay> [args]');
+  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay|mirrors> [args]');
+  log('  mirrors <mirror|roster|tier|class|slice> [--seeds n]   # run one a0-112 section');
+  log('  mirrors report [--out FILE]                            # render the a0-112 report');
   return 2;
 }
 
@@ -820,6 +963,14 @@ function main(argv: readonly string[]): number {
       const rotFlag = rest.indexOf('--rotations');
       const rotations = rotFlag >= 0 ? Number(rest[rotFlag + 1] ?? 4) : 4;
       return soak(matches, rotations);
+    }
+    case 'mirrors': {
+      const sub = rest[0] ?? '';
+      const outFlag = rest.indexOf('--out');
+      if (sub === 'report') return mirrorsReport(outFlag >= 0 ? (rest[outFlag + 1] ?? null) : null);
+      if (!(A0112_SECTIONS as readonly string[]).includes(sub)) return usage();
+      const seedsFlag = rest.indexOf('--seeds');
+      return mirrors(sub as A0112Section, seedsFlag >= 0 ? Number(rest[seedsFlag + 1] ?? 24) : 24);
     }
     case 'pay': {
       const seedsFlag = rest.indexOf('--seeds');

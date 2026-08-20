@@ -112,6 +112,7 @@ describe('the statistics the report quotes', () => {
       collapseTime: -1,
       wavesSpawned: 0,
       waveInterval: WAVE_INTERVAL_S,
+      telemetry: null,
       ...over,
     };
   }
