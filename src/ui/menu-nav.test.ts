@@ -156,3 +156,62 @@ describe('a match is never the only way out', () => {
     expect(reachesMainMenuWithoutMatch('end-eliminated')).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// a0-100c — the one screen with a ruling attached to how many ways in it has
+// ---------------------------------------------------------------------------
+
+describe('SETTINGS has exactly two ways in (a0-100c)', () => {
+  /** Every node that IS a settings screen. There are two, because settings is
+   *  reached in two contexts — before a match and inside one — and the pause
+   *  flavour is a distinct node only because it must not leave the match. */
+  const SETTINGS_SCREENS: readonly NavScreen[] = ['settings', 'pause-settings'];
+
+  it('settings opens from the main menu and the pause menu, and nowhere else', () => {
+    // The developer's ruling, 2026-08-19, from the doors screen:
+    //
+    //   "there should not be a settings button on this page, the settings page
+    //    was literally in the main menu one page up... it should be there and
+    //    pause menu only..."
+    //
+    // Driven from the GRAPH, so it is the map that is on trial and not a screen
+    // this file happens to remember. It fails the moment a third route is
+    // recorded — and the route it was written against was real: until a0-100c
+    // the doors screen carried a SETTINGS plate that reached `openSettings()`
+    // through `main.ts` `applyEntryTarget`, which is what this suite could not
+    // see, because NAV_EDGES had never been told about it.
+    const openedFrom = NAV_EDGES.filter((e) => SETTINGS_SCREENS.includes(e.to)).map((e) => e.from);
+
+    expect([...new Set(openedFrom)].sort()).toEqual(['main-menu', 'pause']);
+    // …and each of the two is exactly ONE edge, so "two ways in" cannot be met
+    // by two different controls on the same screen both opening it.
+    expect(openedFrom.length).toBe(2);
+  });
+
+  it('names the control on each of those two edges SETTINGS', () => {
+    // The ruling is about a button with a word on it, so the graph has to carry
+    // the word — a route recorded under some other affordance would satisfy the
+    // count above while describing a different screen.
+    for (const edge of NAV_EDGES.filter((e) => SETTINGS_SCREENS.includes(e.to))) {
+      expect(edge.via, `${edge.from} -> ${edge.to}`).toBe('SETTINGS');
+    }
+  });
+
+  it('gives the doors screen no settings route at all — BACK is its footer', () => {
+    // The specific deletion. The doors keep their way out, and it reaches the
+    // main menu where settings lives one press away: the developer's own
+    // argument for why the button was redundant.
+    const fromDoors = NAV_EDGES.filter((e) => e.from === 'online');
+    expect(fromDoors.every((e) => !SETTINGS_SCREENS.includes(e.to))).toBe(true);
+    expect(fromDoors.some((e) => e.via === 'BACK' && e.to === 'main-menu')).toBe(true);
+  });
+
+  it('lets both settings screens back out without starting a match', () => {
+    // The other half of the rule, for the two screens this block is about: a
+    // ruling that cut a way IN must not have left either of them a trap.
+    for (const screen of SETTINGS_SCREENS) {
+      expect(screenExits(screen).length, `${screen} has an exit`).toBeGreaterThan(0);
+      expect(reachesMainMenuWithoutMatch(screen), `${screen} reaches the menu`).toBe(true);
+    }
+  });
+});

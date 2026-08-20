@@ -32,6 +32,21 @@
  * pause overlay) — the graph would lie if it stopped at the lobby.
  */
 export type NavScreen =
+  /**
+   * **THE TITLE GATE** (a0-50; `src/ui/title-gate`) — the airlock the wordmark is
+   * stamped into, and the screen a clean boot actually opens on. A press operates
+   * the door and the main menu is behind it; `Escape` reseals it, but only from
+   * the menu's top level (`canReseal: () => mainMenu.atTopLevel()`), which is why
+   * this node has exactly one way in and one way out.
+   *
+   * Added by the a0-100c audit, which is the first time this graph was checked
+   * against the SCREENS rather than trusted. It is a DOM overlay rather than a
+   * Pixi screen, and that is precisely how it stayed off a map of the shell for
+   * this long — the omission was about where the code lives, not about what the
+   * player can be looking at. Skipped by `?gate=0`, which is how the live-stage
+   * and evidence harnesses boot straight to the menu.
+   */
+  | 'title-gate'
   /** The front door and the one true destination — a clean boot opens here. */
   | 'main-menu'
   /** **The doors** — the one screen PLAY opens (ratified: one play flow): SOLO
@@ -88,6 +103,7 @@ export type NavScreen =
 
 /** Every screen, in a stable order (the audit list). */
 export const NAV_SCREENS: readonly NavScreen[] = [
+  'title-gate',
   'main-menu',
   'online',
   'online-keypad',
@@ -140,6 +156,13 @@ export interface NavEdge {
  * cares about the *return* edges, but a full graph reads as the map it is.
  */
 export const NAV_EDGES: readonly NavEdge[] = [
+  // --- The title gate, in front of the menu (a0-50; main.ts `titleGate`) ------
+  // A press operates the door; the menu was behind it the whole time. Escape
+  // reseals from the menu's top level and nowhere deeper — a reseal over an open
+  // settings panel is the wrong answer to the same key.
+  { from: 'title-gate', to: 'main-menu', via: '(operate the door)' },
+  { from: 'main-menu', to: 'title-gate', via: 'ESCAPE (reseal)', escape: true },
+
   // --- Main menu → the three screens it opens (openMainMenu.onPointerDown) -----
   // PLAY is now the ONE door into a match, and what it opens is the doors screen
   // (ratified: one play flow). It builds no world and no lobby of its own — the
@@ -162,6 +185,18 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // control that navigates nowhere is a fact about the map, not a gap in it. The
   // day CAMPAIGN is built it gains a node and an edge, in the same PR as the code.
   //
+  // **There is no `online -> settings` edge, and that is now the truth rather
+  // than an omission (a0-100c).** Until this PR the doors drew a SETTINGS plate
+  // on the trailing end of their footer beam; it reached `openSettings()` in
+  // `main.ts` and really did open the screen, and this graph never recorded it —
+  // the first control the audit below caught, and the reason the audit was run.
+  // The developer's ruling deleted the control: **settings opens from the main
+  // menu and the pause menu, and nowhere else** (held by `menu-nav.test.ts`
+  // `settings opens from the main menu and the pause menu, and nowhere else`).
+  // BACK is what the screen keeps, and it reaches the menu where settings lives
+  // one press away — which is the developer's own argument for why the button
+  // was redundant.
+  //
   // BACK leaves for the menu (closeOnline); Escape does the same on a pointer.
   { from: 'online', to: 'main-menu', via: 'BACK', escape: true },
   { from: 'online', to: 'online-keypad', via: 'JOIN' },
@@ -176,6 +211,18 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // A submitted code joins the host's room and lands in the same lobby, guest
   // flavour — the seats fill live, the map and mode read-only.
   { from: 'online-keypad', to: 'lobby-online', via: 'JOIN (code)' },
+  // The SAME node, by the OTHER affordance: JOIN's second mode is a live listing
+  // (u17-01), and pressing a row goes to the allocator and lands in the identical
+  // guest lobby (`main.ts` `pressBrowseRowAt` -> `startListingJoin`). Recorded in
+  // its own right by the a0-100c audit: the destination was already covered by the
+  // edge above, so reachability never lied — but a map that names one of a
+  // screen's two ways to a room and not the other is a map you have to read the
+  // code to trust.
+  { from: 'online-keypad', to: 'lobby-online', via: '(a listing row)' },
+  // The keypad's remaining controls navigate NOWHERE, and are recorded here for
+  // the same reason CAMPAIGN is: the mode switch (CODE <-> BROWSE) changes which
+  // half of this screen is drawn and never which screen you are on; the pad's
+  // keys and ERASE edit the code in place. Three controls, one node, no edges.
 
   // --- Settings (closeSettings / Escape) --------------------------------------
   { from: 'settings', to: 'main-menu', via: 'DONE', escape: true },
@@ -256,9 +303,17 @@ export const NAV_EDGES: readonly NavEdge[] = [
 // The proof
 // ---------------------------------------------------------------------------
 
-/** The ways out of a screen that do NOT start a match — the genuine exits. Empty
- *  for {@link NAV_ROOT} (it is the destination); non-empty for every other screen,
- *  which is the "every screen you can leave" half of the rule. */
+/**
+ * The ways out of a screen that do NOT start a match — the genuine exits.
+ * Non-empty for every screen, which is the "every screen you can leave" half of
+ * the rule.
+ *
+ * {@link NAV_ROOT} is the one screen whose exits are not what the rule is about:
+ * it is the destination, so it owes nobody a way out. It is no longer *empty*,
+ * though — since the a0-100c audit put the title gate on the map, the menu can
+ * reseal the door in front of itself (`ESCAPE`), and a graph that omitted that
+ * to keep a sentence true would be the omission this file exists to prevent.
+ */
 export function screenExits(screen: NavScreen): readonly NavEdge[] {
   return NAV_EDGES.filter((e) => e.from === screen && !e.startsMatch);
 }
