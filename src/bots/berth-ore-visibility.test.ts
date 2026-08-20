@@ -67,7 +67,7 @@ import { MAPS } from '../sim/maps';
 import { SHIP_SENSOR_RANGE, WORLD_SIZE } from '../sim/constants';
 import { pointSensed, sensorSources } from '../sim/sensing';
 import type { World } from '../sim/state';
-import { HUMAN_VISUAL_RANGE, perceive } from './perception';
+import { DEFAULT_PERCEPTION, HUMAN_VISUAL_RANGE, perceive } from './perception';
 
 // --- the boards under test -------------------------------------------------
 
@@ -160,7 +160,10 @@ describe('a ship on its own berth sees its own ore field — the shipped arena',
     // Fog honesty runs both ways (GDD §2.9). A bot that could still see a field
     // its human counterpart cannot would be reading the board through a wider
     // window than the cockpit gives, which is the handicap-in-reverse.
-    expect(SHIP_SENSOR_RANGE).toBeLessThan(HUMAN_VISUAL_RANGE);
+    // 520 < 720: the reach a bot actually gets (`DEFAULT_PERCEPTION`), not just
+    // the 900 ceiling `resolvePerception` clamps to.
+    expect(SHIP_SENSOR_RANGE).toBeLessThan(DEFAULT_PERCEPTION.visualRange);
+    expect(DEFAULT_PERCEPTION.visualRange).toBeLessThanOrEqual(HUMAN_VISUAL_RANGE);
     for (const mapId of SQUARE_MAPS) {
       const fog = CEILING.fog[mapId as keyof typeof CEILING.fog];
       const bot = CEILING.bot[mapId as keyof typeof CEILING.bot];
