@@ -1279,16 +1279,18 @@ export class Hud extends Container {
     // Top-left ORE: just the safe banked number the Build wheel spends.
     this.bankedText.text = `${model.banked}`;
     this.lastBankedTotal = model.banked;
-    // Keyed on the number AND the frame scale: `layout()` clears the key on a
-    // resize, and a total that has not moved since must still re-stack at the new
-    // type size rather than keep last viewport's ground.
-    const oreKey = `${model.banked}|${this.metrics.scale}`;
+    // Keyed on the MEASURED boxes rather than on the number, because that is what
+    // the ground is sized from: a resize re-scales them (and `layout()` clears the
+    // key besides), and so does the real face landing after the boot fallback —
+    // `ORE` never changes, but its width does, and a cluster laid out against
+    // Trebuchet would keep that placement all match. Pixi caches text metrics, so
+    // reading the four numbers per frame is a dirty check, not a measure.
+    const label = { width: this.totalLabel.width, height: this.totalLabel.height };
+    const numeral = { width: this.bankedText.width, height: this.bankedText.height };
+    const oreKey =
+      `${label.width}x${label.height}|${numeral.width}x${numeral.height}|${this.metrics.scale}`;
     if (oreKey !== this.oreChromeKey) {
-      const layout = oreCounterLayout(
-        { width: this.totalLabel.width, height: this.totalLabel.height },
-        { width: this.bankedText.width, height: this.bankedText.height },
-        this.metrics,
-      );
+      const layout = oreCounterLayout(label, numeral, this.metrics);
       this.totalLabel.x = layout.label.x;
       this.totalLabel.y = layout.label.y;
       this.bankedText.x = layout.numeral.x;
