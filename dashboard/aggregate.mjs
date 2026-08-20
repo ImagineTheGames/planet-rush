@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { verdictRows } from './art-choices.mjs';
 
 const readJson = (p, fallback = null) => {
   try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return fallback; }
@@ -128,14 +129,23 @@ export function aggregate(statusDir, queueDir, workspaceDir, now = Date.now()) {
       for (const [kind, file] of [['ART', 'art-choices.json'], ['SOUND', 'sound-choices.json']]) {
         const store = readJson(join(statusDir, file), null);
         if (!store || typeof store !== 'object') continue;
-        for (const [key, v] of Object.entries(store)) {
-          if (!v || typeof v !== 'object' || !v.at) continue;
+        // ONE ROW PER ANSWER, not per entry (a0-109). An ART board can now hold
+        // an answer per question, and this walked one level deep and read
+        // `.verdict` off the entry — under the new shape that is `undefined`, so
+        // every future ART verdict would raise no ping and the Director would
+        // learn about the developer's pick by happening to look. That is the
+        // exact failure this ping exists to prevent: an ART deny once sat 17
+        // hours, a SOUND deny eight days.
+        //
+        // `verdictRows` reads both shapes, so SOUND — one verdict per slot,
+        // unchanged — still produces exactly the rows it always did.
+        for (const row of verdictRows(store)) {
           out.push({
-            kind, key, at: v.at,
-            verdict: String(v.verdict ?? ''),
-            reason: typeof v.reason === 'string' ? v.reason : '',
+            kind, key: row.key, at: row.at,
+            verdict: row.verdict,
+            reason: row.reason,
             // A deny is the case that needs NEW work; a pick unblocks existing work.
-            denied: /deny/i.test(String(v.verdict ?? '')),
+            denied: /deny/i.test(row.verdict),
           });
         }
       }

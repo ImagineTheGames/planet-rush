@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { aggregate } from './aggregate.mjs';
 import { startNotifier } from './notifier.mjs';
 import { board } from './board.mjs';
+import { describeChoices, describeReview, recordVerdict, clearVerdict } from './art-choices.mjs';
 
 const STATUS = process.env.STATUS_DIR ?? '/status';
 const QUEUE = process.env.QUEUE_DIR ?? '/queue';
@@ -301,12 +302,26 @@ createServer((req, res) => {
     try {
       boards = readdirSync(join(WORKSPACE, 'docs', 'art-direction')).filter(f => f.endsWith('.html'));
     } catch { /* none */ }
-    choices = readAgentJson(join(STATUS, 'art-choices.json'), {},
+    const rawChoices = readAgentJson(join(STATUS, 'art-choices.json'), {},
       { label: "the developer's ART verdicts (art-choices.json)", shape: v => v && typeof v === 'object' });
     // Curated by the Director: ONLY boards listed here are awaiting a decision,
     // with their REAL option labels. Everything else is ratified reference.
-    review = readAgentJson(join(STATUS, 'art-review.json'), {},
+    const rawReview = readAgentJson(join(STATUS, 'art-review.json'), {},
       { label: 'the ART review manifest (art-review.json)', shape: v => v && typeof v === 'object' });
+    // ONE ANSWER PER QUESTION, NOT PER BOARD (a0-109). A board may ask several
+    // things — the explosion lab asks three, one per family — and the store used
+    // to have room for one verdict per board, so the first button pressed was
+    // written as THE answer and the other eighteen candidates left the page:
+    // "i didnt pick any of the explosions, i just clicked something and it all
+    // went as if i had approved them".
+    //
+    // Both halves are normalised HERE, on the way out, and nothing is written
+    // back: `describeChoices` migrates the old one-verdict entries on read (they
+    // become the answer to the board's one question and mean exactly what they
+    // always meant) and adds what the page routes on — which questions are
+    // settled, which are still open, and whether the board is decided at all.
+    review = describeReview(rawReview);
+    choices = describeChoices(rawChoices, rawReview);
     // What HAPPENED to each decision. The developer picked a concept and the
     // card moved to a reference shelf labelled "already decided" — which told
     // them the vote was counted and nothing about whether anyone was acting on
@@ -322,6 +337,23 @@ createServer((req, res) => {
       const hits = briefsMentioning(board);
       if (hits.length) work[board] = hits;
     }
+    // ...and per ANSWER, now that one board can carry three of them. A board
+    // with three picks has three consequences, and "the brief that builds your
+    // pick" has to mean the brief that builds THAT pick — the brief porting the
+    // chosen ship explosion names `ship-hard-snap`, not the lab it came from.
+    // Falls back to the board's own briefs on the page when an option has none.
+    //
+    // Only ids long enough to be a real token are looked up: `briefsMentioning`
+    // is a substring match, so asking it about the verdict "D" would report
+    // every brief in the queue as work on that pick.
+    for (const state of Object.values(choices)) {
+      for (const answer of Object.values(state.answers ?? {})) {
+        const id = String(answer.verdict ?? '');
+        if (!/^[a-z0-9][a-z0-9._-]{5,}$/i.test(id) || work[id]) continue;
+        const hits = briefsMentioning(id);
+        if (hits.length) work[id] = hits;
+      }
+    }
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ boards, choices, review, work }));
     return;
@@ -331,16 +363,29 @@ createServer((req, res) => {
     req.on('data', c => { body += c; });
     req.on('end', () => {
       try {
-        const { board, verdict, reason } = JSON.parse(body);
-        if (typeof board !== 'string' || typeof verdict !== 'string') throw new Error('bad');
+        // `question` names WHICH of the board's questions this answers, and
+        // defaults to the sole question every other board asks — so a page that
+        // never heard of questions still records exactly what it always did.
+        // `clear: true` takes an answer back: the developer changing their mind
+        // is a normal event, and until now undoing a tap meant the Director
+        // hand-editing status/art-choices.json.
+        const { board, question, verdict, reason, clear } = JSON.parse(body);
+        if (typeof board !== 'string') throw new Error('bad');
+        if (clear !== true && typeof verdict !== 'string') throw new Error('bad');
         // NEVER clobber existing verdicts. This used to default to {} on a parse
         // failure and then writeFileSync the whole object back — so one corrupt
         // file silently erased every ART decision the developer had ever made,
         // with no backup anywhere (status/ is gitignored). Absent is a fresh
         // start; present-but-corrupt refuses the write and says why.
         const choices = readChoicesOrRefuse(join(STATUS, 'art-choices.json'), 'ART');
-        choices[board.replace(/[^a-z0-9._-]/gi, '')] = { verdict: verdict.slice(0, 64), reason: typeof reason === 'string' ? reason.slice(0, 500) : undefined, at: new Date().toISOString() };
-        writeFileSync(join(STATUS, 'art-choices.json'), JSON.stringify(choices, null, 2));
+        // Migration happens on READ, inside these two — they rebuild only the
+        // entry being answered and hand every other one straight back, so the
+        // boards nobody touched serialise exactly as they were found. A load has
+        // never rewritten this file and still does not.
+        const next = clear === true
+          ? clearVerdict(choices, { board, question })
+          : recordVerdict(choices, { board, question, verdict, reason });
+        writeFileSync(join(STATUS, 'art-choices.json'), JSON.stringify(next, null, 2));
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
         res.end(JSON.stringify({ ok: true }));
       } catch {

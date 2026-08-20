@@ -1,0 +1,199 @@
+{
+  "facility-concepts-r2.html": {
+    "question": "Round 2 — pick the mining-station look. Round 1 was denied: \"none of these look like a mining space station\". a2-03 builds the winner.",
+    "options": [
+      {
+        "id": "D",
+        "label": "D — The Cutterhead"
+      },
+      {
+        "id": "E",
+        "label": "E — The Hopper Yard"
+      },
+      {
+        "id": "F",
+        "label": "F — The Open Cut"
+      }
+    ]
+  },
+  "explosion-lab.html": {
+    "question": "Pick an explosion for each of the three families — ships, stations, asteroids. Three separate questions: answering one leaves the other two open, and nothing is ported until you name one. Every candidate is built from the game's own particle kinds, at true scale — each plays live, with the filmstrip at 0.05 / 0.15 / 0.35 / 0.6 / 1.0 / 1.5 s underneath it. \"Today\" in each family is what currently ships.",
+    "options": [
+      {
+        "id": "ship-today",
+        "label": "SHIPS — Today (what ships now)"
+      },
+      {
+        "id": "ship-hard-snap",
+        "label": "SHIPS — Hard snap"
+      },
+      {
+        "id": "ship-break-up",
+        "label": "SHIPS — Break-up"
+      },
+      {
+        "id": "ship-fuel-burn",
+        "label": "SHIPS — Fuel burn"
+      },
+      {
+        "id": "ship-compact",
+        "label": "SHIPS — Compact"
+      },
+      {
+        "id": "ship-cold-vent",
+        "label": "SHIPS — Cold vent"
+      },
+      {
+        "id": "station-today",
+        "label": "STATIONS — Today (what ships now)"
+      },
+      {
+        "id": "station-deadweight",
+        "label": "STATIONS — Deadweight"
+      },
+      {
+        "id": "station-long-settle",
+        "label": "STATIONS — Long settle"
+      },
+      {
+        "id": "station-implosion",
+        "label": "STATIONS — Implosion"
+      },
+      {
+        "id": "station-ash",
+        "label": "STATIONS — Ash"
+      },
+      {
+        "id": "station-departure",
+        "label": "STATIONS — Departure (breaks the §4.7 stance)"
+      },
+      {
+        "id": "asteroid-today",
+        "label": "ASTEROIDS — Today (chips, what ships now)"
+      },
+      {
+        "id": "asteroid-dust-bloom",
+        "label": "ASTEROIDS — Dust bloom"
+      },
+      {
+        "id": "asteroid-grit",
+        "label": "ASTEROIDS — Grit"
+      },
+      {
+        "id": "asteroid-hang",
+        "label": "ASTEROIDS — Hang"
+      },
+      {
+        "id": "asteroid-shell",
+        "label": "ASTEROIDS — Shell"
+      },
+      {
+        "id": "asteroid-no-ring",
+        "label": "ASTEROIDS — No ring"
+      },
+      {
+        "id": "asteroid-compact-dust",
+        "label": "ASTEROIDS — Compact dust"
+      }
+    ],
+    "questions": [
+      {
+        "id": "ships",
+        "title": "SHIPS",
+        "question": "Which explosion should a destroyed SHIP use? \"Today\" is what currently ships.",
+        "options": [
+          {
+            "id": "ship-today",
+            "label": "SHIPS — Today (what ships now)"
+          },
+          {
+            "id": "ship-hard-snap",
+            "label": "SHIPS — Hard snap"
+          },
+          {
+            "id": "ship-break-up",
+            "label": "SHIPS — Break-up"
+          },
+          {
+            "id": "ship-fuel-burn",
+            "label": "SHIPS — Fuel burn"
+          },
+          {
+            "id": "ship-compact",
+            "label": "SHIPS — Compact"
+          },
+          {
+            "id": "ship-cold-vent",
+            "label": "SHIPS — Cold vent"
+          }
+        ]
+      },
+      {
+        "id": "stations",
+        "title": "STATIONS",
+        "question": "Which explosion should a destroyed STATION use? GDD §4.7 makes that death the most serious moment in the game and the current effect is deliberately not a firework — \"Departure\" is the one that breaks that stance, included so you can see what you would be turning down.",
+        "options": [
+          {
+            "id": "station-today",
+            "label": "STATIONS — Today (what ships now)"
+          },
+          {
+            "id": "station-deadweight",
+            "label": "STATIONS — Deadweight"
+          },
+          {
+            "id": "station-long-settle",
+            "label": "STATIONS — Long settle"
+          },
+          {
+            "id": "station-implosion",
+            "label": "STATIONS — Implosion"
+          },
+          {
+            "id": "station-ash",
+            "label": "STATIONS — Ash"
+          },
+          {
+            "id": "station-departure",
+            "label": "STATIONS — Departure (breaks the §4.7 stance)"
+          }
+        ]
+      },
+      {
+        "id": "asteroids",
+        "title": "ASTEROIDS",
+        "question": "Which explosion should a shattered ASTEROID use? These lead with dust, per your note.",
+        "options": [
+          {
+            "id": "asteroid-today",
+            "label": "ASTEROIDS — Today (chips, what ships now)"
+          },
+          {
+            "id": "asteroid-dust-bloom",
+            "label": "ASTEROIDS — Dust bloom"
+          },
+          {
+            "id": "asteroid-grit",
+            "label": "ASTEROIDS — Grit"
+          },
+          {
+            "id": "asteroid-hang",
+            "label": "ASTEROIDS — Hang"
+          },
+          {
+            "id": "asteroid-shell",
+            "label": "ASTEROIDS — Shell"
+          },
+          {
+            "id": "asteroid-no-ring",
+            "label": "ASTEROIDS — No ring"
+          },
+          {
+            "id": "asteroid-compact-dust",
+            "label": "ASTEROIDS — Compact dust"
+          }
+        ]
+      }
+    ]
+  }
+}

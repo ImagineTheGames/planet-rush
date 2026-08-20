@@ -1,0 +1,11 @@
+{
+  "facility-concepts.html": {
+    "verdict": "DENY ALL",
+    "reason": "none of these look like a mining space station",
+    "at": "2026-08-06T01:31:49.432Z"
+  },
+  "facility-concepts-r2.html": {
+    "verdict": "D",
+    "at": "2026-08-07T16:53:00.279Z"
+  }
+}
