@@ -25,7 +25,24 @@ Branch: `agent/ui/a0-103-minimap-finds-its-corner`. PR: (pending).
   - RED output kept at `evidence/a0-103-anchor-reach/red-before-the-fix.txt`:
     24 violations, all `minimap`/`right`, all 8 touch profiles, and at 798x384
     it reproduces QA's rect to the pixel — `{x:586, y:292, 80x80}`, 132 px short.
-- (next commit) — **the minimap.**
+- `0fc6073` — **the minimap.** `collapsedRect(viewport, isTouch, insets,
+  fireCorner = false)`; threaded (all defaulted) through `minimapRect`,
+  `Minimap.hitTest`/`tap`, `MinimapView.update`, `Hud.updateMinimap` +
+  `Hud.minimapTap`. `Hud` answers `fireCorner` from
+  `liveOnGlassControls(...).fireButton`. `promptBand` deliberately asks for the
+  map at its LEFTMOST (DECISIONS §6). Sixth reservation row `minimap`/`right`.
+- `7d113b7` — **evidence.** `tools/a0-103-registry-dump.mjs` + before/after
+  registry dumps at 798x384 / 844x390 / 1280x800 and the 844x390 frame pair.
+  BEFORE reproduces a0-99's numbers exactly; AFTER moves the minimap's right gap
+  132 -> 12 and moves nothing else on any profile.
+- `6d82212` — **eleven phone goldens rebaked** (see DECISIONS §7 for the finding
+  that came with them).
+- `70dd6ec` — **dark-matter triage.** The module is nine test-only exports and
+  the gate is CI-blocking; §4.13 in `docs/dark-matter-scan.md` is the verdict
+  (SURFACE, the §4.7 shape) and the allowlist points at it.
+
+Green: `npx tsc --noEmit`, `npm test -- --run` (315 files / 5870 tests),
+`npm run dark-matter:check`, `goldens.spec.ts` iphone + desktop.
 
 ## DECISIONS
 
@@ -106,9 +123,39 @@ the map under every scheme and nothing about the prompt moves on either
 platform. Deliberately not threaded through `promptBand`/`promptBounds`/
 `promptWithdraws`/`promptWrapWidth`.
 
+### 7. The goldens moved — and something else was already stale
+
+11 of 26 iphone baselines regenerated. The 2 that came back byte-identical are
+the check on the method: `phone-landscape-thumb-band` is the one scene whose
+scheme DRAWS the FIRE button, and there the map correctly does not move.
+
+The finding: every regenerated landscape shot also moves EXACTLY 280 px inside
+the top HUD band, and `phone-landscape-hud-top` — a top-band clip the minimap
+cannot appear in — moves by those 280 and nothing else. That is a0-101's shield
+bar. Its rebake did not survive merge #478: `a2253a10` changed both HUD-top
+baselines and main took its own side of both (blob SHAs in the commit message).
+They pass only because 0.35% / 0.23% < the 1% tolerance — the same tolerance
+that let a 120 px minimap move through unnoticed.
+
+Regenerating from this tree picks the correction up, so the phone one is now
+true. `desktop-hud-top` is STILL STALE and this PR does not touch it: it is
+nothing to do with the minimap. Flagged for QA / a0-101 in the PR.
+
+### 8. Dark matter: triaged, not wired
+
+The gate is CI-blocking and the module is nine test-only exports. Wiring it into
+`src/ui` production was considered and rejected three ways (§4.13 in
+docs/dark-matter-scan.md): inside `collapsedRect` it asserts the arithmetic
+against itself; `Hud.describeLayout` reports PHYSICAL bounds so a HUD-side check
+would be wrong under the landscape lock; and the honest caller is
+`installLayoutHook`'s `placement()`, upstairs in Platform's file.
+
 ## NEXT
 
-- Full `npm test -- --run` sweep; rebake goldens if the touch minimap moved
-  pixels in any frozen scene.
-- Open the PR with the audit list (every id/edge the raw check flags, each
-  fixed or explained).
+- Nothing outstanding on the DoD. Open items handed on:
+  - `desktop-hud-top-desktop-linux.png` is pre-a0-101 on main (see §7) — QA's
+    call, deliberately not touched here.
+  - `reachViolations` + the two tables lift into `@platform/layout-registry`
+    verbatim whenever Platform wants them beside `placement()`.
+  - The field report's preferred resolution — shift FIRE so the map always takes
+    the corner — remains open and remains a platform-lane change.
