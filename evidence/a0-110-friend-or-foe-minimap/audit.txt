@@ -230,21 +230,83 @@ mark is coloured or sized remains the branch's difference alone, and the fog, th
 allegiance and the painting are all still done by the shipped pipeline.
 
 
-8. THE GOLDEN RE-BASELINE
+8. THE GOLDEN RE-BASELINE — NOT DONE, AND THE MEASUREMENTS THAT SAY WHY
 ------------------------------------------------------------------------------
-A TRAP WORTH RECORDING, because it nearly shipped a stale baseline as a green
-one. `npx playwright test --update-snapshots` on this Playwright (1.49.1) DOES
-NOT REWRITE A SNAPSHOT THAT PASSES. Run against the changed build it reported
-"50 passed" and rewrote zero files, and `git status` was clean — which reads
-exactly like "nothing changed" and is not the same claim at all.
+The brief asks for goldens rebaked from the merged tree. They are NOT rebaked,
+and this section is the reason, with the numbers. This is a report, not a
+shortcut: the work was done, measured, and then deliberately reverted.
 
-What was actually true: every in-match golden holds the corner map, the map's own
-station and ship marks did change hue and size, and the delta sat under the
-suite's `maxDiffPixelRatio: 0.01` gate. The baselines were stale AND green.
+FIRST, A TRAP WORTH RECORDING. `playwright test --update-snapshots` on this
+Playwright (1.49.1) DOES NOT REWRITE A SNAPSHOT THAT PASSES. Run against the
+changed build it printed "50 passed", rewrote zero files, and left `git status`
+clean — which reads exactly like "nothing changed" and is a different claim
+entirely. Confirmed by mtime: the -u run touched no file. The only path that
+actually writes is a0-103's: DELETE the PNGs, then regenerate.
 
-Confirmed by mtime — no snapshot file was touched by the -u run — and settled the
-way a0-103 settled it: the affected baselines were DELETED and regenerated, which
-is the only path that actually writes.
+Done that way, 45 of 50 goldens came back changed. Measured against the committed
+baselines with Playwright's own pixelmatch at ZERO tolerance
+(evidence/measure-golden-diff.mjs's comparator), and then split by WHERE the
+changed pixels are:
 
-  (regenerated set and per-shot deltas: see the commit that carries them)
+                                        in the minimap rect   elsewhere
+  desktop-frozen                                 203            2 421
+  desktop-frozen-teams                           700            2 421
+  desktop-build-wheel                            208            1 098
+  desktop-sky-coalsack                           208            1 767
+  phone-landscape-frozen                          62            1 550
+  phone-landscape-frozen-teams                   184            1 550
+  desktop-pause                                1 453          589 841
+  desktop-pause-confirm                        2 044          649 677
+  desktop-hud-footer                               —           15 474
+
+In every frame the minimap's own delta is a small minority of the change. The
+rest is not a0-110's, and all three sources were identified rather than guessed:
+
+  (a) THE BUILD BADGE IS THE COMMIT SHA. The ~60–240 px box that changes on
+      title, settings, codex, lobby, doors, ship-select and map-select — screens
+      with no minimap on them at all — is `src/render/build-badge.ts`, and
+      cropping it settles it beyond argument: the stored golden reads `85e34f2*`
+      and the regenerated one reads `0b388ae*`, which is this branch's own HEAD.
+      **Every golden that draws the badge is rewritten by ANY rebake on ANY
+      branch, permanently, with content that means nothing.**
+
+  (b) THE FROZEN SCENE IS NOT PIXEL-DETERMINISTIC IN THE HUD BAND. The 2 421 px
+      that move in `desktop-frozen` sit in y = 18..89, the top chrome band, and
+      the crop shows the station SHIELD bar at a different length. Identical
+      count in `desktop-frozen-teams`, so it is systematic, not random — and it
+      is nothing this branch touches (station-hp.ts is not in the diff).
+
+  (c) THE PAUSE GOLDENS MOVE ~60% OF THEIR PIXELS with no visible difference.
+      Laid side by side the two frames are the same screen, same layout, same
+      copy; the delta is a sub-value shift spread across the full-screen menu
+      backdrop, which zero-tolerance pixelmatch counts in its entirety.
+
+WHY THE GOLDENS WERE RESTORED RATHER THAN COMMITTED
+
+A golden is a whole frame, so re-baselining one adopts everything in it — a0-88's
+README says exactly this, and it is the rule that decides this case. Committing
+the rebake would have signed for 650 000 changed pixels on a pause screen and a
+shield bar this branch never touched, in order to correct a few hundred pixels of
+minimap it did.
+
+The alternative of splicing only the map rect into the committed PNG was
+considered and rejected: that fabricates a frame no build ever produced, which is
+worse than a stale one.
+
+WHAT IS TRUE ABOUT THE COMMITTED BASELINES, STATED PLAINLY
+
+They are STALE in the minimap corner — 62–700 px per in-match frame — and they
+are GREEN, because that delta is far under the suite's `maxDiffPixelRatio: 0.01`.
+The full golden suite was run twice against them with this change in place, once
+before the own-dot fix and once after, and passed 50/50 both times.
+
+FOR THE DIRECTOR — the finding, which is bigger than this brief
+
+The golden suite cannot currently be rebaked cleanly by anyone. (a) guarantees
+that every rebake mixes a meaningless sha change into every frame; (b) and (c)
+mean two more sources of drift ride along. That also quietly spends the 1%
+tolerance budget the gate exists to protect (the a1-01 / r2-01 finding, which
+`evidence/measure-golden-diff.mjs`'s own header warns about). Masking the badge
+rect in the golden comparison would fix (a) outright, and it is a change in the
+QA/tests lane rather than this one — so it is reported here rather than made.
 
