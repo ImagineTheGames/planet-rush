@@ -48,8 +48,77 @@ the resolution is what refuses to call it a draw.
 
 ## BUILT
 
-(kept current below)
+Branch `agent/gameplay/a0-113-a-draw-that-can-occur`, three commits:
+
+1. `d51fb44e` **test(a0-113): the draw the sim cannot reach — red.**
+   `src/sim/outcome.test.ts`, 10 cases. Six red on today's code:
+   `every seat dying on the same tick is a draw` (QA's eight-seat wipe),
+   `two seats destroying each other on the same tick is a draw` (the real
+   one), `the draw does not depend on which core the tick resolved first`,
+   `collapse taking the last cores together is a draw`, `a draw ends the
+   match once and is never re-decided`, `both sides' last cores dying on
+   one tick is a draw`. Four already green and kept green: a survivor by
+   one tick wins, seven-of-eight is a victory, and the TEAMS ally path.
+
+2. `6671a9de` **fix(a0-113).** `resolveWinner`'s no-survivor branch sets
+   `winner`/`winningTeam` to null instead of `lastToDie(m.eliminated)`.
+   `lastToDie()` and `teamOfOwner()` deleted (the latter had no other
+   caller). `match.eliminated` untouched. Docs corrected in `match.ts`,
+   `state.ts`, `step.ts`. Four cases in `match.test.ts` that encoded the
+   tiebreak rewritten, plus the idle-field case (below).
+
+3. `9a2b…` **test(a0-113) [CROSS-LANE].** `src/bots/match-endgame.test.ts`
+   asserted the tiebreak (`expect(result.winner).toBe(order[order.length -
+   1])`, line 112). One assertion + comment, its own commit, flagged in the
+   PR for the Bots owner. It is the ONLY file outside `src/sim/` the change
+   touches.
+
+### The unforced draw, already in our own suite
+
+`match.test.ts` "delivers the whole field yield, and the idle field then
+resolves itself" — seed 11, two players, the shipped map, **no input at
+all** — now ends `winner === null`. Two untouched cores at identical HP
+under identical collapse entropy reach zero on the same tick. No debug
+queue, no QA rig: a shipped configuration that draws. That case is the
+answer to "can this happen in real play".
 
 ## DECISIONS
 
+**Made it a draw; did not keep the tiebreak.** The deciding fact is
+structural, not aesthetic: the no-survivor branch fires *only* on a
+same-tick wipe (see FINDING), so the tiebreak was not a tiebreak, it was
+the entire simultaneous-death case. Keeping it means DRAW can never
+happen; removing it means every all-dead ending is one. No third option
+exists to design, so "make the tiebreak smarter" was rejected on the way
+in.
+
+**GDD §1 line 49 now contradicts the sim, and I did not edit it.** It
+reads *"If the final reactors die in the same instant, the reactor (in
+Teams, the side) that reached zero last in the simulation's resolution
+order wins — whoever dies last, wins."* The brief rules the other way
+("the resolution is wrong and must return a draw"). The brief is the
+later instruction and the Director's; GDD.md is not my file. **Flagged in
+the PR as an amendment for the Director.** Line 690's changelog fragment
+("ties resolve last-to-die") needs the same edit.
+
+**Did not touch the copy, per the brief.** None was needed: the UI already
+ships the whole screen — `HEADLINES.draw = 'DRAW'` and
+`subheadFor` → `'No reactor survived the collapse.'`
+(`src/ui/end-of-match.ts:271`, `:328-329`), accent null. `winner:
+PlayerId | null` is already the wire type end-to-end
+(`src/net/transport.ts:754-757`, `loopback.ts:325`, `server/room.ts:1373`,
+`lobby-flow.ts:826-830`), so online draws too, with no net change.
+**One copy nit reported, not fixed:** the subhead says "the collapse", and
+a draw also arrives by mutual destruction under fire. Writer's call.
+
+**Rejected: making only the two-seat case a draw and leaving the eight-seat
+wipe a win.** No principle separates them — both are "nobody outlived
+anybody" — and it would have preserved the exact artefact QA photographed.
+
 ## NEXT
+
+- Nothing outstanding on the sim.
+- For the Director: GDD §1 line 49 + line 690 need amending to the draw
+  rule. The sim is now the odd one out until they are.
+- For the Bots owner: review commit 3.
+- For the writer/UI: the draw subhead names the collapse only.
