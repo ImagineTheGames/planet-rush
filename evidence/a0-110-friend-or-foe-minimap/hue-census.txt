@@ -1,0 +1,129 @@
+
+before-phone-collapsed-map.png  —  5780 mark px matched of 264x264
+     230    4.0%  P1 Azure  [roster]
+     826   14.3%  P2 Cyan  [roster]
+     179    3.1%  P3 Spring  [roster]
+     405    7.0%  P4 Violet  [roster]
+     367    6.3%  P5 Magenta  [roster]
+     309    5.3%  P7 Chalk  [roster]
+     343    5.9%  P8 SlateBlue  [roster]
+     650   11.2%  SIDE friendly (plasma)  [side]
+      45    0.8%  SIDE hostile (shotEnemy2)  [side]
+     385    6.7%  NEUTRAL wreck (hullSteel)  [neutral]
+     238    4.1%  ore (signalYellow)  [reserved]
+      44    0.8%  chrome (patina)  [chrome]
+      19    0.3%  chrome (own rim, plasmaHot)  [chrome]
+    1740   30.1%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 7 distinct hue(s), 2659 px (46.0%) — P1 Azure, P2 Cyan, P3 Spring, P4 Violet, P5 Magenta, P7 Chalk, P8 SlateBlue
+  -> SIDE colours:    695 px (12.0%)
+
+after-phone-collapsed-map.png  —  5528 mark px matched of 264x264
+     435    7.9%  P2 Cyan  [roster]
+      21    0.4%  P7 Chalk  [roster]
+    1461   26.4%  SIDE friendly (plasma)  [side]
+    1058   19.1%  SIDE hostile (shotEnemy2)  [side]
+     377    6.8%  NEUTRAL wreck (hullSteel)  [neutral]
+     238    4.3%  ore (signalYellow)  [reserved]
+       2    0.0%  chrome (patina)  [chrome]
+     174    3.1%  chrome (own rim, plasmaHot)  [chrome]
+    1762   31.9%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 2 distinct hue(s), 456 px (8.2%) — P2 Cyan, P7 Chalk
+  -> SIDE colours:    2519 px (45.6%)
+
+before-phone-expanded-map.png  —  45753 mark px matched of 828x828
+    4042    8.8%  P1 Azure  [roster]
+    4530    9.9%  P2 Cyan  [roster]
+    1980    4.3%  P3 Spring  [roster]
+    4547    9.9%  P4 Violet  [roster]
+    3913    8.6%  P5 Magenta  [roster]
+    5620   12.3%  P7 Chalk  [roster]
+    3762    8.2%  P8 SlateBlue  [roster]
+    2317    5.1%  SIDE friendly (plasma)  [side]
+     274    0.6%  SIDE hostile (shotEnemy2)  [side]
+    2753    6.0%  NEUTRAL wreck (hullSteel)  [neutral]
+    3208    7.0%  ore (signalYellow)  [reserved]
+     213    0.5%  chrome (patina)  [chrome]
+    1713    3.7%  chrome (own rim, plasmaHot)  [chrome]
+    6881   15.0%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 7 distinct hue(s), 28394 px (62.1%) — P1 Azure, P2 Cyan, P3 Spring, P4 Violet, P5 Magenta, P7 Chalk, P8 SlateBlue
+  -> SIDE colours:    2591 px (5.7%)
+
+after-phone-expanded-map.png  —  42888 mark px matched of 828x828
+     276    0.6%  P1 Azure  [roster]
+     100    0.2%  P4 Violet  [roster]
+       1    0.0%  P5 Magenta  [roster]
+    1925    4.5%  P7 Chalk  [roster]
+       6    0.0%  P8 SlateBlue  [roster]
+   13706   32.0%  SIDE friendly (plasma)  [side]
+   11721   27.3%  SIDE hostile (shotEnemy2)  [side]
+    2766    6.4%  NEUTRAL wreck (hullSteel)  [neutral]
+    3208    7.5%  ore (signalYellow)  [reserved]
+       4    0.0%  chrome (patina)  [chrome]
+    2226    5.2%  chrome (own rim, plasmaHot)  [chrome]
+    6949   16.2%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 5 distinct hue(s), 2308 px (5.4%) — P1 Azure, P4 Violet, P5 Magenta, P7 Chalk, P8 SlateBlue
+  -> SIDE colours:    25427 px (59.3%)
+
+before-desktop-collapsed-map.png  —  1757 mark px matched of 156x156
+     108    6.1%  P1 Azure  [roster]
+     169    9.6%  P2 Cyan  [roster]
+      72    4.1%  P3 Spring  [roster]
+     182   10.4%  P4 Violet  [roster]
+     154    8.8%  P5 Magenta  [roster]
+     119    6.8%  P7 Chalk  [roster]
+     127    7.2%  P8 SlateBlue  [roster]
+     224   12.7%  SIDE friendly (plasma)  [side]
+      29    1.7%  SIDE hostile (shotEnemy2)  [side]
+     157    8.9%  NEUTRAL wreck (hullSteel)  [neutral]
+      80    4.6%  ore (signalYellow)  [reserved]
+       5    0.3%  chrome (patina)  [chrome]
+       1    0.1%  chrome (own rim, plasmaHot)  [chrome]
+     330   18.8%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 7 distinct hue(s), 931 px (53.0%) — P1 Azure, P2 Cyan, P3 Spring, P4 Violet, P5 Magenta, P7 Chalk, P8 SlateBlue
+  -> SIDE colours:    253 px (14.4%)
+
+after-desktop-collapsed-map.png  —  1679 mark px matched of 156x156
+       5    0.3%  P7 Chalk  [roster]
+     616   36.7%  SIDE friendly (plasma)  [side]
+     465   27.7%  SIDE hostile (shotEnemy2)  [side]
+     147    8.8%  NEUTRAL wreck (hullSteel)  [neutral]
+      80    4.8%  ore (signalYellow)  [reserved]
+      26    1.5%  chrome (own rim, plasmaHot)  [chrome]
+     340   20.3%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 1 distinct hue(s), 5 px (0.3%) — P7 Chalk
+  -> SIDE colours:    1081 px (64.4%)
+
+before-desktop-expanded-map.png  —  18167 mark px matched of 568x568
+    1883   10.4%  P1 Azure  [roster]
+    2230   12.3%  P2 Cyan  [roster]
+     985    5.4%  P3 Spring  [roster]
+    2127   11.7%  P4 Violet  [roster]
+    1883   10.4%  P5 Magenta  [roster]
+       2    0.0%  P6 Orange  [roster]
+    1831   10.1%  P7 Chalk  [roster]
+    1881   10.4%  P8 SlateBlue  [roster]
+     834    4.6%  SIDE friendly (plasma)  [side]
+     169    0.9%  SIDE hostile (shotEnemy2)  [side]
+    1239    6.8%  NEUTRAL wreck (hullSteel)  [neutral]
+    1529    8.4%  ore (signalYellow)  [reserved]
+     101    0.6%  chrome (patina)  [chrome]
+      34    0.2%  chrome (own rim, plasmaHot)  [chrome]
+    1439    7.9%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 8 distinct hue(s), 12822 px (70.6%) — P1 Azure, P2 Cyan, P3 Spring, P4 Violet, P5 Magenta, P6 Orange, P7 Chalk, P8 SlateBlue
+  -> SIDE colours:    1003 px (5.5%)
+
+after-desktop-expanded-map.png  —  16960 mark px matched of 568x568
+      33    0.2%  P2 Cyan  [roster]
+      13    0.1%  P3 Spring  [roster]
+      45    0.3%  P4 Violet  [roster]
+       2    0.0%  P6 Orange  [roster]
+      45    0.3%  P7 Chalk  [roster]
+    6716   39.6%  SIDE friendly (plasma)  [side]
+    5753   33.9%  SIDE hostile (shotEnemy2)  [side]
+    1196    7.1%  NEUTRAL wreck (hullSteel)  [neutral]
+    1529    9.0%  ore (signalYellow)  [reserved]
+      12    0.1%  chrome (patina)  [chrome]
+     127    0.7%  chrome (own rim, plasmaHot)  [chrome]
+    1489    8.8%  chrome (coverage disc, plasma)  [chrome]
+  -> ROSTER identity: 5 distinct hue(s), 138 px (0.8%) — P2 Cyan, P3 Spring, P4 Violet, P6 Orange, P7 Chalk
+  -> SIDE colours:    12469 px (73.5%)

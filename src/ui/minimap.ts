@@ -6,20 +6,45 @@
  * `Hud` owns both and feeds this a {@link MinimapFrame} each frame.
  *
  * **What it shows (sim-driven — GDD §2.2 "a minimap (bottom right)").** Arena
- * bounds, stations as owner-coloured squares (a derelict wreck goes neutral steel —
- * it is no longer owned, GDD §2.7), ships as smaller triangles pointed along their
+ * bounds, stations as side-coloured squares (a derelict wreck goes neutral steel —
+ * it is nobody's side, GDD §2.7), ships as smaller triangles pointed along their
  * heading (the local ship highlighted, a spawn-protected ship dimmed — GDD §2.1),
  * radar satellites as small diamonds (feature f1), the collapse ring while it is
  * active (GDD §2.3), and faint ore-field dots. **Marks and colours only** — no
  * nameplates, no health numbers (those are read off the station and the ship
  * themselves, GDD §2.2).
  *
- * **Shape is KIND, colour is OWNER (a0-88).** Two independent channels. Colour was
- * already carrying roster identity (style-guide §3), so when every body was a
- * filled circle the only thing left to separate a ship from a station was SIZE —
- * and at minimap scale on a phone that is no separation at all: *"the minimap shows
- * two circles. ships should be a different icon though to differentiate."* See
- * {@link MinimapShape} for the grammar and {@link markPolygon} for the geometry.
+ * **Shape is KIND, colour is SIDE (a0-88, amended a0-110).** Two independent
+ * channels. Shape came first and has not moved: triangle → ship, square → station,
+ * diamond → satellite, dot → ore, because when every body was the same filled
+ * circle only SIZE separated a ship from a home and at phone scale that is no
+ * separation at all (*"the minimap shows two circles. ships should be a different
+ * icon though to differentiate."*). See {@link MinimapShape} and
+ * {@link markPolygon}.
+ *
+ * What DID move is the colour channel. It used to carry roster identity
+ * (style-guide §3) — that is what a0-88 was working around when it went looking
+ * for a second channel. The developer overruled it **for this surface only**:
+ *
+ * > *"i feel like on minimap friendlies should all be blue, and enemies all red…
+ * > it would just make it easier to understand"*
+ *
+ * So on the minimap, and nowhere else, **colour answers friend or foe**
+ * ({@link MINIMAP_SIDE_COLORS}) — the same blue/red the nameplate's side tag
+ * already wears over the same hull (`./lobby` `SIDE_COLORS`, ratified u3), and the
+ * same blue/red a friendly and a hostile bolt already wear (`../art/vfx/shots`,
+ * *"all friendlies should have that same blue and all enemies red… even in team
+ * mode… in ffa its all red obviously"*). One rule, three surfaces.
+ *
+ * **The cost, stated rather than buried:** in a four-player FFA this map can no
+ * longer say WHICH rival a mark belongs to. That is the ratified trade — at a few
+ * pixels, on a glance object, "can it hurt me" is the question a player actually
+ * asks — and roster identity is still carried everywhere it can be read: the ship
+ * itself, the HP bars, the nameplates, the hull decal (style-guide §3 rule 3).
+ * The one place it comes back here is the **viewer-less** map (a spectator, a
+ * replay): with nobody looking there is no friend-or-foe question, so rather than
+ * paint everything neutral the map answers the question it still can — see
+ * {@link minimapViewerSide}.
  *
  * **Fog of war (RATIFIED feature f1).** The map renders ONLY the player's
  * sensed-state (`../sim/sensing`): fogged regions read dark, static geography a
@@ -64,6 +89,9 @@
 import type { PlayerId } from '@shared/types';
 import type { Rect } from '@platform/layout-registry';
 import { PALETTE } from '@render/index';
+import { DERIVED } from '../art/palette';
+import { SIDE_COLORS, sideRelation } from './lobby';
+import type { TeamTable } from './nameplates';
 import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
@@ -174,17 +202,40 @@ export const MINIMAP_THUMB_RESERVE_FRACTION = 0.16;
 // scales — a collapsed dot is tiny, the same dot expanded is readable)
 // ---------------------------------------------------------------------------
 
-const STATION_DOT_FRACTION = 0.04;
+export const STATION_DOT_FRACTION = 0.04;
 const STATION_DOT_MIN = 2;
-const SHIP_DOT_FRACTION = 0.026;
-const SHIP_DOT_MIN = 1.5;
+/**
+ * Ship marks came down **a quarter** at a0-110 (0.026 → 0.0195): *"also decrease
+ * the size of the ship icons on the minimap"*.
+ *
+ * The FRACTION is what moved; {@link SHIP_DOT_MIN} did not, and that is the whole
+ * shape of the fix. A mark that shrinks below legibility on the smallest supported
+ * map has been deleted rather than reduced, so the floor — the thing that catches
+ * a clamped 44 px square — is left exactly where it was. On every map anyone
+ * actually plays on (80 px on touch, 148 px on desktop, the expanded overlay) the
+ * fraction governs and the quarter lands in full.
+ *
+ * Why a ship read too big in the first place, which is not obvious from these two
+ * numbers: since a0-88 a ship is a TRIANGLE, and a triangle's ink is not bounded by
+ * its radius the way a circle's is. Its nose reaches {@link TRIANGLE_NOSE} = 1.95 r
+ * and its overall length is 2.86 r — so at the old 0.026 the 80 px corner map drew
+ * a ship **5.96 px long**, against a station square of 5.67 px, while nominally
+ * carrying the smaller radius. The ships were not merely large, they out-reached
+ * the anchors. TUNABLE.
+ */
+export const SHIP_DOT_FRACTION = 0.0195;
+export const SHIP_DOT_MIN = 1.5;
 /** A radar satellite reads a touch smaller than a ship — a small orbiting body,
- *  not a combatant (feature f1). */
-const SATELLITE_DOT_FRACTION = 0.02;
-const SATELLITE_DOT_MIN = 1.25;
+ *  not a combatant (feature f1). It takes the SAME 0.75× a0-110 put on the ship
+ *  (0.02 → 0.015) for exactly that reason: left at 0.02 it would have come out
+ *  LARGER than the ship it is supposed to read smaller than, which inverts this
+ *  file's own grammar. Stations and ore are the map's anchors and do not move —
+ *  they are not what the developer complained about. */
+export const SATELLITE_DOT_FRACTION = 0.015;
+export const SATELLITE_DOT_MIN = 1.25;
 /** The local ship's dot is drawn larger than an enemy's so it reads as *mine* at
  *  a glance — the minimap counterpart of the own-ship health bar's larger size. */
-const OWN_SHIP_DOT_MULTIPLIER = 1.55;
+export const OWN_SHIP_DOT_MULTIPLIER = 1.55;
 const ORE_DOT_FRACTION = 0.011;
 const ORE_DOT_MIN = 0.5;
 
@@ -249,6 +300,199 @@ export const MINIMAP_ORE_ALPHA = 0.28;
  *  makes), so the map distinguishes "I can see this field" from "I found this
  *  field earlier" without either one shouting. */
 export const MINIMAP_REMEMBERED_ORE_ALPHA = 0.14;
+
+// ---------------------------------------------------------------------------
+// Colour carries SIDE (a0-110) — friend or foe, in the palette that already
+// answers that question everywhere else in this game
+// ---------------------------------------------------------------------------
+//
+// > *"i feel like on minimap friendlies should all be blue, and enemies all red…
+// > it would just make it easier to understand"*  — the developer, 2026-08-20.
+//
+// This overrules "colour is roster identity" (style-guide §3) **on this surface
+// only**, and a0-88's shape channel survives untouched: shape still carries KIND.
+// See the module header for the trade the developer accepted (a four-player FFA
+// can no longer say *which* rival a mark is) and why it is a good one.
+//
+// **The palette is not a new decision, and that is the point.** Both hues were
+// ratified at u3 (2026-08-05) — *"perhaps just Friendly, and Enemy, with colors
+// like Blue for Friendly, Red for Enemy"* — and live in ONE table, `./lobby`
+// `SIDE_COLORS`, which the nameplate's side tag already reads. The tag floats over
+// the very hull whose mark this is. Two different blues for one fact is precisely
+// the drift that table exists to prevent, so this reads the table rather than
+// inventing a seventh hue.
+//
+//   FRIENDLY = `PALETTE.plasma` #4DC3FF. The brief flagged the ENERGY overlap
+//     (shields, the mining torch, weapon fire) as a real cost and asked for it to
+//     be argued rather than assumed. Accepted, on two grounds. First, nothing on
+//     this map draws energy — no shield, no torch, no bolt — so the hue is
+//     unambiguous *here*. Second, and stronger: across surfaces it is not an
+//     overlap at all. `../art/vfx/shots` already paints every friendly bolt plasma
+//     and every hostile bolt red, on the developer's own ruling — *"all friendlies
+//     should have that same blue and all enemies red… even in team mode… in ffa
+//     its all red obviously"*. A friendly mark and a friendly bolt wearing one
+//     blue is one meaning, not two.
+//   HOSTILE  = `SIDE_COLORS.enemy` #CB7979 — threat red lifted toward white, the
+//     declared `shotEnemy2` rung of the enemy-fire ramp, so **no new hue enters
+//     the palette**. It stays inside the RESERVED rule (style-guide §2: red is
+//     damage, alarm, enemy fire — a state, not a faction) because an enemy is
+//     exactly the state red exists to name: the same reasoning the developer
+//     ratified for explosions on 2026-08-18, *"we already use red for enemies and
+//     red can also mean death."*
+//     NOT raw #B23A3A: it is 3.2:1 on Vacuum, and `lobby.test.ts` pins every side
+//     colour at ≥ 4.5:1. u3 rejected the raw rung as "too dim for a 12px word on a
+//     phone"; a hostile mark on the 80 px corner map is ~3 px across and needs the
+//     legible rung more than a word does, not less.
+//   NEUTRAL  = `PALETTE.hullSteel` — the derelict wreck, unchanged. A wreck is no
+//     longer owned (GDD §2.7), so it is nobody's side; steel and
+//     {@link MINIMAP_DERELICT_ALPHA} already said "spent", and neither moved.
+//
+// Signal yellow stays ore and is not touched — it is RESERVED (style-guide §2) and
+// an ore hint *is* ore. The collapse ring stays raw threat red: it is a hazard, a
+// state of the arena, and has no side to answer for.
+
+/**
+ * A mark's side, **from the viewer's seat**. Four values, not a boolean — the
+ * brief is explicit that this map has three sides plus the unowned:
+ *
+ *   - `own`     — the viewing player. Friendly, and additionally separated by SIZE
+ *                 ({@link OWN_SHIP_DOT_MULTIPLIER}) and the `own` outline flag, so
+ *                 "where am I" survives the colour channel being spent on sides.
+ *   - `ally`    — a teammate. Friendly, same hue as `own`; nothing about a glance
+ *                 map wants to make you hunt for the difference between you and a
+ *                 friend, and size already draws it when you want it.
+ *   - `hostile` — everyone else. In FFA that is every other player, which is the
+ *                 developer's *"in ffa its all red obviously"*.
+ *   - `neutral` — nobody's: a derelict wreck (GDD §2.7), or any un-owned body.
+ *
+ * A map with no viewer at all is NOT one of these — see {@link minimapSide}, which
+ * answers `null` there rather than pretending everything is neutral.
+ */
+export type MinimapSide = 'own' | 'ally' | 'hostile' | 'neutral';
+
+/** What each side is painted. `own` and `ally` deliberately share a hue — see
+ *  {@link MinimapSide}. Read out of the ratified `./lobby` table so the mark under
+ *  a hull and the side tag over it can never disagree. */
+export const MINIMAP_SIDE_COLORS: Readonly<Record<MinimapSide, number>> = {
+  own: SIDE_COLORS.friendly,
+  ally: SIDE_COLORS.friendly,
+  hostile: SIDE_COLORS.enemy,
+  neutral: PALETTE.hullSteel,
+};
+
+/**
+ * The VIEWING player's side, or `undefined` when this map has no viewer.
+ *
+ * Two sources, in order. `frame.viewerTeam` is the explicit one — the local ship's
+ * own `team`, the exact number `areEnemies` acts on, which is what `main.ts` feeds
+ * and what makes the map and the nameplate the same fact. Failing that it is read
+ * off the LOCAL SHIP in the feed, through the same teams-of-one fallback the sim
+ * uses (`../sim/allegiance`: absent `team` ⇒ the player's own id). That second
+ * source is not belt-and-braces — it is what makes FFA work from a feed that has
+ * never heard of teams, and it means the wiring cannot silently drop friend-or-foe
+ * and leave a map that looks fine and lies.
+ *
+ * `undefined` is the documented **viewer-less** case (a spectator, a replay, a
+ * fixture with nobody in it) and it is what sends {@link minimapMarkColor} back to
+ * roster identity. Never "everything hostile": a view with no friendly in it has
+ * no enemies either — the same rule `./lobby` `sideRelation` applies to the word.
+ */
+export function minimapViewerSide(frame: MinimapFrame): number | undefined {
+  if (typeof frame.viewerTeam === 'number' && Number.isFinite(frame.viewerTeam) && frame.viewerTeam >= 0) {
+    return frame.viewerTeam;
+  }
+  for (const sh of frame.ships ?? []) {
+    if (sh.local) return sideOf(frame.teams, sh.owner);
+  }
+  return undefined;
+}
+
+/** The side a slot fights for: the teams table when it names one, else the slot
+ *  itself — FFA is teams-of-one (`../sim/match-config`), so `team === owner` and
+ *  every other player reads hostile without a table existing at all. */
+function sideOf(teams: TeamTable | undefined, owner: PlayerId): number {
+  const named = teams?.[Math.floor(owner)];
+  return typeof named === 'number' && Number.isFinite(named) && named >= 0 ? Math.floor(named) : owner;
+}
+
+/**
+ * Which side a body reads as, from the viewer's seat — or **`null` when this map
+ * has no viewer to be friendly to**.
+ *
+ * Those last two are different answers and the distinction is load-bearing, so it
+ * is two values rather than one:
+ *
+ *   - `'neutral'` IS an answer — *nobody's*. A derelict wreck (GDD §2.7), or any
+ *     un-owned body (`owner < 0`). It paints steel.
+ *   - `null` is the absence of the question — a spectator, a replay, a fixture
+ *     with no local ship. There is no friend or foe to answer, so
+ *     {@link minimapMarkColor} answers the question it still can and paints roster
+ *     identity, which is exactly the pre-a0-110 map.
+ *
+ * `local` is what promotes friendly to `own`; everything else goes through
+ * `./lobby` {@link sideRelation}, the same predicate that decides whether a
+ * nameplate says `FRIENDLY A` or `ENEMY B` — so one fact produces both, and the
+ * word over a hull can never contradict the mark under it.
+ */
+export function minimapSide(
+  owner: PlayerId,
+  local: boolean,
+  viewerSide: number | undefined,
+  teams?: TeamTable,
+): MinimapSide | null {
+  if (viewerSide === undefined || !Number.isFinite(viewerSide) || viewerSide < 0) return null;
+  const relation = sideRelation(sideOf(teams, owner), viewerSide);
+  if (relation === 'neutral') return 'neutral'; // un-owned: nobody's side
+  if (relation === 'enemy') return 'hostile';
+  return local ? 'own' : 'ally';
+}
+
+/**
+ * The colour a mark is painted: its side, or — on a viewer-less map ({@link
+ * minimapSide} returning `null`) — its OWNER, the pre-a0-110 grammar.
+ *
+ * The fallback is deliberate. Colour on this map answers "friend or foe"; with no
+ * viewer that question does not exist, and painting every mark neutral would spend
+ * the channel on nothing and delete both answers at once. The nameplate degrades
+ * to neutral instead and can afford to — it still has the WORD `TEAM A` carrying
+ * the fact. This map has no words.
+ */
+export function minimapMarkColor(side: MinimapSide | null, owner: PlayerId): number {
+  return side === null ? playerColor(owner) : MINIMAP_SIDE_COLORS[side];
+}
+
+/**
+ * The rim the viewer's OWN mark is stroked with, so the eye finds "me" instantly.
+ *
+ * It used to be `PALETTE.plasma` against a roster-coloured fill. a0-110 spends the
+ * fill on the side, and the friendly side IS plasma — so that rim would now be
+ * stroking plasma onto plasma and drawing nothing. It steps up one rung to the
+ * declared hot shade of the SAME hue (`plasmaHot`, the torch/muzzle centre), which
+ * keeps it a highlight on the friendly mark rather than a second colour competing
+ * with it, and adds no hue to the palette.
+ *
+ * The rim is the second of three things that say "me" — size ({@link
+ * OWN_SHIP_DOT_MULTIPLIER}) is the first and does the most work, and being drawn
+ * every frame rather than on the throttle is the third.
+ */
+export const MINIMAP_OWN_RIM_COLOR = DERIVED.plasmaHot;
+
+/**
+ * The radius a ship mark takes in a rect of this size — **the one place** the ship
+ * fraction and its floor are applied.
+ *
+ * It exists because there are two callers and they must never drift: the throttled
+ * scene here, and the view's per-frame own-ship dot ({@link ./minimap-view}), which
+ * cannot read `scene.ownDot` because the scene is only rebuilt every
+ * {@link MINIMAP_REDRAW_TICKS} ticks. That second caller used to re-type the
+ * numbers as literals, and a0-110 found out the hard way: the fraction came down a
+ * quarter here and the player's own ship stayed the old size on screen, because the
+ * copy never heard about it.
+ */
+export function shipDotRadius(rectSize: number, local = false): number {
+  const r = dotRadius(rectSize, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
+  return local ? r * OWN_SHIP_DOT_MULTIPLIER : r;
+}
 
 // ---------------------------------------------------------------------------
 // Fog of war (RATIFIED feature f1 — the minimap renders ONLY the player's
@@ -392,6 +636,24 @@ export interface MinimapFrame {
    *  (dark outside coverage, remembered geography dimmed, live dots only under
    *  coverage). Absent / null ⇒ no fog, everything renders (backward compatible). */
   readonly fog?: MinimapFog | null;
+  /**
+   * Which side each slot fights for (a0-110) — the SAME table the nameplates read
+   * (`./nameplates` {@link TeamTable}), built in `main.ts` off the live world's
+   * ships rather than off the lobby, so the mark's colour and the plate's word are
+   * one fact.
+   *
+   * Optional, and absent is not a degraded mode: FFA is teams-of-one
+   * (`../sim/match-config`), so with no table every slot's side is its own id and
+   * every rival still reads hostile — *"in ffa its all red obviously"*.
+   */
+  readonly teams?: TeamTable;
+  /**
+   * The VIEWING player's own side (a0-110) — the local ship's `team`, the exact
+   * number `areEnemies` acts on. Absent falls back to the local ship in
+   * {@link ships}; absent AND no local ship is the viewer-less map, which reverts
+   * to roster identity ({@link minimapViewerSide}, {@link minimapMarkColor}).
+   */
+  readonly viewerTeam?: number | undefined;
 }
 
 /** Safe-area / thumb insets, CSS px. All optional, default 0 — so a desktop or an
@@ -1105,12 +1367,16 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
   const transform = fitBounds(frame.bounds, rect);
   const size = Math.min(rect.width, rect.height);
   const stationR = dotRadius(size, STATION_DOT_FRACTION, STATION_DOT_MIN);
-  const shipR = dotRadius(size, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
+  const shipR = shipDotRadius(size);
   const satR = dotRadius(size, SATELLITE_DOT_FRACTION, SATELLITE_DOT_MIN);
   const oreR = dotRadius(size, ORE_DOT_FRACTION, ORE_DOT_MIN);
 
   const fog = frame.fog ?? null;
   const coverage = fog?.coverage ?? [];
+  // Friend or foe, decided ONCE for the whole scene (a0-110). Every owned mark
+  // below reads its colour off this; a wreck never does, because it has no side.
+  const viewerSide = minimapViewerSide(frame);
+  const teams = frame.teams;
 
   const stationDots: MinimapDot[] = [];
   for (const p of frame.stations ?? []) {
@@ -1129,8 +1395,11 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       x: s.x,
       y: s.y,
       radius: stationR,
-      // A wreck is no longer owned (GDD §2.7): neutral steel, dimmer.
-      color: p.alive ? playerColor(p.owner) : PALETTE.hullSteel,
+      // A live home takes its SIDE (a0-110). A wreck is no longer owned (GDD §2.7)
+      // so it has no side to take: neutral steel, dimmer, exactly as before.
+      color: p.alive
+        ? minimapMarkColor(minimapSide(p.owner, false, viewerSide, teams), p.owner)
+        : MINIMAP_SIDE_COLORS.neutral,
       alpha,
       // A fixed installation: the solid anchor (a0-88). A wreck keeps the square —
       // it is still an installation, just nobody's; what says "spent" is the
@@ -1150,8 +1419,11 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     const dot: MinimapDot = {
       x: s.x,
       y: s.y,
-      radius: sh.local ? shipR * OWN_SHIP_DOT_MULTIPLIER : shipR,
-      color: playerColor(sh.owner),
+      radius: sh.local ? shipDotRadius(size, true) : shipR,
+      // Friend or foe (a0-110). `local` is what makes the viewer's own mark `own`
+      // rather than `ally` — it wears the same friendly blue either way, and what
+      // keeps YOU findable is the 1.55× above plus the `own` outline, not the hue.
+      color: minimapMarkColor(minimapSide(sh.owner, sh.local, viewerSide, teams), sh.owner),
       alpha: sh.spawnProtected ? MINIMAP_SPAWN_PROTECT_ALPHA : MINIMAP_DOT_ALPHA,
       own: sh.local,
       // A vessel, pointed where it is going (a0-88).
@@ -1171,7 +1443,9 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       x: s.x,
       y: s.y,
       radius: satR,
-      color: playerColor(sat.owner),
+      // An installation has a side too (a0-110) — a hostile radar post is a thing
+      // that can hurt you, which is the question this channel now answers.
+      color: minimapMarkColor(minimapSide(sat.owner, sat.local, viewerSide, teams), sat.owner),
       alpha: MINIMAP_DOT_ALPHA,
       own: sat.local,
       // An installation, but a small orbiting one: the station's square, turned on

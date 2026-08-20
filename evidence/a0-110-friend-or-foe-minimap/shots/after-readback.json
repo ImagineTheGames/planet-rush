@@ -1,0 +1,148 @@
+{
+  "label": "after",
+  "scene": "/?debug=1&freeze=1&sides=2&gate=0",
+  "phone-collapsed-staged": {
+    "viewer": 0,
+    "ally": 2,
+    "hostiles": [
+      1,
+      3
+    ],
+    "wreck": 5
+  },
+  "phone-collapsed": {
+    "drawn": {
+      "expanded": false,
+      "rect": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      },
+      "ownDot": {
+        "x": 771.6,
+        "y": 332
+      },
+      "stationCount": 8,
+      "shipCount": 6,
+      "oreCount": 30,
+      "satelliteCount": 0,
+      "coverageCount": 8,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 702,
+      "y": 288,
+      "width": 88,
+      "height": 88
+    }
+  },
+  "phone-expanded-staged": {
+    "viewer": 0,
+    "ally": 2,
+    "hostiles": [
+      1,
+      3
+    ],
+    "wreck": 5
+  },
+  "phone-expanded": {
+    "drawn": {
+      "expanded": true,
+      "rect": {
+        "x": 264.6,
+        "y": 26.880000000000024,
+        "width": 268.79999999999995,
+        "height": 268.79999999999995
+      },
+      "ownDot": {
+        "x": 485.01599999999996,
+        "y": 161.28
+      },
+      "stationCount": 8,
+      "shipCount": 6,
+      "oreCount": 30,
+      "satelliteCount": 0,
+      "coverageCount": 8,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 260.6,
+      "y": 22.880000000000024,
+      "width": 276.79999999999995,
+      "height": 276.79999999999995
+    }
+  },
+  "desktop-collapsed-staged": {
+    "viewer": 0,
+    "ally": 2,
+    "hostiles": [
+      1,
+      3
+    ],
+    "wreck": 5
+  },
+  "desktop-collapsed": {
+    "drawn": {
+      "expanded": false,
+      "rect": {
+        "x": 1120,
+        "y": 600,
+        "width": 148,
+        "height": 148
+      },
+      "ownDot": {
+        "x": 1241.36,
+        "y": 674
+      },
+      "stationCount": 8,
+      "shipCount": 6,
+      "oreCount": 30,
+      "satelliteCount": 0,
+      "coverageCount": 8,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 1116,
+      "y": 596,
+      "width": 156,
+      "height": 156
+    }
+  },
+  "desktop-expanded-staged": {
+    "viewer": 0,
+    "ally": 2,
+    "hostiles": [
+      1,
+      3
+    ],
+    "wreck": 5
+  },
+  "desktop-expanded": {
+    "drawn": {
+      "expanded": true,
+      "rect": {
+        "x": 360,
+        "y": 100,
+        "width": 560,
+        "height": 560
+      },
+      "ownDot": {
+        "x": 819.2,
+        "y": 380
+      },
+      "stationCount": 8,
+      "shipCount": 6,
+      "oreCount": 30,
+      "satelliteCount": 0,
+      "coverageCount": 8,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 356,
+      "y": 96,
+      "width": 568,
+      "height": 568
+    }
+  }
+}

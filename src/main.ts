@@ -2572,6 +2572,8 @@ async function boot(): Promise<void> {
     oreHints: { x: number; y: number; id: number }[];
     collapse: { x: number; y: number; radius: number } | null;
     fog: MinimapFog | null;
+    teams: TeamTable;
+    viewerTeam: number | undefined;
   } = {
     bounds: { width: 0, height: 0 },
     stations: minimapStations,
@@ -2580,6 +2582,11 @@ async function boot(): Promise<void> {
     oreHints: minimapOre,
     collapse: null,
     fog: null,
+    // Friend or foe on the map (a0-110). The SAME two reads the nameplates take
+    // (`hudFrame.playerTeams` / `hudFrame.viewerTeam`), off the same live world, so
+    // the mark under a hull and the word over it can never disagree about a side.
+    teams: [],
+    viewerTeam: undefined,
   };
   /** Rebuild the per-slot name table (and its mirror difficulty table) from the
    *  live match: the local player's chosen name (from the lobby, or persisted
@@ -4341,6 +4348,11 @@ async function boot(): Promise<void> {
   function feedMinimap(): void {
     minimapFrame.bounds.width = world.bounds.width;
     minimapFrame.bounds.height = world.bounds.height;
+    // Whose side each slot is on, and which side is the viewer's (a0-110) —
+    // rebuilt with the name table on boot and on rematch, so a rematch that moves
+    // this player across the split recolours the whole map with them.
+    minimapFrame.teams = playerTeams;
+    minimapFrame.viewerTeam = viewerTeam;
 
     let pn = 0;
     let satn = 0;
@@ -5931,8 +5943,9 @@ async function boot(): Promise<void> {
    * wiring — that the shipped bundle threads the sim's `sensorSources` into the
    * map, so building a radar satellite paints a LARGE coverage disc and reveals a
    * distant enemy, and killing it collapses that disc and the enemy drops the same
-   * tick. `buildSatellite`/`killSatellite` STAGE the sim data (push / zero a
-   * satellite, park a distant enemy under the satellite-only band) exactly as
+   * tick. `buildSatellite`/`killSatellite`/`stageSides` STAGE the sim data (push /
+   * zero a satellite, park a distant enemy under the satellite-only band, park an
+   * ally and two rivals inside the viewer's own sensor) exactly as
    * `__healthbarStage` stages a bot — the fog itself is computed by the real
    * pipeline, so the seam cannot fake the wiring it proves. Best paired with
    * `?freeze=1` (deterministic: no bot drift, the pinned scene holds still).
@@ -6008,6 +6021,85 @@ async function boot(): Promise<void> {
         enemy.alive = true;
         enemy.spawnProtect = 0;
         return { satRange: SATELLITE.sensorRange, enemyDist };
+      },
+      /**
+       * Stage the **a0-110 frame**: park ONE ALLY and TWO RIVALS — with their
+       * homes — inside the viewer's own ship sensor, so a single glance carries
+       * all three sides at once, plus a rival's WRECK so the fourth case (nobody's
+       * side, GDD §2.7) is in the same picture.
+       *
+       * The frozen scene cannot give this frame on its own: the map renders only
+       * the player's sensed state (feature f1), and two seconds into a match a
+       * viewer senses their own home and nothing else — `ship 0` in a0-88's own
+       * readback. So a capture of "friendlies blue, enemies red" would otherwise be
+       * a picture of one blue square.
+       *
+       * Sim data ONLY, exactly as {@link buildSatellite} and `__nameplateStage`
+       * stage theirs: positions, `alive`, and one core zeroed. It never touches a
+       * colour, a radius or a side — the shipped pipeline computes the fog, resolves
+       * the allegiance and paints the marks, so this seam cannot fake the thing it
+       * is staging for. Fixed offsets off the local ship, so the frame is
+       * deterministic on the frozen scene and a before/after pair differs by the
+       * branch alone.
+       *
+       * Null when there is no local ship. Degrades honestly on a roster that cannot
+       * fill the frame (FFA has no ally; a 2-player world has one rival) — the
+       * caller gets back exactly who was seated and can say so.
+       */
+      stageSides(): {
+        viewer: PlayerId;
+        ally: PlayerId | null;
+        hostiles: PlayerId[];
+        wreck: PlayerId | null;
+      } | null {
+        const local = world.ships.find(isLocalShip);
+        if (!local) return null;
+        // Well inside SHIP_SENSOR_RANGE, so the shipped fog reveals every one of
+        // them without a satellite or a second sensor source in the frame.
+        const near = SHIP_SENSOR_RANGE * 0.42;
+        const park = (s: Ship, angle: number, dist: number): void => {
+          s.pos.x = local.pos.x + Math.cos(angle) * dist;
+          s.pos.y = local.pos.y + Math.sin(angle) * dist;
+          s.vel.x = 0;
+          s.vel.y = 0;
+          s.alive = true;
+          s.spawnProtect = 0; // a dimmed mark would muddy the colour read
+        };
+        const parkHome = (owner: PlayerId, angle: number, dist: number): MiningStation | null => {
+          const home = world.stations.find((p) => p.owner === owner);
+          if (!home) return null;
+          home.pos.x = local.pos.x + Math.cos(angle) * dist;
+          home.pos.y = local.pos.y + Math.sin(angle) * dist;
+          return home;
+        };
+
+        const others = world.ships.filter((s) => s.id !== LOCAL_PLAYER && !s.eliminated);
+        const ally = others.find((s) => sameSide(world, LOCAL_PLAYER, s.id)) ?? null;
+        const hostiles = others.filter((s) => !sameSide(world, LOCAL_PLAYER, s.id)).slice(0, 2);
+
+        if (ally) {
+          park(ally, -Math.PI / 2, near);
+          parkHome(ally.id, -Math.PI / 2 - 0.5, near * 1.5);
+        }
+        hostiles.forEach((s, i) => {
+          park(s, i === 0 ? 0.1 : Math.PI * 0.82, near);
+          parkHome(s.id, i === 0 ? 0.5 : Math.PI * 0.62, near * 1.5);
+        });
+
+        // A rival's WRECK — the fourth case. Zero the core on a THIRD rival's home
+        // if the roster has one, so no live mark loses its side to make the point.
+        let wreck: PlayerId | null = null;
+        const spare = world.ships.find(
+          (s) => !sameSide(world, LOCAL_PLAYER, s.id) && !hostiles.some((h) => h.id === s.id),
+        );
+        const spareHome = spare ? parkHome(spare.id, Math.PI * 1.35, near * 1.35) : null;
+        if (spareHome) {
+          spareHome.coreHp = 0;
+          spareHome.alive = false;
+          wreck = spareHome.owner;
+        }
+
+        return { viewer: LOCAL_PLAYER, ally: ally?.id ?? null, hostiles: hostiles.map((s) => s.id), wreck };
       },
       /** Kill the staged satellite (feature f1): zero its HP, so it is no longer a
        *  sensor source (`../sim/sensing` reads only hp > 0) — its coverage disc
