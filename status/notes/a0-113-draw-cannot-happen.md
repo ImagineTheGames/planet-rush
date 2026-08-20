@@ -67,7 +67,7 @@ Branch `agent/gameplay/a0-113-a-draw-that-can-occur`, three commits:
    `state.ts`, `step.ts`. Four cases in `match.test.ts` that encoded the
    tiebreak rewritten, plus the idle-field case (below).
 
-3. `9a2b…` **test(a0-113) [CROSS-LANE].** `src/bots/match-endgame.test.ts`
+3. `50198413` **test(a0-113) [CROSS-LANE].** `src/bots/match-endgame.test.ts`
    asserted the tiebreak (`expect(result.winner).toBe(order[order.length -
    1])`, line 112). One assertion + comment, its own commit, flagged in the
    PR for the Bots owner. It is the ONLY file outside `src/sim/` the change
