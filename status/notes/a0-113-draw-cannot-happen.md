@@ -73,6 +73,10 @@ Branch `agent/gameplay/a0-113-a-draw-that-can-occur`, three commits:
    PR for the Bots owner. It is the ONLY file outside `src/sim/` the change
    touches.
 
+4. `dcdbae67` **test(a0-113) [CROSS-LANE: src/bots, tests/harness].** Two 2v2
+   suites asserted "there is always a winner" and met real draws. See below —
+   this is the strongest evidence on the branch.
+
 ### The unforced draw, already in our own suite
 
 `match.test.ts` "delivers the whole field yield, and the idle field then
@@ -81,6 +85,21 @@ all** — now ends `winner === null`. Two untouched cores at identical HP
 under identical collapse entropy reach zero on the same tick. No debug
 queue, no QA rig: a shipped configuration that draws. That case is the
 answer to "can this happen in real play".
+
+### Measured: the shipped bot cast draws, and the scripted harness 2v2 ALWAYS draws
+
+Ran both failing suites under a throwaway diagnostic (deleted; never committed):
+
+- **`src/bots/team-winning.test.ts`, 2v2 of the shipped cast, seed 4.** Home
+  death times `[843.72, 850.02, 850.02, 850.02]`. Slot 1 (team 0) and BOTH of
+  team 1's homes reach zero on the same collapse tick. 7 of 8 seeds still
+  decide; seed 4 is a draw. Real bots, shipped map, no rig.
+- **`tests/harness/match.test.ts`, scripted raiders vs turtles.**
+  `survived=[0,0,0,0]` at t=850.02 on seed 7 **and on every other seed tried
+  (1-10)**. That test was named *"one team survives"* and was green only because
+  the tiebreak invented a winner; its `if (slot.survived)` loop never ran an
+  iteration. The scripted raiders never break two turtles before the collapse —
+  a balance observation for the harness owner, out of scope here.
 
 ## DECISIONS
 
@@ -120,5 +139,7 @@ anybody" — and it would have preserved the exact artefact QA photographed.
 - Nothing outstanding on the sim.
 - For the Director: GDD §1 line 49 + line 690 need amending to the draw
   rule. The sim is now the odd one out until they are.
-- For the Bots owner: review commit 3.
+- For the Bots owner: review commits 3 and 4 (`50198413`, `dcdbae67`).
+- For the QA/harness owner: commit 4's second half, and the balance question it
+  exposes — the scripted 2v2 never produces a survivor on any seed 1-10.
 - For the writer/UI: the draw subhead names the collapse only.
