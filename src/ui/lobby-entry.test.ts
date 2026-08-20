@@ -721,14 +721,15 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
   it('carries the title screen’s letterhead, and names the screen you are on', () => {
     // No new voice is invented for a screen the handoff never drew: the authority
     // line is the title screen's, verbatim, and the keypad's status names that
-    // panel in the ratified vocabulary — `CLAIM`, and a code is still a CODE.
+    // panel in the word a player already has — `ROOM` (a0-108), and a code is
+    // still a CODE.
     expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
     expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
     // JOIN now lands on BROWSE (u17-01, plan D2), so the keypad's line is reached
     // through the mode switch — and each mode names the thing it actually is.
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    expect(entryModel(join).status).toBe('OPEN CLAIMS');
-    expect(entryModel(chooseJoinMode(join, 'code')).status).toBe('CLAIM CODE');
+    expect(entryModel(join).status).toBe('OPEN ROOMS');
+    expect(entryModel(chooseJoinMode(join, 'code')).status).toBe('ROOM CODE');
   });
 
   it('never lets the keypad hold two vocabularies at once (l2-02 merge gap)', () => {
@@ -736,12 +737,28 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
     // so the screen shipped saying ROOM CODE directly above ENTER THE CLAIM CODE.
     // Encoded as a condition rather than pinned prose: whatever these two say, they
     // may not disagree about what the thing is called.
+    //
+    // It used to be pinned prose — `toContain('CLAIM')` on both halves — which is
+    // why a0-108 had to come here and retype the answer. Now it names no noun at
+    // all: the status line's nouns must reappear in the prompt drawn under it, so
+    // renaming the thing in one place and not the other is what goes red, whatever
+    // it is renamed to.
+    const nouns = (line: string) =>
+      (line.match(/\b[A-Z]{2,}\b/g) ?? []).map((w) => w.replace(/S$/, ''));
+
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    const model = entryModel(join);
-    expect(model.status).toContain('CLAIM');
-    expect(model.prompt).toContain('CLAIM');
-    expect(model.status).not.toContain('ROOM');
-    expect(model.prompt).not.toContain('ROOM');
+    for (const mode of ['browse', 'code'] as const) {
+      const model = entryModel(chooseJoinMode(join, mode));
+      const shared = nouns(model.status).filter((n) => nouns(model.prompt).includes(n));
+      expect(shared, `${mode}: "${model.status}" and "${model.prompt}" name nothing in common`)
+        .not.toEqual([]);
+    }
+
+    // …and the two halves agree with EACH OTHER, so switching mode does not switch
+    // vocabulary either. This is the half l2-02's gap actually fell through.
+    const browse = entryModel(chooseJoinMode(join, 'browse'));
+    const code = entryModel(chooseJoinMode(join, 'code'));
+    expect(nouns(browse.status).filter((n) => nouns(code.status).includes(n))).not.toEqual([]);
   });
 
   it('keeps the footer plates inside the footer BEAM, and BACK where it was', () => {

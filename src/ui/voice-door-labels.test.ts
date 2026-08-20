@@ -107,7 +107,7 @@ function renderedCopy(): string[] {
  * phrase and not two. That is what makes the check honest: a substring test would
  * see `SOLO` inside a longer stale label and wave the sentence through.
  *
- * Single letters are not phrases (`'A claim code is 4 characters.'`), and a word
+ * Single letters are not phrases (`'A room code is 4 characters.'`), and a word
  * that merely starts a sentence is mixed case and never matches.
  */
 function capsPhrases(line: string): string[] {
@@ -140,7 +140,7 @@ const NOT_A_DOOR: ReadonlyMap<string, string> = new Map([
   ['BROWSE', 'lobby-browser: the JOIN screen’s own mode switch'],
   ['ENTER ROOM CODE', 'lobby-browser: the JOIN screen’s own mode switch'],
   ['BACK', 'the footer plate every screen carries (u2 menu-back)'],
-  ['NO OPEN CLAIMS RIGHT NOW', 'lobby-browser headline: a state, and the one it names'],
+  ['NO OPEN ROOMS RIGHT NOW', 'lobby-browser headline: a state, and the one it names'],
 ]);
 
 describe('door labels quoted in other copy', () => {
@@ -210,9 +210,11 @@ describe('door labels quoted in other copy', () => {
   });
 
   it('keeps every refusal readable with the fiction word stripped out', () => {
-    // §4.7's accessibility clause: delete "claim" and the meaning must survive.
-    // Each refusal still names its reason and what to do about it.
-    expect(ENTRY_ERRORS.unknown.replace(/claim/gi, 'room')).toContain('Check it and try again');
+    // §4.7's accessibility clause: delete the flavour noun and the meaning must
+    // survive. a0-108 took the last one out of these four — they now read plainly
+    // with nothing to strip, which is the strongest form of passing this. Each
+    // still names its reason and what to do about it.
+    expect(ENTRY_ERRORS.unknown).toContain('Check it and try again');
     expect(ENTRY_ERRORS.full).toMatch(/is full/);
     expect(ENTRY_ERRORS.offline).toMatch(/Cannot reach the server/);
     expect(ENTRY_ERRORS.short).toMatch(/\d+ characters/);

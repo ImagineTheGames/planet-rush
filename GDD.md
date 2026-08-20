@@ -509,8 +509,8 @@ The developer picks a winner (one revision round max), frozen into `style-guide.
 **What the voice IS:**
 
 1. **Procedural.** It states status, cost, condition, and — when it refuses — the reason. Nothing else.
-2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `CLAIM HELD`, not `GLORIOUS VICTORY`.
-3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (room, level, score), the authority reaches for the nouns of work and paperwork (claim, sector, yield, contract, seal, log).
+2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `VICTORY`, not `GLORIOUS VICTORY`. The register is carried by what is *left out* — a bare outcome word is already in voice.
+3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (level, score), the authority reaches for the nouns of work and paperwork (sector, yield, contract, seal, log). *(Amended 2026-08-19, a0-108 — `claim` left this list; see the vocabulary table.)*
 4. **Terse and present-tense.** Second person, imperative for instructions. The interface has a word budget and spends it on the reason, not the fiction.
 5. **Indifferent.** It is not on the operator's side. This — not jokes — is where the game's cheek lives in register 2.
 
@@ -534,25 +534,36 @@ The developer picks a winner (one revision round max), frozen into `style-guide.
 
 | Reach for | Instead of | Note |
 |---|---|---|
-| **claim** (the match's arena and its lobby) | room, arena, level, system | The room-code *noun* stays "code" — see the clarity rule. |
+| **room** (the match's lobby, and the thing a code joins) | claim, arena, system | *(Amended 2026-08-19, a0-108 — **this row used to point the other way**, and `claim` is now a word the voice may not use for it at all. See the ruling below.)* The room-code *noun* stays "code" — see the clarity rule. |
+| **host** (the player who started the game) | claim holder, owner, operator-in-charge | *(a0-108.)* "Host" is the word every game the player has met uses, and the clarity rule outranks the fiction. |
 | **operator** (the player) | player, pilot, commander, captain | Bots are operators too; where the interface must distinguish humans from bots, it says so plainly. |
 | **contract** (a match you take) | game, session, match-type | "Match" stays where it names the live thing being timed (`MATCH 8:42`). |
 | **sector** (a map / arena layout) | map, level | The four map display names are unchanged (§2.1). |
 | **yield** (ore abundance) | ore density, richness | `YIELD · RICH`. |
 | **seal / signed** (an authorisation stamp) | — | Bound to the allocator's existing ticket stamp (`TICKET SIGNED`). It does **not** replace "code". |
-| **station · reactor · collection field · abandoned rig · the claim · the Crush** | planet, core, atmosphere, derelict | Already ratified in §0; listed here so the voice does not reinvent them. |
-| **held / lost / offline / refused** | victory, defeat, error, oops | Outcome words are stated, not celebrated. |
+| **station · reactor · collection field · abandoned rig · the Crush** | planet, core, atmosphere, derelict | Already ratified in §0; listed here so the voice does not reinvent them. **`the claim` was struck from this row (a0-108)** — §0 may keep it as the *fiction's* name for the field, but no player-facing string says it. |
+| **victory / defeat / draw / offline / refused** | glorious victory, crushing defeat, error, oops | Outcome words are stated, not celebrated. *(Amended 2026-08-19, a0-108 — this row read `held / lost`, which is what put `CLAIM HELD` on the end screen. The register was never in the noun; it is in the absence of the adjective.)* |
+
+**The `claim` ruling (2026-08-19, a0-108) — the one word this section got wrong.** The developer struck it twice, three days apart:
+
+> *"we still have words like 'claim' no player is going to know what that means just put it in everyday game terms like Visibility - Public … and Join Code instead of claim"* (2026-08-16, on the lobby chip)
+
+> *"remove alll this claim wording, its just Victory, Defeat, Draw, Eliminated…"* (2026-08-19, on the end screen)
+
+This is the **clarity rule** applied to the register's own central noun, and it is not an exception to §4.7 but the rule working: a word a first-time player has to learn before they can act is a bug, and `claim` was on twelve screens teaching nobody anything. The voice survives it intact — the authority is still procedural, unglamorous and indifferent, because none of that ever lived in this noun. **The replacement vocabulary is `ROOM` / `HOST` / `CODE`**, which the network layer, the join segment and `docs/copy-sweep-industrial-voice.md` were already using, so nothing was invented to replace it.
+
+The first ruling was carried out by hand on the chip it was pointed at, and the word was still on nine other screens three days later. It is now enforced by `src/ui/copy-audit.test.ts` (`no player-facing string says claim`), which walks the live exports, the assembled model output, and every string literal in `src/ui` — so a screen added next month is covered without anyone remembering this paragraph. **Code identifiers are untouched and deliberately so** (`CLAIM_LABELS`, `claimChipLabel`, `LobbyLayoutOptions.claim`): the audit reads values, never keys.
 
 **Worked examples — the same string in both registers.** Copy work should be able to tell which column it is writing without asking.
 
 | Game-menu register (wrong) | Interface voice (right) | Why |
 |---|---|---|
-| `VICTORY` | `CLAIM HELD` | States the outcome; does not congratulate. |
-| `DEFEAT` | `CLAIM LOST` | Same sentence shape as the win. The authority files both identically. |
-| `You win! Great flying!` | `You took the claim.` | Already shipped and already correct — the flat report *is* the voice. |
+| `GLORIOUS VICTORY!` | `VICTORY` | States the outcome; does not congratulate. *(Amended 2026-08-19, a0-108 — these two rows had `VICTORY` in the WRONG column and `CLAIM HELD` in the right one. The adjective was always the thing in register, never the noun.)* |
+| `CRUSHING DEFEAT` | `DEFEAT` | Same sentence shape as the win. The authority files both identically. |
+| `You win! Great flying!` | `You won.` | The flat report *is* the voice. |
 | `PLAY SOLO` | `SOLO CONTRACT` | A thing you take, not a thing you do. |
-| `CREATE ROOM` / `JOIN ROOM` | `OPEN A CLAIM` / `JOIN A CLAIM` | The claim is the shared object; "room" is a lobby-software word. |
-| `WAITING FOR THE HOST` | `WAITING FOR THE CLAIM HOLDER` | "Host" is the network word; the holder is the fiction's word. |
+| `Oops, nobody's here!` | `NO OPEN ROOMS RIGHT NOW` | *(Amended 2026-08-19, a0-108 — this row read `CREATE ROOM` / `JOIN ROOM` → `OPEN A CLAIM` / `JOIN A CLAIM`. Both doors already ship as `HOST` and `JOIN` under the clarity rule, so the row was describing copy that never existed.)* |
+| `Hang tight! 🎮` | `WAITING FOR THE HOST` | *(a0-108 — this row, too, used to point the other way: it made `WAITING FOR THE CLAIM HOLDER` the right answer. `HOST` is what ships, and it is four characters shorter on a 54px footer strip.)* |
 | `Oops! Couldn't find that room 😕` | `No room with that code. Check it and try again.` | Shipped and correct: fact, then instruction, no apology, no emoji. |
 | `Nice repair!` (never) | `+15 HP` | The authority prices the work. It does not compliment it. |
 | `LEVEL: The Compass` | `SECTOR · THE COMPASS` | The layout is surveyed ground, not a level. |
@@ -580,13 +591,14 @@ The developer picks a winner (one revision round max), frozen into `style-guide.
 - **`RUSH!`** (§2.1) and the slot-state words `OPEN` / `BOT` / `CLOSED` (§2.1).
 - **Bot character names, ship class names, player colour names, and the four map display names.**
 - **The navigation verbs — `BACK`, `CLOSE`, `DONE`, `JOIN` (the keypad's submit), and `ERASE`.** A player uses these before reading a line of fiction, and every in-register synonym (`RETURN`, `DISMISS`, `FILE`, `SUBMIT`, `RELEASE`) loses on comprehension. The authority renames the world; it does not rename the way out of a screen. This is the clarity rule's floor.
+- **The four end-screen headlines — `VICTORY`, `DEFEAT`, `DRAW`, `ELIMINATED`** (ratified 2026-08-19, a0-108, quoted developer-verbatim). And the room vocabulary they arrived with: **`ROOM CODE`**, **`OPEN ROOMS`**, and **`WAITING FOR THE HOST`**. Re-fictioning any of these is the third attempt at a ruling the developer has now made twice; `src/ui/copy-audit.test.ts` fails the build before it reaches a screen.
 - **`HOME`** on the HUD, and `HOME LOST`. This is the one deliberately warm word in the interface, and it is load-bearing on register 1 — "the pitch is a clock, and a home" (§1). The authority is allowed exactly one word it does not own.
 
 **Accessibility — the voice must never make a state ambiguous.** Non-negotiable, and it is the failure mode of every voice pass:
 
 - An **error or refusal must be readable as a plain sentence** with the fiction stripped out. If deleting the flavour word removes the meaning, the string is wrong.
 - **State is never carried by flavour alone.** A player must not have to know what a "seal" is to learn that a seat is unavailable.
-- An in-register **headline may only replace a plain one when the line beneath it states the outcome plainly** — `CLAIM HELD` is permitted because `You took the claim.` sits under it, and because colour and layout already carry the result. A headline change that leaves the outcome to inference is rejected.
+- An in-register **headline may only replace a plain one when the line beneath it states the outcome plainly**, and a headline change that leaves the outcome to inference is rejected. *(Amended 2026-08-19, a0-108 — this clause used to be the standing **permission** for `CLAIM HELD`, granted because `You took the claim.` sat under it. With the headlines now plain the permission is spent, but the clause is unchanged and still governs the next voice pass that reaches for one.)* **What the subhead is for did not change with it:** `VICTORY` states the outcome and does not say **who won**, which in TEAMS is routinely an ally rather than the reader (§2.1, a0-09). The line beneath names them, and `end-of-match.test.ts` guards that rather than the reversion.
 - Screen-reader and colourblind paths are unchanged: the voice adds no new information channel and removes none. Nothing that was legible without colour becomes dependent on it.
 
 **Propagation.** The tone paragraph is mirrored in two places outside this document — `style-guide.md` §8 and `content/codex/pipeline/tone.md` — because lexical retrieval provably never surfaces a tone section on its own (0/4 query types in the Assignment-4 codex pipeline), so it is pinned by hand. **Both mirrors must gain register 2.** *(Amended 2026-08-06: `style-guide.md` §8 is now current — it carries the new tone paragraph and no longer quotes the pre-pivot "when a **planet** dies" wording. `content/codex/pipeline/tone.md` is **still stale** and still quotes the retired Saturday-morning paragraph; a mirror is quoted verbatim by definition, so a stale one is as damaging as a stale GDD. The replacement text is written out ready to paste in `docs/audio-revoice-spec.md` §9, as a task for the owning agent — the mirrors are the Director's and Art's files, not the architect's.)* Also recorded as a task and a developer question in `docs/copy-sweep-industrial-voice.md`.

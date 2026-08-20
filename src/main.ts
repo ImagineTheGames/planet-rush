@@ -187,7 +187,7 @@ import {
   DOOR_ORDER,
   KEYPAD_KEYS,
   regionPickerVisible,
-  // JOIN's second mode (u17-01): the list of open claims, its age stamp, and the
+  // JOIN's second mode (u17-01): the list of open rooms, its age stamp, and the
   // JOIN button on a row. The read and the tap behind it are `./net`'s.
   JOIN_MODES,
   BROWSE_POLL_MS,
@@ -5028,8 +5028,8 @@ async function boot(): Promise<void> {
        * The crowning is the sim's, untouched — `resolveWinner` reports the last
        * surviving core it walks, so a side left holding several reports its
        * highest slot, which is an ally whenever more than the local core stands.
-       * That is precisely how the developer's screenshot came to read *"Player 7
-       * took the claim"* over DEFEAT while their own reactor was intact.
+       * That is precisely how the developer's screenshot came to name Player 7
+       * the winner, under DEFEAT, while their own reactor was intact.
        *
        * Reaches nothing `endMatch`/`winLocal` do not: the sim's own `destroyCore`,
        * on enemy cores only. Needs a sided world (`?debug=1&sides=2`) to mean

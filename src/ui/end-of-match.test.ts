@@ -68,8 +68,8 @@ describe('reading an outcome', () => {
    * notion of a side — and the case below did not exist, so the suite passed the
    * defect happily for as long as it shipped. The developer's report, 2026-08-07,
    * with a screenshot of the end screen: *"i lost somehow but my team is the one
-   * that won..."* The screen read DEFEAT over *"Player 7 took the claim."* and
-   * Player 7 was their teammate.
+   * that won..."* The screen read DEFEAT over a line naming Player 7 the way it
+   * names an opponent, and Player 7 was their teammate.
    *
    * Not an edge case: in TEAMS an ally's win is arithmetically identical to an
    * enemy's under an identity check, so **every** Teams win by anyone other than
@@ -271,7 +271,7 @@ describe('the frame model', () => {
    * THE §4.7 GUARD, REWRITTEN RATHER THAN RETIRED (a0-108)
    * ---------------------------------------------------------------------------
    * This test used to assert the *condition* on the old headlines: GDD §4.7's
-   * accessibility clause permitted `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
+   * accessibility clause permitted the three in-register headlines it then had
    * **only** while a plain line sat underneath, so if a refactor emptied
    * `subheadFor()` the headlines had to revert to plain words.
    *
