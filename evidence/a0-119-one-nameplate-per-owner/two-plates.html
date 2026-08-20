@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>a0-119 — one owner, two nameplates, on each other</title>
+    <!--
+      Dev-server only: `npm run dev`, then open
+      /evidence/a0-119-one-nameplate-per-owner/two-plates.html.
+      Not linked from the game and not in the bundle. See two-plates.ts.
+
+      The @font-face rules are copied from index.html because a specimen of two
+      pieces of TYPE is worthless in a fallback face: the whole finding is that
+      one label is drawn across another and neither can be read, and Oxanium and
+      Trebuchet are not the same amount of ink in the same places.
+      `awaitRatifiedFaces` below is the same gate the game boots behind, imported
+      rather than re-implemented.
+    -->
+    <link rel="preload" href="/fonts/Audiowide-Regular-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Oxanium-Variable-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face {
+        font-family: 'Audiowide';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url('/fonts/Audiowide-Regular-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Oxanium';
+        font-style: normal;
+        font-weight: 200 800;
+        font-display: block;
+        src: url('/fonts/Oxanium-Variable-latin.woff2') format('woff2');
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #05070b;
+        color: #9fb0c4;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      figure.cell {
+        margin: 0 0 20px;
+      }
+      figure.cell canvas {
+        display: block;
+        outline: 1px solid #223;
+      }
+      figure.cell figcaption {
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { awaitRatifiedFaces } from '/src/ui/font-boot.ts';
+      import { mountTwoPlates } from './two-plates.ts';
+      await awaitRatifiedFaces();
+      await mountTwoPlates(document.getElementById('root'));
+    </script>
+  </body>
+</html>
