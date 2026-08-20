@@ -159,9 +159,11 @@ anybody" — and it would have preserved the exact artefact QA photographed.
 
 1. ~~Re-verify red on `main`~~ — done this session, above.
 2. Full `npm test -- --run` + `npx tsc --noEmit` green (tsc: clean, exit 0).
-3. Open the PR with the before/after citations. **Not yet open as of the start
-   of this session** — the branch was pushed (`1ef3db67`) with no PR on it.
-4. Nothing outstanding on the sim itself.
+3. ~~Open the PR~~ — **PR #491**, opened this session, MERGEABLE.
+   https://github.com/ImagineTheGames/planet-rush/pull/491
+   Full suite green before opening: 319 files / 5938 tests, tsc exit 0.
+4. Nothing outstanding on the sim itself. Remaining work is CI settling and
+   the three hand-offs below, none of which this branch can do for them.
 
 ### Hand-offs the PR must carry (none of them block this branch)
 
