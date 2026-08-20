@@ -1,0 +1,323 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "viewport": {
+    "width": 798,
+    "height": 384
+  },
+  "minimap": {
+    "id": "minimap",
+    "anchor": {
+      "region": "bottom-right",
+      "margin": 12
+    },
+    "bounds": {
+      "x": 706,
+      "y": 292,
+      "width": 80,
+      "height": 80
+    },
+    "gapLeft": 706,
+    "gapTop": 292,
+    "gapRight": 12,
+    "gapBottom": 12
+  },
+  "minimapDeclaredMargin": 12,
+  "rightAnchoredElements": [
+    {
+      "id": "station-hp",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 628,
+        "y": 16,
+        "width": 154.5,
+        "height": 39
+      },
+      "gapLeft": 628,
+      "gapTop": 16,
+      "gapRight": 15.5,
+      "gapBottom": 329
+    },
+    {
+      "id": "zoom-control",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "gapLeft": 718,
+      "gapTop": 61,
+      "gapRight": 16,
+      "gapBottom": 275
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      },
+      "gapLeft": 706,
+      "gapTop": 292,
+      "gapRight": 12,
+      "gapBottom": 12
+    }
+  ],
+  "bottomAnchoredElements": [
+    {
+      "id": "build-badge",
+      "anchor": {
+        "region": "bottom-left",
+        "margin": 8
+      },
+      "bounds": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      },
+      "gapLeft": 8,
+      "gapTop": 363,
+      "gapRight": 746.5,
+      "gapBottom": 8
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      },
+      "gapLeft": 706,
+      "gapTop": 292,
+      "gapRight": 12,
+      "gapBottom": 12
+    }
+  ],
+  "allElements": [
+    {
+      "id": "ship-local",
+      "anchor": {
+        "region": "center",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 383,
+        "y": 176,
+        "width": 32,
+        "height": 32
+      },
+      "gapLeft": 383,
+      "gapTop": 176,
+      "gapRight": 383,
+      "gapBottom": 176
+    },
+    {
+      "id": "build-button",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 54,
+        "y": 134,
+        "width": 76,
+        "height": 76
+      },
+      "gapLeft": 54,
+      "gapTop": 134,
+      "gapRight": 668,
+      "gapBottom": 174
+    },
+    {
+      "id": "build-badge",
+      "anchor": {
+        "region": "bottom-left",
+        "margin": 8
+      },
+      "bounds": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      },
+      "gapLeft": 8,
+      "gapTop": 363,
+      "gapRight": 746.5,
+      "gapBottom": 8
+    },
+    {
+      "id": "pause-button",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 72,
+        "y": 16,
+        "width": 48,
+        "height": 48
+      },
+      "gapLeft": 72,
+      "gapTop": 16,
+      "gapRight": 678,
+      "gapBottom": 320
+    },
+    {
+      "id": "ore-hud",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "gapLeft": 16,
+      "gapTop": 16,
+      "gapRight": 729.1,
+      "gapBottom": 308
+    },
+    {
+      "id": "banked-total",
+      "anchor": {
+        "region": "top-left",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 26.573333333333334,
+        "y": 39,
+        "width": 10.000000000000004,
+        "height": 21
+      },
+      "gapLeft": 26.6,
+      "gapTop": 39,
+      "gapRight": 761.4,
+      "gapBottom": 324
+    },
+    {
+      "id": "station-hp",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 628,
+        "y": 16,
+        "width": 154.5,
+        "height": 39
+      },
+      "gapLeft": 628,
+      "gapTop": 16,
+      "gapRight": 15.5,
+      "gapBottom": 329
+    },
+    {
+      "id": "zoom-control",
+      "anchor": {
+        "region": "top-right",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "gapLeft": 718,
+      "gapTop": 61,
+      "gapRight": 16,
+      "gapBottom": 275
+    },
+    {
+      "id": "onboarding",
+      "anchor": {
+        "region": "full",
+        "margin": 16
+      },
+      "bounds": {
+        "x": 232.9,
+        "y": 309,
+        "width": 332.20000000000005,
+        "height": 59
+      },
+      "gapLeft": 232.9,
+      "gapTop": 309,
+      "gapRight": 232.9,
+      "gapBottom": 16
+    },
+    {
+      "id": "nameplates",
+      "anchor": {
+        "region": "full",
+        "margin": 0
+      },
+      "bounds": {
+        "x": 482.3,
+        "y": 104,
+        "width": 25.399999999999977,
+        "height": 16
+      },
+      "gapLeft": 482.3,
+      "gapTop": 104,
+      "gapRight": 290.3,
+      "gapBottom": 264
+    },
+    {
+      "id": "minimap",
+      "anchor": {
+        "region": "bottom-right",
+        "margin": 12
+      },
+      "bounds": {
+        "x": 706,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      },
+      "gapLeft": 706,
+      "gapTop": 292,
+      "gapRight": 12,
+      "gapBottom": 12
+    }
+  ],
+  "minimapState": {
+    "expanded": false,
+    "rect": {
+      "x": 706,
+      "y": 292,
+      "width": 80,
+      "height": 80
+    },
+    "ownDot": {
+      "x": 771.6,
+      "y": 332
+    },
+    "stationCount": 1,
+    "shipCount": 0,
+    "oreCount": 12,
+    "satelliteCount": 0,
+    "coverageCount": 2,
+    "collapseRing": false
+  }
+}

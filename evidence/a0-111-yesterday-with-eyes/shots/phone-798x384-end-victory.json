@@ -1,0 +1,42 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "asked": "victory",
+  "staging": "__endScreenStage.winLocal() — every rival core destroyed through the sim's own destroyCore; the local core stands",
+  "screenReported": "result",
+  "result": {
+    "kind": "victory",
+    "headline": "VICTORY",
+    "subhead": "You won."
+  },
+  "buttons": [
+    "rematch",
+    "menu"
+  ],
+  "coreHp": [
+    100,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "elements": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "onboarding",
+    "nameplates",
+    "minimap"
+  ],
+  "subheadNamesAPlayer": false,
+  "subheadSaysWon": true,
+  "drawnTextCount": 67,
+  "claimHits": []
+}

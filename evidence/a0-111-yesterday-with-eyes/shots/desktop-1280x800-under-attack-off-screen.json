@@ -1,0 +1,79 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "stationState": "the local station OFF screen",
+  "staging": "__oreHudStage.mine(0), plus a held siege: __planetRush.damageCore(0, 2) every 400ms above a 30 HP floor",
+  "alarmPolls": 15,
+  "prompt": {
+    "visible": true,
+    "text": "Your station is under attack — follow the arrow",
+    "wrapWidth": 904,
+    "width": 545.76,
+    "height": 19
+  },
+  "device": "keyboard",
+  "scheme": "tap",
+  "world": {
+    "left": 1744,
+    "top": 1700,
+    "right": 3024,
+    "bottom": 2500,
+    "width": 1280,
+    "height": 800
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "alarm": {
+    "local": 0,
+    "localPlayer": 0,
+    "allies": [
+      0
+    ],
+    "active": false,
+    "engagements": 0,
+    "sounds": 0
+  },
+  "coreHp": 64,
+  "ship": {
+    "x": 2384,
+    "y": 2100,
+    "vx": 0,
+    "vy": 0
+  },
+  "home": {
+    "x": 1484,
+    "y": 1200
+  },
+  "homeOnScreen": false,
+  "arrowDrawn": true,
+  "alarmFrameDrawn": true,
+  "promptDrawn": true,
+  "arrowRect": {
+    "x": 500.3526515928134,
+    "y": 13.866779645812892,
+    "width": 19.786508495861938,
+    "height": 24.717432041656117
+  },
+  "promptRect": {
+    "x": 347.12,
+    "y": 709,
+    "width": 585.76,
+    "height": 41
+  },
+  "elements": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "onboarding",
+    "nameplates",
+    "minimap",
+    "healthbars",
+    "alarm-frame",
+    "alarm-arrow"
+  ]
+}

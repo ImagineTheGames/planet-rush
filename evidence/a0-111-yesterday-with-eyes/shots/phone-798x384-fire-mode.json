@@ -1,0 +1,268 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?gate=0 on the production bundle → SETTINGS (the menu door)",
+  "controlSchemeAtRest": "tap",
+  "rowsAtRest": [
+    {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    {
+      "kind": "controls",
+      "label": "CONTROLS",
+      "value": "TAP COMMANDER",
+      "disabled": false
+    },
+    {
+      "kind": "reduceVfx",
+      "label": "REDUCE VFX",
+      "value": "OFF",
+      "disabled": false
+    },
+    {
+      "kind": "volume",
+      "label": "MASTER VOLUME",
+      "value": "",
+      "disabled": false
+    },
+    {
+      "kind": "volume",
+      "label": "SFX VOLUME",
+      "value": "",
+      "disabled": false
+    },
+    {
+      "kind": "volume",
+      "label": "MUSIC VOLUME",
+      "value": "",
+      "disabled": false
+    }
+  ],
+  "storeAtRest": {},
+  "press1": {
+    "control": "fireMode",
+    "pressedAt": {
+      "x": 209,
+      "y": 133
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "rowBefore": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "rowAfter": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "storedFireModeBefore": "(absent)",
+    "storedFireModeAfter": "(absent)",
+    "storedSchemeBefore": "(absent)",
+    "storedSchemeAfter": "(absent)"
+  },
+  "press2": {
+    "control": "fireMode",
+    "pressedAt": {
+      "x": 209,
+      "y": 133
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "rowBefore": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "rowAfter": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "storedFireModeBefore": "(absent)",
+    "storedFireModeAfter": "(absent)",
+    "storedSchemeBefore": "(absent)",
+    "storedSchemeAfter": "(absent)"
+  },
+  "helpPress": {
+    "control": "help:fireMode",
+    "pressedAt": {
+      "x": 47,
+      "y": 133
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "rowBefore": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "rowAfter": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-FIRE",
+      "disabled": true
+    },
+    "storedFireModeBefore": "(absent)",
+    "storedFireModeAfter": "(absent)",
+    "storedSchemeBefore": "(absent)",
+    "storedSchemeAfter": "(absent)"
+  },
+  "helpTitle": "FIRE MODE",
+  "helpPanelText": [
+    "?",
+    "+",
+    "−",
+    "84ddec7*",
+    "AUTO-FIRE",
+    "CHANGES SAVE IMMEDIATELY",
+    "CODEX",
+    "CONTRACT OPEN · SECTOR 04",
+    "CONTROLS",
+    "Controls, audio, visual effects",
+    "DEEP FIELD MINING AUTHORITY",
+    "DONE",
+    "FIRE MODE",
+    "HANGAR",
+    "MASTER VOLUME",
+    "MUSIC VOLUME",
+    "Objective, Bots, Ships, Systems, Strategy",
+    "OFF",
+    "Open a rig and take the field",
+    "PLANET RUSH",
+    "PLAY",
+    "REDUCE VFX",
+    "SETTINGS",
+    "SFX VOLUME",
+    "switch CONTROLS to STICKS to fire",
+    "TAP COMMANDER",
+    "TAP COMMANDER aims and fires for",
+    "TAP COMMANDER aims and fires foryou. This row is locked on AUTO-FIRE —switch CONTROLS to STICKS to fireyourself.",
+    "you. This row is locked on AUTO-FIRE —",
+    "Your ship, your level, what you have unlocked"
+  ],
+  "schemeSwitch": {
+    "control": "controls",
+    "pressedAt": {
+      "x": 209,
+      "y": 192
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "rowBefore": {
+      "kind": "controls",
+      "label": "CONTROLS",
+      "value": "TAP COMMANDER",
+      "disabled": false
+    },
+    "rowAfter": {
+      "kind": "controls",
+      "label": "CONTROLS",
+      "value": "STICKS",
+      "disabled": false
+    },
+    "storedFireModeBefore": "(absent)",
+    "storedFireModeAfter": "(absent)",
+    "storedSchemeBefore": "(absent)",
+    "storedSchemeAfter": "sticks"
+  },
+  "liveRowPress": {
+    "control": "fireMode",
+    "pressedAt": {
+      "x": 209,
+      "y": 133
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "rowBefore": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "AUTO-AIM",
+      "disabled": false
+    },
+    "rowAfter": {
+      "kind": "fireMode",
+      "label": "FIRE MODE",
+      "value": "MANUAL",
+      "disabled": false
+    },
+    "storedFireModeBefore": "(absent)",
+    "storedFireModeAfter": "manual",
+    "storedSchemeBefore": "sticks",
+    "storedSchemeAfter": "sticks"
+  },
+  "claimHits": [],
+  "screenText": [
+    "?",
+    "+",
+    "−",
+    "84ddec7*",
+    "AUTO-AIM",
+    "AUTO-FIRE",
+    "CHANGES SAVE IMMEDIATELY",
+    "CODEX",
+    "CONTRACT OPEN · SECTOR 04",
+    "CONTROLS",
+    "Controls, audio, visual effects",
+    "DEEP FIELD MINING AUTHORITY",
+    "DONE",
+    "FIRE MODE",
+    "HANGAR",
+    "MANUAL",
+    "MASTER VOLUME",
+    "MUSIC VOLUME",
+    "Objective, Bots, Ships, Systems, Strategy",
+    "OFF",
+    "Open a rig and take the field",
+    "PLANET RUSH",
+    "PLAY",
+    "REDUCE VFX",
+    "SETTINGS",
+    "SFX VOLUME",
+    "STICKS",
+    "switch CONTROLS to STICKS to fire",
+    "TAP COMMANDER",
+    "TAP COMMANDER aims and fires for",
+    "TAP COMMANDER aims and fires foryou. This row is locked on AUTO-FIRE —switch CONTROLS to STICKS to fireyourself.",
+    "you. This row is locked on AUTO-FIRE —",
+    "Your ship, your level, what you have unlocked"
+  ]
+}

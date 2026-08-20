@@ -1,0 +1,169 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?gate=0 on the production bundle → PLAY",
+  "menuControls": [
+    "play",
+    "codex",
+    "settings",
+    "hangar"
+  ],
+  "doors": {
+    "screen": "home",
+    "title": "MINE · DEFEND · ATTACK",
+    "notice": "",
+    "error": "",
+    "controls": [
+      {
+        "kind": "campaign",
+        "physicalCenter": {
+          "x": 640,
+          "y": 301.5
+        },
+        "physicalBounds": {
+          "x": 240,
+          "y": 265.5,
+          "width": 800,
+          "height": 72
+        }
+      },
+      {
+        "kind": "solo",
+        "physicalCenter": {
+          "x": 640,
+          "y": 392.5
+        },
+        "physicalBounds": {
+          "x": 240,
+          "y": 352.5,
+          "width": 800,
+          "height": 80
+        }
+      },
+      {
+        "kind": "create",
+        "physicalCenter": {
+          "x": 640,
+          "y": 483.5
+        },
+        "physicalBounds": {
+          "x": 240,
+          "y": 447.5,
+          "width": 800,
+          "height": 72
+        }
+      },
+      {
+        "kind": "join",
+        "physicalCenter": {
+          "x": 640,
+          "y": 570.5
+        },
+        "physicalBounds": {
+          "x": 240,
+          "y": 534.5,
+          "width": 800,
+          "height": 72
+        }
+      },
+      {
+        "kind": "back",
+        "physicalCenter": {
+          "x": 114,
+          "y": 754
+        },
+        "physicalBounds": {
+          "x": 44,
+          "y": 726,
+          "width": 140,
+          "height": 56
+        }
+      }
+    ]
+  },
+  "settingsListedOnDoors": [],
+  "back": {
+    "pressedAt": {
+      "x": 114,
+      "y": 754
+    },
+    "topmostAtThatPoint": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "before": {
+      "onlineVisible": true,
+      "onlineScreen": "home",
+      "menuScreen": "online",
+      "menuVisible": true
+    },
+    "after": {
+      "onlineVisible": false,
+      "onlineScreen": "home",
+      "menuScreen": "menu",
+      "menuVisible": true
+    }
+  },
+  "drawnTextCount": 55,
+  "claimHits": [],
+  "allDrawnText": [
+    "8",
+    "4",
+    "d",
+    "e",
+    "c",
+    "7",
+    "*",
+    "P",
+    "L",
+    "A",
+    "N",
+    "E",
+    "T",
+    " ",
+    "R",
+    "U",
+    "S",
+    "H",
+    "D",
+    "F",
+    "I",
+    "M",
+    "G",
+    "O",
+    "Y",
+    "C",
+    "·",
+    "0",
+    "p",
+    "n",
+    "a",
+    "r",
+    "i",
+    "g",
+    "t",
+    "k",
+    "h",
+    "f",
+    "l",
+    "X",
+    "b",
+    "j",
+    "v",
+    ",",
+    "B",
+    "o",
+    "s",
+    "y",
+    "m",
+    "u",
+    "w",
+    "K",
+    ".",
+    "J",
+    "’"
+  ]
+}
