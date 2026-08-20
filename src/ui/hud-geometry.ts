@@ -1066,7 +1066,15 @@ export function promptBand(
   // Horizontal: centred, and no wider than twice its distance to the nearest
   // thing already living in that band — a thumb column, or the minimap's corner.
   const centerX = viewportWidth / 2;
-  const map = collapsedRect({ width: viewportWidth, height: viewportHeight }, isTouch, insets);
+  // The map at its LEFTMOST, deliberately (a0-103). Since a0-103 the collapsed
+  // square only holds clear of the fire column on the frames a FIRE button is
+  // drawn there, so its left edge now depends on the seated scheme and the fire
+  // mode. The prompt's band must not: a sentence that re-wraps when the player
+  // toggles Auto-aim mid-match is a worse bug than a band a little narrower than
+  // it could be. So this reserves the worst case on touch — the map pushed left
+  // of the fire column — and the prompt clears it under every scheme. Desktop
+  // has no fire column and never did; nothing here moves on either platform.
+  const map = collapsedRect({ width: viewportWidth, height: viewportHeight }, isTouch, insets, isTouch);
   const thumb = isTouch ? PROMPT_THUMB_COLUMN : 0;
   const leftLimit = left + thumb;
   const rightLimit = Math.min(right - thumb, map.width > 0 ? map.x - PROMPT_MINIMAP_GAP : right);
