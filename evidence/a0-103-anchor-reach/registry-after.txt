@@ -4,8 +4,8 @@ qa-phone/landscape (a0-99) — 798x384 @dpr3
   id                region          margin   x      y      w      h     right-gap  bottom-gap
   ship-local        center          0       383.0  176.0   32.0   32.0     383.0      176.0
   pause-button      full            0        72.0   16.0   48.0   48.0     678.0      320.0
-  ore-hud           top-left        16       16.0   16.0   45.7   41.0     736.3      327.0
-  banked-total      top-left        16       16.0   27.0   10.0   21.0     772.0      336.0
+  ore-hud           top-left        16       16.0   16.0   52.9   60.0     729.1      308.0
+  banked-total      top-left        16       26.6   39.0   10.0   21.0     761.4      324.0
   station-hp        top-right       16      628.0   16.0  154.5   39.0      15.5      329.0
   zoom-control      top-right       16      718.0   61.0   64.0   48.0      16.0      275.0
   onboarding        full            16      232.9  309.0  332.2   59.0     232.9       16.0
@@ -16,8 +16,8 @@ iphone/landscape — 844x390 @dpr3
   id                region          margin   x      y      w      h     right-gap  bottom-gap
   ship-local        center          0       406.0  179.0   32.0   32.0     406.0      179.0
   pause-button      full            0        72.0   16.0   48.0   48.0     724.0      326.0
-  ore-hud           top-left        16       16.0   16.0   45.7   41.0     782.3      333.0
-  banked-total      top-left        16       16.0   27.0   10.0   21.0     818.0      342.0
+  ore-hud           top-left        16       16.0   16.0   52.9   60.0     775.1      314.0
+  banked-total      top-left        16       26.6   39.0   10.0   21.0     807.4      330.0
   station-hp        top-right       16      674.0   16.0  154.5   39.0      15.5      335.0
   zoom-control      top-right       16      764.0   61.0   64.0   48.0      16.0      281.0
   onboarding        full            16      230.6  315.0  382.8   59.0     230.6       16.0
@@ -27,8 +27,8 @@ iphone/landscape — 844x390 @dpr3
 desktop — 1280x800 @dpr1
   id                region          margin   x      y      w      h     right-gap  bottom-gap
   ship-local        center          0       624.0  384.0   32.0   32.0     624.0      384.0
-  ore-hud           top-left        16       16.0   16.0   49.7   52.0    1214.3      732.0
-  banked-total      top-left        16       16.0   30.0   13.0   26.0    1251.0      744.0
+  ore-hud           top-left        16       16.0   16.0   52.9   75.0    1211.1      709.0
+  banked-total      top-left        16       26.6   45.0   13.0   26.0    1240.4      729.0
   controls-strip    bottom-strip    0         0.0  760.0 1280.0   40.0       0.0        0.0
   station-hp        top-right       16     1106.0   16.0  158.5   42.0      15.5      742.0
   onboarding        full            16      196.8  690.0  886.4   60.0     196.8       50.0
