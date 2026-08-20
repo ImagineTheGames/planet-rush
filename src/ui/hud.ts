@@ -93,7 +93,7 @@ import type { DrawnHealthBar } from './healthbar-view';
 import { nameplateModel } from './nameplates';
 import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
-import type { DrawnNameplate } from './nameplates-view';
+import type { DrawnNameplate, WithheldNameplate } from './nameplates-view';
 import { PeerPresenceView } from './peer-presence-view';
 import type { DrawnPresenceLine } from './peer-presence-view';
 import type { PresenceTell } from './peer-presence';
@@ -1160,7 +1160,6 @@ export class Hud extends Container {
     // earlier changes nothing it computes.
     const underAttack = this.updateAlarm(frame);
     this.updateHealthBars(frame, underAttack);
-    this.updateNameplates(frame);
     this.updateTapMarkers(frame);
     this.updateMinimap(frame);
     this.updateStationHp(frame);
@@ -1177,6 +1176,16 @@ export class Hud extends Container {
     // …and the presence banner after it, because it hangs off the clock's drawn
     // footprint and that footprint depends on whether the clock re-flowed.
     this.updatePresence(frame, wheelOpen);
+    // The name labels run LAST of the world-anchored layers (a0-115), after every
+    // fixed readout has drawn itself at this frame's size. They have to yield to
+    // those readouts' rects, and a readout's rect is a measured thing that moves
+    // when its text does — the banked total gains a digit, the clock ticks from
+    // `NEXT 1:00` to `NEXT 0:59`, HOME becomes HOME LOST. Reading them before they
+    // were updated would step every label around LAST frame's counter, which is
+    // the one frame of lag a camera can photograph. They read nothing the readouts
+    // write beyond those rects, so this is purely a question of which frame's
+    // answer they get.
+    this.updateNameplates(frame);
     this.updateCostFloats(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
@@ -1911,7 +1920,41 @@ export class Hud extends Container {
       frame.difficulties ?? NO_DIFFICULTIES,
       frame.playerTeams ?? NO_TEAMS,
     );
-    this.nameplates.update(plates, this.screenWidth, this.screenHeight);
+    this.nameplates.update(plates, this.screenWidth, this.screenHeight, this.readoutKeepOut());
+  }
+
+  /**
+   * The fixed readouts' drawn rects this frame, in the HUD's own screen space —
+   * what a world-anchored label may not be drawn inside (a0-115).
+   *
+   * **Measured off the drawn objects, not off the constants they were laid out
+   * with**, and for the same reason {@link describeLayout} is: the rect that
+   * matters is the one the ink actually occupies, and a banked total that has
+   * ticked from `3` to `1204` is a wider counter than any constant in
+   * `./hud-geometry` knows about. These are the same Pixi groups that method
+   * registers under `ore-hud` / `station-hp` / `zoom-control`, so the keep-out and
+   * the registry can never disagree about where a readout is.
+   *
+   * `wave-clock` is here too, even though `describeLayout` still cannot honestly
+   * register it (its `top-center` zone is a third of the viewport and the strip is
+   * intrinsically wider — the argument is above). What a label has to clear is
+   * where the strip is DRAWN, which is a fact about the frame regardless of
+   * whether the registry has an anchor it can hold the strip to; a0-116 is this
+   * same collision on that element.
+   *
+   * Local bounds plus the group's own origin rather than `getBounds()`: the labels
+   * are laid out in this container's space, and `getBounds()` is global/physical
+   * (PR #93's rotation trap). Same space in, same space out.
+   */
+  private readoutKeepOut(): Rect[] {
+    const out: Rect[] = [];
+    for (const group of [this.oreGroup, this.waveGroup, this.stationGroup, this.zoomGroup]) {
+      if (!group.visible) continue;
+      const b = group.getLocalBounds();
+      if (b.width <= 0 || b.height <= 0) continue;
+      out.push({ x: group.x + b.x, y: group.y + b.y, width: b.width, height: b.height });
+    }
+    return out;
   }
 
   /** ?debug=1 live-stage seam: arm the nameplate layer's drawn-label capture so
@@ -1926,6 +1969,15 @@ export class Hud extends Container {
    *  {@link enableNameplateDebug} was called. */
   debugNameplates(): DrawnNameplate[] {
     return this.nameplates.debugPlates();
+  }
+
+  /** The name labels the layer decided NOT to draw last frame, and why (a0-115) —
+   *  a plate that stepped out of a readout's way and found nowhere to stand is
+   *  recorded here rather than simply gone, so a live-stage test can tell a label
+   *  that yielded from a label that broke. Empty unless
+   *  {@link enableNameplateDebug} was called. */
+  debugWithheldNameplates(): WithheldNameplate[] {
+    return this.nameplates.debugWithheld();
   }
 
   // --- Tap Commander order markers (developer §4) -------------------------

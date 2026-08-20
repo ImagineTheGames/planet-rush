@@ -1,0 +1,86 @@
+[
+  {
+    "profile": "phone",
+    "stop": "beside",
+    "counter": {
+      "x": 16,
+      "y": 16,
+      "width": 52.866666666666674,
+      "height": 60
+    },
+    "ship": {
+      "x": 66.26666666666668,
+      "y": 76.756
+    },
+    "drawn": {
+      "text": "Rusty",
+      "left": 47.86666666666668,
+      "right": 130.66666666666669,
+      "y": 36.756
+    },
+    "withheld": null
+  },
+  {
+    "profile": "phone",
+    "stop": "under",
+    "counter": {
+      "x": 16,
+      "y": 16,
+      "width": 52.866666666666674,
+      "height": 60
+    },
+    "ship": {
+      "x": 52.90333333333333,
+      "y": 76.756
+    },
+    "drawn": {
+      "text": "Rusty",
+      "left": 34.50333333333333,
+      "right": 117.30333333333333,
+      "y": 36.756
+    },
+    "withheld": null
+  },
+  {
+    "profile": "desktop",
+    "stop": "beside",
+    "counter": {
+      "x": 16,
+      "y": 16,
+      "width": 52.866666666666674,
+      "height": 75
+    },
+    "ship": {
+      "x": 66.26666666666668,
+      "y": 84.256
+    },
+    "drawn": {
+      "text": "Rusty",
+      "left": 47.86666666666668,
+      "right": 130.66666666666669,
+      "y": 44.256
+    },
+    "withheld": null
+  },
+  {
+    "profile": "desktop",
+    "stop": "under",
+    "counter": {
+      "x": 16,
+      "y": 16,
+      "width": 52.866666666666674,
+      "height": 75
+    },
+    "ship": {
+      "x": 52.90333333333333,
+      "y": 84.256
+    },
+    "drawn": {
+      "text": "Rusty",
+      "left": 34.50333333333333,
+      "right": 117.30333333333333,
+      "y": 44.256
+    },
+    "withheld": null
+  }
+]

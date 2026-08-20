@@ -487,6 +487,27 @@ export function oreCounterLayout(
   };
 }
 
+/**
+ * The counter's drawn footprint in **screen space** — the rect the layout registry
+ * records as `ore-hud`, and the one a world-anchored label has to stay out of
+ * (a0-115).
+ *
+ * {@link oreCounterLayout} answers in the ore group's own space, because that is
+ * what the view needs to place three children; this is the same layout pinned
+ * where `./hud` `layout()` pins the group — `(contentBox.x + HUD_PAD, HUD_PAD)`,
+ * the content box's top-left corner and never the screen's (a0-74). Two lines
+ * rather than a comment in a test, so the keep-out suite measures the counter the
+ * same way the HUD draws it instead of restating the offset.
+ */
+export function oreCounterBounds(layout: OreCounterLayout, contentX: number): Rect {
+  return {
+    x: contentX + HUD_PAD,
+    y: HUD_PAD,
+    width: layout.ground.width,
+    height: layout.ground.height,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Your own station's HP (GDD §2.2 — top-right, in your player colour)
 // ---------------------------------------------------------------------------
