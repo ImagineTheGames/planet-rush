@@ -28,10 +28,12 @@
  * exactly as the health-bar and nameplate layers do — the layout host un-rotates
  * them into logical space itself (`physicalBoundsToLogical` in main.ts).
  *
- * Palette (style-guide §1/§2): a near-vacuum backdrop with a steel border; owner
- * colours on the dots (the roster resolver [[station-hp]] shares); signal yellow —
- * the RESERVED ore colour — only on the faint ore hints, which *are* ore; threat
- * red only on the collapse ring, the match's danger state.
+ * Palette (style-guide §1/§2): a near-vacuum backdrop with a steel border; **SIDE
+ * colours on the dots** since a0-110 — friendly blue, hostile red, a derelict's
+ * neutral steel, all decided in the pure sibling ({@link ./minimap}
+ * `MINIMAP_SIDE_COLORS`) and never mixed here; signal yellow — the RESERVED ore
+ * colour — only on the faint ore hints, which *are* ore; threat red only on the
+ * collapse ring, the match's danger state, which has no side.
  */
 
 import { Container, Graphics } from 'pixi.js';
@@ -39,13 +41,17 @@ import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { PANEL_FILL } from './chrome';
 import { gantryPoly, INSTRUMENT_RULE, MINIMAP_CHAMFER } from './instrument';
-import { playerColor } from './station-hp';
 import {
   fitBounds,
   mapPoint,
   markPolygon,
   minimapRect,
   minimapScene,
+  minimapSide,
+  minimapMarkColor,
+  minimapViewerSide,
+  shipDotRadius,
+  MINIMAP_OWN_RIM_COLOR,
   MINIMAP_DOT_ALPHA,
   MINIMAP_MARGIN,
   MINIMAP_REDRAW_TICKS,
@@ -219,29 +225,41 @@ export class MinimapView extends Container {
     if (local) {
       const p = mapPoint(transform, local.x, local.y);
       const size = Math.min(rect.width, rect.height);
-      // Match minimapScene's own-ship sizing so the every-frame dot and the
-      // throttled scene agree (larger than an enemy dot, outlined = "mine").
-      const r = Math.max(1.5, size * 0.026) * 1.55;
+      // Sizing and colour BOTH come from the pure model, never from numbers
+      // re-typed here. This dot cannot read `scene.ownDot` — the scene is rebuilt
+      // only every MINIMAP_REDRAW_TICKS and this draws every frame — so the two
+      // agree by sharing the decision instead of by copying it. a0-110 is why
+      // that is written down: the copy that used to live here held the old ship
+      // fraction and `playerColor`, so a quarter off the ships and a friendly blue
+      // both landed everywhere on the map EXCEPT on the player's own ship.
+      const r = shipDotRadius(size, true);
       const cx = clamp(p.x, rect.x + r, rect.x + rect.width - r);
       const cy = clamp(p.y, rect.y + r, rect.y + rect.height - r);
       const alpha = local.spawnProtected ? MINIMAP_SPAWN_PROTECT_ALPHA : MINIMAP_DOT_ALPHA;
-      // The same triangle every ship gets (a0-88) — mine is bigger and outlined,
-      // and it points where I am pointed, which is the fastest "that one is me and
-      // this is which way I am facing" the map can say.
+      // The same triangle every ship gets (a0-88), in the same friendly blue every
+      // ally gets (a0-110) — mine is bigger, rimmed and drawn every frame, and it
+      // points where I am pointed.
       const mark: MinimapDot = {
         x: cx,
         y: cy,
         radius: r,
-        color: playerColor(local.owner),
+        color: minimapMarkColor(
+          minimapSide(local.owner, true, minimapViewerSide(frame), frame.teams),
+          local.owner,
+        ),
         alpha,
         own: true,
         shape: 'triangle',
         angle: local.angle ?? 0,
       };
       drawMark(this.ownDotG, mark);
-      // Bright outline so the eye finds "me" instantly among the marks.
+      // Bright rim so the eye finds "me" instantly among the marks — one rung up
+      // the same hue, since the fill is now the friendly blue itself
+      // ({@link MINIMAP_OWN_RIM_COLOR}).
       const poly = markPolygon(mark);
-      if (poly) this.ownDotG.poly(poly, true).stroke({ width: 1, color: PALETTE.plasma, alpha: 0.95 });
+      if (poly) {
+        this.ownDotG.poly(poly, true).stroke({ width: 1, color: MINIMAP_OWN_RIM_COLOR, alpha: 0.95 });
+      }
       ownPos = { x: cx, y: cy };
     }
 

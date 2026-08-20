@@ -89,6 +89,7 @@
 import type { PlayerId } from '@shared/types';
 import type { Rect } from '@platform/layout-registry';
 import { PALETTE } from '@render/index';
+import { DERIVED } from '../art/palette';
 import { SIDE_COLORS, sideRelation } from './lobby';
 import type { TeamTable } from './nameplates';
 import { playerColor } from './station-hp';
@@ -458,6 +459,39 @@ export function minimapSide(
  */
 export function minimapMarkColor(side: MinimapSide | null, owner: PlayerId): number {
   return side === null ? playerColor(owner) : MINIMAP_SIDE_COLORS[side];
+}
+
+/**
+ * The rim the viewer's OWN mark is stroked with, so the eye finds "me" instantly.
+ *
+ * It used to be `PALETTE.plasma` against a roster-coloured fill. a0-110 spends the
+ * fill on the side, and the friendly side IS plasma — so that rim would now be
+ * stroking plasma onto plasma and drawing nothing. It steps up one rung to the
+ * declared hot shade of the SAME hue (`plasmaHot`, the torch/muzzle centre), which
+ * keeps it a highlight on the friendly mark rather than a second colour competing
+ * with it, and adds no hue to the palette.
+ *
+ * The rim is the second of three things that say "me" — size ({@link
+ * OWN_SHIP_DOT_MULTIPLIER}) is the first and does the most work, and being drawn
+ * every frame rather than on the throttle is the third.
+ */
+export const MINIMAP_OWN_RIM_COLOR = DERIVED.plasmaHot;
+
+/**
+ * The radius a ship mark takes in a rect of this size — **the one place** the ship
+ * fraction and its floor are applied.
+ *
+ * It exists because there are two callers and they must never drift: the throttled
+ * scene here, and the view's per-frame own-ship dot ({@link ./minimap-view}), which
+ * cannot read `scene.ownDot` because the scene is only rebuilt every
+ * {@link MINIMAP_REDRAW_TICKS} ticks. That second caller used to re-type the
+ * numbers as literals, and a0-110 found out the hard way: the fraction came down a
+ * quarter here and the player's own ship stayed the old size on screen, because the
+ * copy never heard about it.
+ */
+export function shipDotRadius(rectSize: number, local = false): number {
+  const r = dotRadius(rectSize, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
+  return local ? r * OWN_SHIP_DOT_MULTIPLIER : r;
 }
 
 // ---------------------------------------------------------------------------
@@ -1333,7 +1367,7 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
   const transform = fitBounds(frame.bounds, rect);
   const size = Math.min(rect.width, rect.height);
   const stationR = dotRadius(size, STATION_DOT_FRACTION, STATION_DOT_MIN);
-  const shipR = dotRadius(size, SHIP_DOT_FRACTION, SHIP_DOT_MIN);
+  const shipR = shipDotRadius(size);
   const satR = dotRadius(size, SATELLITE_DOT_FRACTION, SATELLITE_DOT_MIN);
   const oreR = dotRadius(size, ORE_DOT_FRACTION, ORE_DOT_MIN);
 
@@ -1385,7 +1419,7 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     const dot: MinimapDot = {
       x: s.x,
       y: s.y,
-      radius: sh.local ? shipR * OWN_SHIP_DOT_MULTIPLIER : shipR,
+      radius: sh.local ? shipDotRadius(size, true) : shipR,
       // Friend or foe (a0-110). `local` is what makes the viewer's own mark `own`
       // rather than `ally` — it wears the same friendly blue either way, and what
       // keeps YOU findable is the 1.55× above plus the `own` outline, not the hue.

@@ -1412,6 +1412,10 @@ export {
   minimapSide,
   minimapMarkColor,
   minimapViewerSide,
+  MINIMAP_OWN_RIM_COLOR,
+  // The ONE place a ship mark's radius is decided — the scene and the view's
+  // per-frame own dot both call it rather than each holding the numbers.
+  shipDotRadius,
   // The mark-sizing tunables, exported so a test can bind to the floor rather
   // than to a number (a0-110: the fraction moved, the floor did not).
   STATION_DOT_FRACTION,

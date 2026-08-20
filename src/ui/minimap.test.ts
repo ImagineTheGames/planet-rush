@@ -83,7 +83,9 @@ import {
   MINIMAP_DOT_ALPHA,
   MINIMAP_DERELICT_ALPHA,
   MINIMAP_SIDE_COLORS,
+  MINIMAP_OWN_RIM_COLOR,
   MINIMAP_COLLAPSED_MIN,
+  shipDotRadius,
   SHIP_DOT_FRACTION,
   SHIP_DOT_MIN,
   SATELLITE_DOT_FRACTION,
@@ -1086,6 +1088,35 @@ describe('minimapScene — the ship mark came down a quarter (a0-110)', () => {
       return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
     };
     expect(span(scene.shipDots[0]!)).toBeLessThan(span(scene.stationDots[0]!));
+  });
+
+  it('the own dot is sized and coloured from ONE seam, not a copy in the view', () => {
+    // The trap a0-110 walked into, pinned so it cannot come back. The view redraws
+    // the local ship's dot EVERY frame (the throttled scene is rebuilt only every
+    // MINIMAP_REDRAW_TICKS), so it cannot read `scene.ownDot` — it has to compute
+    // the same thing. It used to do that with the numbers re-typed as literals,
+    // which meant the quarter came off every ship on the map except the player's
+    // own, and the friendly blue reached every ally except the player. Both halves
+    // now go through `shipDotRadius` and `minimapMarkColor`, and this asserts the
+    // scene agrees with them — if the view ever forks again, the fork is visible
+    // here as a mismatch rather than on the developer's phone.
+    for (const side of [MINIMAP_COLLAPSED_MIN, MINIMAP_COLLAPSED_TOUCH, MINIMAP_COLLAPSED_DESKTOP]) {
+      const scene = minimapScene(
+        frame({
+          teams: TEAMS,
+          viewerTeam: 0,
+          ships: [ship({ owner: 0, local: true }), ship({ owner: 1, x: 300, y: 300 })],
+        }),
+        { x: 0, y: 0, width: side, height: side },
+      );
+      expect(scene.ownDot!.radius).toBe(shipDotRadius(side, true));
+      expect(scene.shipDots[0]!.radius).toBe(shipDotRadius(side));
+      expect(scene.ownDot!.color).toBe(minimapMarkColor(minimapSide(0, true, 0, TEAMS), 0));
+    }
+    // …and the rim that says "me" is not the colour it is drawn on. It used to be
+    // plasma over a roster fill; the fill is plasma now, so a plasma rim would be
+    // stroking a mark onto itself and drawing nothing.
+    expect(MINIMAP_OWN_RIM_COLOR).not.toBe(MINIMAP_SIDE_COLORS.own);
   });
 
   it('a satellite still reads SMALLER than a ship — the ratio a0-110 had to protect', () => {
