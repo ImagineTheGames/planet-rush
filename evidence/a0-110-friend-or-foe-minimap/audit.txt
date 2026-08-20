@@ -1,0 +1,250 @@
+a0-110 — the minimap should answer friend or foe, and the ships are too big
+==============================================================================
+UI Engineer. Branch agent/ui/a0-110-friend-or-foe-minimap, off origin/main @
+b2ee0091. Container run, 2026-08-20. Every frame below was opened and read.
+
+
+THE REPORT
+------------------------------------------------------------------------------
+Developer, 2026-08-20:
+
+  "i feel like on minimap friendlies should all be blue, and enemies all red...
+   it would just make it easier to understand, also decrease the size of the ship
+   icons on the minimap"
+
+Two things. The first overrules a stated rule in this file's own header — colour
+on the minimap was ROSTER IDENTITY (style-guide §3), and a0-88 built the shape
+channel precisely *because* colour was already spoken for. The second is a
+proportion complaint that turns out to have a cause worth naming (§5).
+
+
+1. THE CAPTURE
+------------------------------------------------------------------------------
+Viewport      798x384 CSS dpr 3 — the developer's own phone
+              (evidence/a0-74-viewport/profiles.ts, `phone-798x384`)
+              and 1280x800 dpr 1 — the golden suite's desktop control.
+States        COLLAPSED (the corner map, the object complained about) and
+              EXPANDED (the same decision, large enough to read).
+Scene         ?debug=1&freeze=1&sides=2&gate=0 — the frozen seeded world with
+              the debug TEAMS switch, so there is a real ally table rather than
+              FFA's teams-of-one.
+Server        evidence/a0-110-friend-or-foe-minimap/playwright.config.ts —
+              private port 4290, own `npm run build`, reuseExistingServer off.
+              The lanes share this box and 4173 may be serving another lane's
+              bundle (a0-06's trap).
+Before half   a worktree of origin/main @ b2ee0091 + ONLY the staging sha
+              (see §7), served on port 4291, captured with the SAME spec.
+
+What each frame drew, read back off Hud.debugMinimap at the moment of the shot
+(shots/{before,after}-readback.json). BEFORE and AFTER agree frame for frame:
+
+  frame               state       station ship ore sat coverage  staged
+  phone-collapsed     corner 80      8     6   30   0     8      viewer 0
+  phone-expanded      overlay 269    8     6   30   0     8      ally   2
+  desktop-collapsed   corner 148     8     6   30   0     8      hostiles 1,3
+  desktop-expanded    overlay 560    8     6   30   0     8      wreck  5
+
+One ally, two rivals, a wreck and the viewer, in every frame, on both devices —
+which is what the brief asked the evidence to show.
+
+
+2. WHAT THE PAIR SHOWS
+------------------------------------------------------------------------------
+shots/compare-phone-collapsed.png — the reported object, 4x, before | after.
+
+BEFORE: violet, spring green, azure, chalk, magenta, cyan and slate-blue squares
+and triangles. Every mark is a correct answer to "who", and there is no answer at
+all to "can it hurt me". Three of those marks are on my side and four are not,
+and nothing in the picture says which.
+
+AFTER: the same eight bodies. Mine and my ally's are plasma blue. All four rival
+marks are the same red. The wreck is steel. The read is immediate and it survives
+being 3 px across, which is the whole point.
+
+
+3. THE SAME THING, COUNTED (hue-census.txt, hues.mjs)
+------------------------------------------------------------------------------
+"It is a rainbow" and "it is two colours" should not have to be taken on trust
+from two thumbnails. Every mark pixel is matched against the project's own
+constants composited at src/ui/minimap.ts's own alpha values over the map's own
+backdrop tones — no invented ranges. Backdrop, wash, chrome and antialiased edges
+are left UNCOUNTED rather than distributed, so this under-counts marks and never
+over-counts them.
+
+  frame              ROSTER identity hues        SIDE colours
+                     before      ->  after       before  ->  after
+  phone collapsed    7  (46.0%)  ->  2 ( 8.2%)   12.0%   ->  45.6%
+  phone expanded     7  (62.1%)  ->  5 ( 5.4%)    5.7%   ->  59.3%
+  desktop collapsed  7  (53.0%)  ->  1 ( 0.3%)   14.4%   ->  64.4%
+  desktop expanded   8  (70.6%)  ->  5 ( 0.8%)    5.5%   ->  73.5%
+
+The residual roster percentages after (0.3%–8.2%) are antialiased edge pixels
+where a mark meets the backdrop, not marks — the desktop collapsed frame, which
+has the least antialiasing per mark, falls to five pixels.
+
+AND THE TWO CONTROLS, which are the more interesting half:
+
+  ore (signal yellow)   238 -> 238   3208 -> 3208    80 -> 80   1529 -> 1529
+  wreck (hull steel)    385 -> 377   2753 -> 2766   157 -> 147  1239 -> 1196
+
+Ore is IDENTICAL to the pixel in all four pairs. The RESERVED colour
+(style-guide §2) was not spent on a side and did not move. The wreck holds to
+within 3% — it is nobody's side, it kept neutral steel and the derelict dim, and
+the small delta is the ship triangles beside it getting smaller and changing a
+few shared edge pixels.
+
+
+4. WHY THE PALETTE WAS A LOOKUP AND NOT A CHOICE
+------------------------------------------------------------------------------
+The brief framed the friendly blue as open: plasma-with-overlap, or a distinct
+blue that does not collide with it. It is not open. Both halves are already
+ratified in this lane, in ONE table, worn by a label that floats over the very
+hull whose mark this is:
+
+  src/ui/lobby.ts  SIDE_COLORS = { friendly: PALETTE.plasma  #4DC3FF,
+                                   enemy:    #CB7979,
+                                   neutral:  PALETTE.patina }
+
+u3, 2026-08-05: "perhaps just Friendly, and Enemy, with colors like Blue for
+Friendly, Red for Enemy". And src/art/vfx/shots.ts carries the same ruling for
+projectiles in the developer's own words: "all friendlies should have that same
+blue and all enemies red... even in team mode... in ffa its all red obviously".
+
+a0-110 is that rule reaching a third surface. A distinct "minimap blue" would
+have meant the nameplate over a hull and the mark under it wore two different
+blues for one fact — which is the drift that table's doc-comment exists to stop.
+
+THE PLASMA/ENERGY OVERLAP, argued rather than assumed. Accepted. Nothing on this
+map draws energy — no shield, no torch, no bolt — so the hue is unambiguous here.
+And across surfaces it is not an overlap at all: a friendly bolt is already
+plasma, so a friendly mark in plasma is one meaning, not two.
+
+REJECTED, raw threat red #B23A3A for hostiles. It is 3.2:1 on Vacuum and
+lobby.test.ts pins every side colour at >= 4.5:1. u3 rejected that rung as too
+dim for a 12px word; a hostile mark on the 80px corner map is ~3px across and
+needs the legible rung more, not less. #CB7979 is the declared shotEnemy2 step of
+the enemy-fire ramp, so NO SEVENTH HUE enters the palette, and red-for-enemy
+stays inside the RESERVED rule by the same reasoning the developer ratified for
+explosions on 2026-08-18 ("we already use red for enemies and red can also mean
+death") — red is reserved to a STATE, and an enemy is that state.
+
+THE PALETTE AUDIT. src/art/compliance.ts walks the SPRITE IR only and does not
+reach UI colours, so it neither blesses nor rejects this. The audit that DOES
+bind is lobby.test.ts's SIDE_COLORS pin — the hexes plus the >= 4.5:1 contrast
+bar — and reusing the table means a0-110 passes it by construction rather than
+routing around it. src/ui/lobby.ts's "where this colour may land" list is amended
+in this PR to admit the minimap, with the reason it is a real extension: it is
+the one surface with no room for a WORD, so there the hue is the sole carrier
+rather than reinforcement.
+
+
+5. THE SIZE, AND WHY IT READ TOO BIG
+------------------------------------------------------------------------------
+  SHIP_DOT_FRACTION       0.026 -> 0.0195   (0.75x)
+  SATELLITE_DOT_FRACTION  0.020 -> 0.015    (0.75x)
+  every floor             UNCHANGED
+
+The cause is not in those numbers. Since a0-88 a ship is a TRIANGLE, and a
+triangle's ink is not bounded by its radius: its nose reaches 1.95r and its
+overall length is 2.86r. So the ship carrying the SMALLER radius was drawing the
+LONGER mark:
+
+  rect      ship r        triangle length     station square side
+  80 (touch)  2.080 -> 1.560   5.96 -> 4.47 px      5.67 px (unchanged)
+  148 (desk)  3.848 -> 2.886  11.02 -> 8.26 px     10.49 px (unchanged)
+  44 (clamped) 1.500 -> 1.500   4.30 -> 4.30 px      3.54 px (unchanged)
+
+At 80px a ship was 5.96px long against a 5.67px station square — it out-reached
+the anchor it is supposed to read smaller than. After, it is 4.47 against 5.67.
+
+THE FLOOR DID NOT MOVE, deliberately. The brief's constraint is that a mark
+shrunk below legibility has been deleted rather than reduced, so the fraction
+took the whole quarter and SHIP_DOT_MIN was left exactly where it was. The 44px
+clamped square is byte-identical before and after — it was already floored at
+0.026 (0.026 x 44 = 1.14, under the floor), so the quarter lands on every map
+anyone plays on and takes nothing from the one map that had nothing to give.
+
+THE SATELLITE HAD TO MOVE TOO, and the brief licenses saying so. Left at 0.020
+against a ship at 0.0195 it would have come out LARGER than the ship it is
+documented to read smaller than, inverting minimap.ts's own grammar. The same
+0.75x keeps the ratio exact. Station (0.04) and ore (0.011) do NOT move — they
+are the anchors, and not what was complained about.
+
+Total mark ink in the census fell 4.4% (phone collapsed) to 6.6% (desktop
+expanded), which is what a quarter off ships and satellites looks like while
+stations and ore hold.
+
+
+6. THE DEFECT THE CAPTURE CAUGHT — and the unit tests could not
+------------------------------------------------------------------------------
+The first `after` capture came back with the player's OWN ship still dark roster
+azure and still full size, while every ally beside it was plasma and a quarter
+smaller. 100 green unit tests, and the one mark the player looks at first was the
+one mark the ruling never reached.
+
+src/ui/minimap-view.ts redraws the LOCAL ship every frame — it cannot read
+scene.ownDot, because the scene rebuilds only every MINIMAP_REDRAW_TICKS and a
+dot that tracks your motion has to be current. It recomputed the mark, with the
+numbers re-typed as literals:
+
+    const r = Math.max(1.5, size * 0.026) * 1.55;
+    color: playerColor(local.owner),
+
+Fixed at the source rather than by re-typing the new numbers a second time:
+shipDotRadius() is now the ONE place the ship fraction and its floor are applied,
+and the colour goes through the same minimapMarkColor(minimapSide(...)) the scene
+uses. A unit test pins the scene against both helpers at three rect sizes, so a
+future fork shows up there instead of on a phone.
+
+AND THE RIM. The own mark is stroked so the eye finds "me", and that stroke was
+PALETTE.plasma over a roster fill. With the fill now plasma it would have stroked
+plasma onto plasma and drawn nothing — an affordance lost silently rather than
+visibly. It steps one rung up the same hue to plasmaHot (the declared torch
+centre), so it is a highlight on the friendly mark and not a second colour, and
+no hue is added. Size (1.55x) still does most of the "that one is me" work.
+
+This is the entire reason the evidence step exists, and it is written down here
+because "the tests were green" was true and insufficient.
+
+
+7. THE ONE DEVIATION FROM a0-88's CAPTURE RULE
+------------------------------------------------------------------------------
+a0-88's rule: a capture script must use only seams that exist on origin/main,
+because a script that needs the change cannot photograph the thing before it.
+
+The minimap renders only the player's SENSED state (feature f1). Two seconds into
+the frozen scene a viewer senses their own home and nothing else — a0-88's own
+readback for this scene records `ship 0`. So a capture of "friendlies blue,
+enemies red" on the stock scene is a picture of one blue square.
+
+No existing seam gives the frame either: __nameplateStage.stageBot,
+__minimapStage.buildSatellite and __teamFogStage.stage all address the FIRST
+non-local ship, so they fight over one slot and no composition yields two
+distinct rivals.
+
+So __minimapStage.stageSides() is new, and it is ISOLATED IN ITS OWN COMMIT so a
+reviewer can cherry-pick it onto main and confirm what it is: one file, sim
+positions and one zeroed core, no colour, no radius, no side logic. The `before`
+tree is origin/main + that sha and nothing else. Everything that decides how a
+mark is coloured or sized remains the branch's difference alone, and the fog, the
+allegiance and the painting are all still done by the shipped pipeline.
+
+
+8. THE GOLDEN RE-BASELINE
+------------------------------------------------------------------------------
+A TRAP WORTH RECORDING, because it nearly shipped a stale baseline as a green
+one. `npx playwright test --update-snapshots` on this Playwright (1.49.1) DOES
+NOT REWRITE A SNAPSHOT THAT PASSES. Run against the changed build it reported
+"50 passed" and rewrote zero files, and `git status` was clean — which reads
+exactly like "nothing changed" and is not the same claim at all.
+
+What was actually true: every in-match golden holds the corner map, the map's own
+station and ship marks did change hue and size, and the delta sat under the
+suite's `maxDiffPixelRatio: 0.01` gate. The baselines were stale AND green.
+
+Confirmed by mtime — no snapshot file was touched by the -u run — and settled the
+way a0-103 settled it: the affected baselines were DELETED and regenerated, which
+is the only path that actually writes.
+
+  (regenerated set and per-shot deltas: see the commit that carries them)
+
