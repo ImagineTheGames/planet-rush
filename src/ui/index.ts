@@ -1372,7 +1372,9 @@ export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
 // Bottom-right corner square that taps/clicks open to a centred overlay (same
 // gesture PC + mobile, `M` on PC), drawing sim-driven marks — station squares,
 // ship triangles pointed along their heading, satellite diamonds, the collapse
-// ring, faint ore dots (a0-88: SHAPE is kind, COLOUR is owner). Same pure-model /
+// ring, faint ore dots (a0-88: SHAPE is kind; a0-110: COLOUR is SIDE — friendly
+// blue, hostile red, a wreck neutral steel, off the ratified `./lobby`
+// SIDE_COLORS). Same pure-model /
 // Pixi-view split as the rest: `./minimap` decides (toggle, fit, scene, mark
 // geometry, the sensed region), `./minimap-view` draws (throttled cached content +
 // a per-frame own-ship mark). The `Hud` owns both.
@@ -1404,6 +1406,20 @@ export {
   MINIMAP_FOG_ALPHA,
   MINIMAP_COVERAGE_FILL_ALPHA,
   MINIMAP_COVERAGE_RING_ALPHA,
+  // Friend or foe (a0-110) — the side table, the resolver, and the two seams the
+  // colour is read through.
+  MINIMAP_SIDE_COLORS,
+  minimapSide,
+  minimapMarkColor,
+  minimapViewerSide,
+  // The mark-sizing tunables, exported so a test can bind to the floor rather
+  // than to a number (a0-110: the fraction moved, the floor did not).
+  STATION_DOT_FRACTION,
+  SHIP_DOT_FRACTION,
+  SHIP_DOT_MIN,
+  SATELLITE_DOT_FRACTION,
+  SATELLITE_DOT_MIN,
+  OWN_SHIP_DOT_MULTIPLIER,
 } from './minimap';
 export type {
   MinimapState,
@@ -1417,6 +1433,7 @@ export type {
   MinimapInsets,
   MinimapDot,
   MinimapShape,
+  MinimapSide,
   MinimapRegion,
   MinimapScene,
   FitTransform,

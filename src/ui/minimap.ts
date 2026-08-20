@@ -201,7 +201,7 @@ export const MINIMAP_THUMB_RESERVE_FRACTION = 0.16;
 // scales — a collapsed dot is tiny, the same dot expanded is readable)
 // ---------------------------------------------------------------------------
 
-const STATION_DOT_FRACTION = 0.04;
+export const STATION_DOT_FRACTION = 0.04;
 const STATION_DOT_MIN = 2;
 /**
  * Ship marks came down **a quarter** at a0-110 (0.026 → 0.0195): *"also decrease
@@ -222,19 +222,19 @@ const STATION_DOT_MIN = 2;
  * carrying the smaller radius. The ships were not merely large, they out-reached
  * the anchors. TUNABLE.
  */
-const SHIP_DOT_FRACTION = 0.0195;
-const SHIP_DOT_MIN = 1.5;
+export const SHIP_DOT_FRACTION = 0.0195;
+export const SHIP_DOT_MIN = 1.5;
 /** A radar satellite reads a touch smaller than a ship — a small orbiting body,
  *  not a combatant (feature f1). It takes the SAME 0.75× a0-110 put on the ship
  *  (0.02 → 0.015) for exactly that reason: left at 0.02 it would have come out
  *  LARGER than the ship it is supposed to read smaller than, which inverts this
  *  file's own grammar. Stations and ore are the map's anchors and do not move —
  *  they are not what the developer complained about. */
-const SATELLITE_DOT_FRACTION = 0.015;
-const SATELLITE_DOT_MIN = 1.25;
+export const SATELLITE_DOT_FRACTION = 0.015;
+export const SATELLITE_DOT_MIN = 1.25;
 /** The local ship's dot is drawn larger than an enemy's so it reads as *mine* at
  *  a glance — the minimap counterpart of the own-ship health bar's larger size. */
-const OWN_SHIP_DOT_MULTIPLIER = 1.55;
+export const OWN_SHIP_DOT_MULTIPLIER = 1.55;
 const ORE_DOT_FRACTION = 0.011;
 const ORE_DOT_MIN = 0.5;
 

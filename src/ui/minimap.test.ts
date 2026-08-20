@@ -62,6 +62,7 @@ import { hudMetrics, hudType } from './instrument';
 import { contentBox } from './viewport';
 import { ZOOM_CONTROL_ANCHOR, ZOOM_CONTROL_ID, zoomControlBounds } from './zoom-control';
 import { playerColor } from './station-hp';
+import { SIDE_COLORS } from './lobby';
 import {
   Minimap,
   collapsedRect,
@@ -81,6 +82,17 @@ import {
   MINIMAP_STRIP_CLEARANCE,
   MINIMAP_DOT_ALPHA,
   MINIMAP_DERELICT_ALPHA,
+  MINIMAP_SIDE_COLORS,
+  MINIMAP_COLLAPSED_MIN,
+  SHIP_DOT_FRACTION,
+  SHIP_DOT_MIN,
+  SATELLITE_DOT_FRACTION,
+  SATELLITE_DOT_MIN,
+  STATION_DOT_FRACTION,
+  OWN_SHIP_DOT_MULTIPLIER,
+  minimapSide,
+  minimapMarkColor,
+  minimapViewerSide,
   MINIMAP_SPAWN_PROTECT_ALPHA,
   MINIMAP_ORE_ALPHA,
   MINIMAP_REMEMBERED_ALPHA,
@@ -664,27 +676,46 @@ describe('minimapScene — shape is KIND, colour is OWNER (a0-88)', () => {
     expect(outlineVertices({ ...vessel, radius: r })).not.toBe(outlineVertices({ ...station, radius: r }));
   });
 
-  it('OWNERSHIP COLOUR is untouched — shape is the only new channel', () => {
+  // a0-88 asserted here that every mark kept its ROSTER colour, because the whole
+  // reason it built the shape channel was that colour was already spoken for. That
+  // premise is what a0-110 overruled — colour now answers friend or foe (see the
+  // a0-110 block below). What a0-88 actually owns is unchanged and still asserted
+  // everywhere else in this describe: not one SHAPE moved.
+  //
+  // Roster identity does still come back on the one map with no viewer to be
+  // friendly to, which is what this test now pins — a spectator or a replay, where
+  // there is no friend-or-foe question and the map answers the one it still can.
+  it('with NO viewer there is no friend or foe, so colour falls back to the ROSTER', () => {
     const scene = minimapScene(
       frame({
         stations: [
           { owner: 2, x: 100, y: 100, alive: true },
           { owner: 3, x: 900, y: 100, alive: false },
         ],
-        ships: [ship({ owner: 5, x: 500, y: 500 }), ship({ owner: 0, x: 400, y: 400, local: true })],
+        // No `local` ship anywhere and no viewerTeam: nobody is looking.
+        ships: [ship({ owner: 5, x: 500, y: 500 }), ship({ owner: 0, x: 400, y: 400 })],
         satellites: [{ owner: 6, x: 700, y: 300, alive: true, local: false }],
         oreHints: [{ x: 600, y: 600 }],
       }),
       RECT,
     );
-    // Exactly the colours §3 assigned, mark for mark — a wreck still neutral steel,
-    // ore still the reserved signal yellow.
     expect(scene.stationDots[0]!.color).toBe(playerColor(2));
-    expect(scene.stationDots[1]!.color).toBe(PALETTE.hullSteel);
+    expect(scene.stationDots[1]!.color).toBe(PALETTE.hullSteel); // a wreck is still steel
     expect(scene.shipDots[0]!.color).toBe(playerColor(5));
-    expect(scene.ownDot!.color).toBe(playerColor(0));
+    expect(scene.shipDots[1]!.color).toBe(playerColor(0));
     expect(scene.satelliteDots[0]!.color).toBe(playerColor(6));
     expect(scene.oreDots[0]!.color).toBe(PALETTE.signalYellow);
+    // …and it is the ABSENCE of a viewer that does it, not a preference: seat the
+    // same player in the same feed and every mark re-reads as a side.
+    const seated = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 100, y: 100, alive: true }],
+        ships: [ship({ owner: 5, x: 500, y: 500 }), ship({ owner: 0, x: 400, y: 400, local: true })],
+      }),
+      RECT,
+    );
+    expect(seated.stationDots[0]!.color).toBe(MINIMAP_SIDE_COLORS.hostile);
+    expect(seated.ownDot!.color).toBe(MINIMAP_SIDE_COLORS.own);
   });
 
   it('every kind on the map gets its own mark: ship / station / satellite / ore', () => {
@@ -776,6 +807,312 @@ describe('minimapScene — shape is KIND, colour is OWNER (a0-88)', () => {
       expect(polygonArea(markPolygon(dot)!) / circleArea).toBeGreaterThan(0.75);
       expect(polygonArea(markPolygon(dot)!) / circleArea).toBeLessThan(1.25);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Colour is SIDE (a0-110) — and the ships came down a quarter
+// ---------------------------------------------------------------------------
+//
+// *"i feel like on minimap friendlies should all be blue, and enemies all red…
+// it would just make it easier to understand, also decrease the size of the ship
+// icons on the minimap"*
+//
+// The hues are NOT a0-110's invention and these tests deliberately assert against
+// the ratified table rather than against hex literals: `./lobby` SIDE_COLORS, u3
+// (2026-08-05), the same blue and red the nameplate's side tag already wears over
+// the same hull. If that table ever moves, the map moves with it — which is the
+// point, and is why a literal here would be the wrong assertion.
+
+/** A four-player match with SIDES: the viewer (0) and one ally (1) on side 0, two
+ *  rivals (2, 3) on their own. The exact match the brief asks for evidence on. */
+const TEAMS: readonly (number | undefined)[] = [0, 0, 1, 2];
+
+describe('minimapScene — colour is SIDE (a0-110)', () => {
+  it('colour on the minimap answers friend or foe', () => {
+    const scene = minimapScene(
+      frame({
+        teams: TEAMS,
+        viewerTeam: 0,
+        stations: [
+          { owner: 0, x: 100, y: 100, alive: true }, // mine
+          { owner: 1, x: 300, y: 100, alive: true }, // my ally's
+          { owner: 2, x: 500, y: 100, alive: true }, // a rival's
+          { owner: 3, x: 700, y: 100, alive: false }, // …and a rival's WRECK
+        ],
+        ships: [
+          ship({ owner: 0, x: 100, y: 500, local: true }), // me
+          ship({ owner: 1, x: 300, y: 500 }), // my ally
+          ship({ owner: 2, x: 500, y: 500 }), // rival A
+          ship({ owner: 3, x: 700, y: 500 }), // rival B
+        ],
+      }),
+      RECT,
+    );
+
+    // ME — the friendly blue, not a colour of my own. What still says "you" is
+    // SIZE and the outline flag, both untouched by this brief.
+    expect(scene.ownDot!.color).toBe(MINIMAP_SIDE_COLORS.own);
+    expect(scene.ownDot!.color).toBe(SIDE_COLORS.friendly);
+    expect(scene.ownDot!.own).toBe(true);
+    expect(scene.ownDot!.radius).toBeGreaterThan(scene.shipDots[0]!.radius);
+
+    // MY ALLY — the same friendly blue. Deliberate: on a glance object nothing
+    // wants you hunting for the difference between you and a friend. (The local
+    // ship leaves for `ownDot`, so the ally is the first of the three that stay,
+    // in feed order; its projected x pins that it really is owner 1 at x=300.)
+    expect(scene.shipDots).toHaveLength(3);
+    const ally = scene.shipDots[0]!;
+    expect(ally.x).toBeCloseTo(300 * 0.2);
+    expect(ally.color).toBe(SIDE_COLORS.friendly);
+    expect(ally.own).toBeFalsy();
+
+    // EVERYONE ELSE — hostile red, and BOTH rivals take the same one. That is the
+    // cost the developer accepted out loud: this map no longer says WHICH rival.
+    const hostiles = scene.shipDots.filter((d) => d.color === MINIMAP_SIDE_COLORS.hostile);
+    expect(hostiles).toHaveLength(2);
+    expect(MINIMAP_SIDE_COLORS.hostile).toBe(SIDE_COLORS.enemy);
+    expect(hostiles[0]!.color).toBe(hostiles[1]!.color);
+    // …and no rival is wearing its roster hue any more.
+    expect(scene.shipDots.some((d) => d.color === playerColor(2))).toBe(false);
+    expect(scene.shipDots.some((d) => d.color === playerColor(3))).toBe(false);
+
+    // Homes read as sides by exactly the same rule — mine and my ally's blue, the
+    // live rival's red.
+    expect(scene.stationDots[0]!.color).toBe(SIDE_COLORS.friendly);
+    expect(scene.stationDots[1]!.color).toBe(SIDE_COLORS.friendly);
+    expect(scene.stationDots[2]!.color).toBe(SIDE_COLORS.enemy);
+
+    // A DERELICT WRECK IS NOBODY'S SIDE (GDD §2.7). It is not a faint enemy and
+    // not a spent friend — it is no longer owned at all, so it takes neither hue:
+    // neutral steel and the derelict dim, exactly as before this brief.
+    expect(scene.stationDots[3]!.color).toBe(PALETTE.hullSteel);
+    expect(scene.stationDots[3]!.color).toBe(MINIMAP_SIDE_COLORS.neutral);
+    expect(scene.stationDots[3]!.color).not.toBe(SIDE_COLORS.enemy);
+    expect(scene.stationDots[3]!.color).not.toBe(SIDE_COLORS.friendly);
+    expect(scene.stationDots[3]!.alpha).toBe(MINIMAP_DERELICT_ALPHA);
+
+    // Three sides, not a boolean — resolved through the same predicate the
+    // nameplate's FRIENDLY/ENEMY word is.
+    expect(minimapSide(0, true, 0, TEAMS)).toBe('own');
+    expect(minimapSide(1, false, 0, TEAMS)).toBe('ally');
+    expect(minimapSide(2, false, 0, TEAMS)).toBe('hostile');
+    expect(minimapSide(3, false, 0, TEAMS)).toBe('hostile');
+  });
+
+  it('in FFA every rival is hostile, from a feed that has never heard of teams', () => {
+    // *"in ffa its all red obviously"*. FFA is teams-of-one, so no table is needed
+    // at all: a slot's side is its own id and the predicate does the rest.
+    const scene = minimapScene(
+      frame({
+        ships: [
+          ship({ owner: 0, x: 100, y: 500, local: true }),
+          ship({ owner: 1, x: 300, y: 500 }),
+          ship({ owner: 2, x: 500, y: 500 }),
+          ship({ owner: 3, x: 700, y: 500 }),
+        ],
+      }),
+      RECT,
+    );
+    expect(scene.ownDot!.color).toBe(SIDE_COLORS.friendly);
+    expect(scene.shipDots).toHaveLength(3);
+    expect(scene.shipDots.every((d) => d.color === SIDE_COLORS.enemy)).toBe(true);
+  });
+
+  it('an ally is friendly only while the table says so — a rematch recolours them', () => {
+    const teamed = minimapScene(
+      frame({ teams: [0, 0], viewerTeam: 0, stations: [], ships: [ship({ owner: 1 })] }),
+      RECT,
+    );
+    expect(teamed.shipDots[0]!.color).toBe(SIDE_COLORS.friendly);
+    // Same player, same seat, split the other way.
+    const split = minimapScene(
+      frame({ teams: [0, 1], viewerTeam: 0, stations: [], ships: [ship({ owner: 1 })] }),
+      RECT,
+    );
+    expect(split.shipDots[0]!.color).toBe(SIDE_COLORS.enemy);
+  });
+
+  it('a radar post has a side too — a hostile one is a thing that can hurt you', () => {
+    const scene = minimapScene(
+      frame({
+        teams: TEAMS,
+        viewerTeam: 0,
+        satellites: [
+          { owner: 0, x: 100, y: 300, alive: true, local: true },
+          { owner: 1, x: 300, y: 300, alive: true, local: false },
+          { owner: 2, x: 500, y: 300, alive: true, local: false },
+        ],
+      }),
+      RECT,
+    );
+    expect(scene.satelliteDots.map((d) => d.color)).toEqual([
+      SIDE_COLORS.friendly,
+      SIDE_COLORS.friendly,
+      SIDE_COLORS.enemy,
+    ]);
+    // Shape did NOT move: a satellite is still the station's diamond (a0-88).
+    expect(scene.satelliteDots.every((d) => d.shape === 'diamond')).toBe(true);
+  });
+
+  it('the RESERVED colours are not spent on a side — ore stays ore, the ring stays a hazard', () => {
+    const scene = minimapScene(
+      frame({
+        teams: TEAMS,
+        viewerTeam: 0,
+        ships: [ship({ owner: 0, local: true })],
+        oreHints: [{ x: 600, y: 600 }],
+        collapse: { x: 500, y: 500, radius: 400 },
+      }),
+      RECT,
+    );
+    // Signal yellow is RESERVED (style-guide §2) and an ore hint IS ore.
+    expect(scene.oreDots[0]!.color).toBe(PALETTE.signalYellow);
+    // The collapse ring is a state of the ARENA. It has no side, so it keeps raw
+    // threat red and never takes the (lifted) hostile hue.
+    expect(scene.collapseRing!.color).toBe(PALETTE.threatRed);
+    expect(scene.collapseRing!.color).not.toBe(MINIMAP_SIDE_COLORS.hostile);
+  });
+
+  it('the side hues are the ratified table, and no seventh hue enters the palette', () => {
+    // a0-110 chose reuse over invention: these ARE `./lobby` SIDE_COLORS (u3),
+    // which lobby.test pins to plasma / the shotEnemy2 rung and holds at ≥ 4.5:1
+    // on Vacuum. A distinct "minimap blue" would have put two blues on one fact.
+    expect(MINIMAP_SIDE_COLORS.own).toBe(SIDE_COLORS.friendly);
+    expect(MINIMAP_SIDE_COLORS.ally).toBe(SIDE_COLORS.friendly);
+    expect(MINIMAP_SIDE_COLORS.hostile).toBe(SIDE_COLORS.enemy);
+    expect(SIDE_COLORS.friendly).toBe(PALETTE.plasma);
+    // Neutral is the WRECK's steel, not the lobby's patina — a wreck is a body on
+    // this map, not a side with no name.
+    expect(MINIMAP_SIDE_COLORS.neutral).toBe(PALETTE.hullSteel);
+  });
+
+  it('a viewer-less map answers null, never "everything is hostile"', () => {
+    // The same rule `./lobby` sideRelation applies to the WORD: a view with no
+    // friendly in it has no enemies either.
+    expect(minimapSide(2, false, undefined, TEAMS)).toBeNull();
+    expect(minimapMarkColor(null, 2)).toBe(playerColor(2));
+    expect(minimapViewerSide(frame({ ships: [ship({ owner: 4 })] }))).toBeUndefined();
+    // The viewer's side is read from viewerTeam first, then off the local ship —
+    // so FFA works even when the wiring never passes a table.
+    expect(minimapViewerSide(frame({ viewerTeam: 1, ships: [] }))).toBe(1);
+    expect(minimapViewerSide(frame({ ships: [ship({ owner: 4, local: true })] }))).toBe(4);
+    expect(minimapViewerSide(frame({ teams: TEAMS, ships: [ship({ owner: 1, local: true })] }))).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The size (a0-110) — a quarter off the ships, and not one floor moved
+// ---------------------------------------------------------------------------
+
+describe('minimapScene — the ship mark came down a quarter (a0-110)', () => {
+  it('a ship mark stays legible at the smallest supported minimap', () => {
+    // The narrowest profile the field request pins placement on, on TOUCH, with
+    // the FIRE column reserved — the corrected corner rect a0-103 landed, not the
+    // old one. Sizing against the pre-a0-103 rect would size against a map that no
+    // longer exists.
+    const narrowest = collapsedRect(PHONE_NARROW, true, {}, true);
+    expect(narrowest.width).toBeGreaterThanOrEqual(MINIMAP_COLLAPSED_MIN);
+
+    const shipAt = (side: number): number =>
+      minimapScene(frame({ ships: [ship({ owner: 1 })] }), { x: 0, y: 0, width: side, height: side })
+        .shipDots[0]!.radius;
+
+    // 1. THE FLOOR HOLDS. This is the constraint that matters: a mark that shrinks
+    //    below legibility has been deleted, not reduced. a0-110 moved the FRACTION
+    //    and left SHIP_DOT_MIN exactly where it was, so no supported map — down to
+    //    the clamped square — can draw a ship smaller than the floor.
+    for (const side of [MINIMAP_COLLAPSED_MIN, narrowest.width, MINIMAP_COLLAPSED_TOUCH, MINIMAP_COLLAPSED_DESKTOP]) {
+      expect(shipAt(side), `ship radius at ${side}px`).toBeGreaterThanOrEqual(SHIP_DOT_MIN);
+    }
+    // …and at the clamped minimum the floor is what is actually doing the holding
+    // (the fraction alone would give 0.86px there), so it is load-bearing and not
+    // decoration.
+    expect(MINIMAP_COLLAPSED_MIN * SHIP_DOT_FRACTION).toBeLessThan(SHIP_DOT_MIN);
+    expect(shipAt(MINIMAP_COLLAPSED_MIN)).toBe(SHIP_DOT_MIN);
+
+    // 2. THE MARK IS STILL A MARK. The radius is a nominal, not the ink: a ship is
+    //    a TRIANGLE (a0-88), so what has to stay legible is the drawn outline. At
+    //    the smallest supported square it is still a few px on both axes, and
+    //    still visibly longer than it is wide — i.e. still reads as pointing.
+    const tiny = minimapScene(
+      frame({ ships: [ship({ owner: 1 })] }),
+      { x: 0, y: 0, width: MINIMAP_COLLAPSED_MIN, height: MINIMAP_COLLAPSED_MIN },
+    ).shipDots[0]!;
+    const poly = markPolygon(tiny)!;
+    const xs = poly.filter((_, i) => i % 2 === 0);
+    const ys = poly.filter((_, i) => i % 2 === 1);
+    const length = Math.max(...xs) - Math.min(...xs);
+    const width = Math.max(...ys) - Math.min(...ys);
+    expect(length).toBeGreaterThanOrEqual(3);
+    expect(width).toBeGreaterThanOrEqual(2);
+    expect(length).toBeGreaterThan(width);
+
+    // 3. NOTHING CHANGED AT THE FLOOR. The clamped square was already floored
+    //    before a0-110 (0.026 × 44 = 1.14, under the floor too), so the quarter
+    //    lands on the maps people actually play on and takes nothing from the one
+    //    map that had nothing to give.
+    expect(shipAt(MINIMAP_COLLAPSED_MIN)).toBe(Math.max(SHIP_DOT_MIN, MINIMAP_COLLAPSED_MIN * 0.026));
+  });
+
+  it('the quarter lands where it was asked for — the phone and desktop corner maps', () => {
+    const shipAt = (side: number): number =>
+      minimapScene(frame({ ships: [ship({ owner: 1 })] }), { x: 0, y: 0, width: side, height: side })
+        .shipDots[0]!.radius;
+    // Exactly 0.75× the pre-a0-110 fraction, on every map the floor does not catch.
+    expect(SHIP_DOT_FRACTION).toBeCloseTo(0.026 * 0.75, 10);
+    for (const side of [MINIMAP_COLLAPSED_TOUCH, MINIMAP_COLLAPSED_DESKTOP]) {
+      expect(shipAt(side)).toBeCloseTo(side * 0.026 * 0.75, 10);
+      expect(shipAt(side)).toBeLessThan(side * 0.026); // it really did come down
+    }
+  });
+
+  it('a ship no longer out-reaches the home it is parked next to', () => {
+    // The developer said "too big" of a mark whose RADIUS was already the smaller
+    // one. A triangle's ink is not bounded by its radius — nose 1.95r, length
+    // 2.86r — so at 0.026 the 80px corner map drew a 5.96px ship against a 5.67px
+    // station square. This is the assertion that complaint actually cashes out to.
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 100, y: 100, alive: true }],
+        ships: [ship({ owner: 1, x: 500, y: 500 })],
+      }),
+      { x: 0, y: 0, width: MINIMAP_COLLAPSED_TOUCH, height: MINIMAP_COLLAPSED_TOUCH },
+    );
+    const span = (dot: MinimapDot): number => {
+      const poly = markPolygon(dot)!;
+      const xs = poly.filter((_, i) => i % 2 === 0);
+      const ys = poly.filter((_, i) => i % 2 === 1);
+      return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    };
+    expect(span(scene.shipDots[0]!)).toBeLessThan(span(scene.stationDots[0]!));
+  });
+
+  it('a satellite still reads SMALLER than a ship — the ratio a0-110 had to protect', () => {
+    // Left at 0.02 while the ship went to 0.0195, a satellite would have come out
+    // LARGER than the ship it is documented to read smaller than. Same 0.75× on
+    // both keeps the file's own grammar exact.
+    expect(SATELLITE_DOT_FRACTION).toBeCloseTo(0.02 * 0.75, 10);
+    expect(SATELLITE_DOT_FRACTION).toBeLessThan(SHIP_DOT_FRACTION);
+    expect(SATELLITE_DOT_MIN).toBeLessThan(SHIP_DOT_MIN);
+    // The whole ordering the module documents: station > ship > satellite > ore.
+    expect(STATION_DOT_FRACTION).toBeGreaterThan(SHIP_DOT_FRACTION);
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 100, y: 100, alive: true }],
+        ships: [ship({ owner: 1, x: 500, y: 500 }), ship({ owner: 0, x: 400, y: 400, local: true })],
+        satellites: [{ owner: 3, x: 700, y: 300, alive: true, local: false }],
+        oreHints: [{ x: 600, y: 600 }],
+      }),
+      { x: 0, y: 0, width: MINIMAP_COLLAPSED_DESKTOP, height: MINIMAP_COLLAPSED_DESKTOP },
+    );
+    expect(scene.stationDots[0]!.radius).toBeGreaterThan(scene.shipDots[0]!.radius);
+    expect(scene.shipDots[0]!.radius).toBeGreaterThan(scene.satelliteDots[0]!.radius);
+    expect(scene.satelliteDots[0]!.radius).toBeGreaterThan(scene.oreDots[0]!.radius);
+    // The anchors did NOT move — they are not what the developer complained about.
+    expect(STATION_DOT_FRACTION).toBe(0.04);
+    // And "which one is me" is still SIZE, at the reduced scale as at the old one.
+    expect(scene.ownDot!.radius).toBeCloseTo(scene.shipDots[0]!.radius * OWN_SHIP_DOT_MULTIPLIER, 10);
   });
 });
 
