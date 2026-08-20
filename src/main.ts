@@ -2572,6 +2572,8 @@ async function boot(): Promise<void> {
     oreHints: { x: number; y: number; id: number }[];
     collapse: { x: number; y: number; radius: number } | null;
     fog: MinimapFog | null;
+    teams: TeamTable;
+    viewerTeam: number | undefined;
   } = {
     bounds: { width: 0, height: 0 },
     stations: minimapStations,
@@ -2580,6 +2582,11 @@ async function boot(): Promise<void> {
     oreHints: minimapOre,
     collapse: null,
     fog: null,
+    // Friend or foe on the map (a0-110). The SAME two reads the nameplates take
+    // (`hudFrame.playerTeams` / `hudFrame.viewerTeam`), off the same live world, so
+    // the mark under a hull and the word over it can never disagree about a side.
+    teams: [],
+    viewerTeam: undefined,
   };
   /** Rebuild the per-slot name table (and its mirror difficulty table) from the
    *  live match: the local player's chosen name (from the lobby, or persisted
@@ -4341,6 +4348,11 @@ async function boot(): Promise<void> {
   function feedMinimap(): void {
     minimapFrame.bounds.width = world.bounds.width;
     minimapFrame.bounds.height = world.bounds.height;
+    // Whose side each slot is on, and which side is the viewer's (a0-110) —
+    // rebuilt with the name table on boot and on rematch, so a rematch that moves
+    // this player across the split recolours the whole map with them.
+    minimapFrame.teams = playerTeams;
+    minimapFrame.viewerTeam = viewerTeam;
 
     let pn = 0;
     let satn = 0;

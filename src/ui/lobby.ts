@@ -464,13 +464,25 @@ export function teamName(team: number, viewerTeam?: number): string {
  * (ratified u3, 2026-08-05: *"with colors like Blue for Friendly, Red for
  * Enemy"*).
  *
- * Where it is allowed to land: the **motif only** — the roster row's team
- * underline and its side chip, and the side tag on a nameplate. Never a hull,
- * never a ship's trim, never an HP bar. The eight identity colours are per-SLOT
- * and ratified (style-guide §3.1): they are how a player tells two *enemies*
- * apart, and at three and four sides they are doing real work alongside the
- * letter. The motif is exactly the hue-independent layer this file already
- * described, so blue/red belongs there and nowhere else.
+ * Where it is allowed to land: the **motif** — the roster row's team underline and
+ * its side chip, the side tag on a nameplate — and, since a0-110, **the minimap
+ * mark** (`./minimap` `MINIMAP_SIDE_COLORS`). Never a hull, never a ship's trim,
+ * never an HP bar. The eight identity colours are per-SLOT and ratified
+ * (style-guide §3.1): they are how a player tells two *enemies* apart, and at
+ * three and four sides they are doing real work alongside the letter.
+ *
+ * **The minimap is a real extension of this list and not a slip** *(ratified
+ * 2026-08-20, a0-110: "i feel like on minimap friendlies should all be blue, and
+ * enemies all red… it would just make it easier to understand")*. Everywhere else
+ * on this list the side colour is *reinforcement* — the WORD carries the meaning
+ * and the hue merely agrees, which is what the m10 ratification ("colour alone is
+ * insufficient") bought. The minimap is the one surface in the game with no room
+ * for a word: a mark there is ~3 px. So on that surface, and only there, colour is
+ * the sole carrier of side — and the developer accepted the matching cost out
+ * loud, that a four-player FFA map can no longer say WHICH rival a mark is. The
+ * `own` mark stays findable by SIZE rather than by hue, and the colourblind path
+ * is the shape channel a0-88 built plus every other surface, which still reads
+ * identity. Nothing else on this list changed.
  *
  * Why these two hues, from the frozen palette rather than invented
  * (`src/art/tokens.ts`; pinned in `./lobby.test`):
