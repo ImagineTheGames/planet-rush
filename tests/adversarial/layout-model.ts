@@ -409,6 +409,12 @@ export function foreignTopmost(
   const out: Foreign[] = [];
   for (const control of frame.painted) {
     if (control.role !== 'read' && control.role !== 'press') continue;
+    // A zero-extent element has no coordinates of its own to probe: the nine
+    // points would land OUTSIDE it (they are inset half a pixel), so whatever is
+    // behind would answer and the probe would invent a cover out of an element
+    // that drew nothing. `endOfMatchLayout` hands back zero-extent rects by
+    // design on a viewport with no room for them, so this is reachable.
+    if (control.bounds.width <= 0 || control.bounds.height <= 0) continue;
     const hits: Array<{ name: string; answered: string }> = [];
     for (const pt of probePoints(control.bounds)) {
       const top = topmostAt(frame, pt.x, pt.y);
