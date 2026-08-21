@@ -111,4 +111,80 @@ function menuPanel(name: string): void {
   console.log(`${name}.png — ${w}x${h}, sky ${spec.id} (${sky.length} shapes) + ${stars.length} star shapes`);
 }
 
+/**
+ * **The same crop of the same menu, enlarged.** A cross is a 0.7 px line and a
+ * halo is a soft 20 px wash, so at 1:1 "some of these have a cross and some do
+ * not" is a thing you have to take on trust. At 5× it is a thing you can see, and
+ * the before/after pair is the whole of change 2 in one look.
+ *
+ * The shapes are scaled about the crop's centre and painted by the same
+ * rasterizer, so this is a magnification of the ART — every radius, every alpha
+ * and every stroke width grows with it — rather than a resample of the plate.
+ */
+const CROP = { cx: 1105, cy: 372, w: 288, h: 180 } as const;
+const ZOOM = 5;
+
+function scale(s: Shape, k: number, ox: number, oy: number): Shape {
+  const X = (v: number): number => (v - ox) * k;
+  const Y = (v: number): number => (v - oy) * k;
+  const path =
+    s.path.kind === 'circle'
+      ? { ...s.path, cx: X(s.path.cx), cy: Y(s.path.cy), r: s.path.r * k }
+      : { ...s.path, points: s.path.points.map((v, i) => (i % 2 === 0 ? X(v) : Y(v))) };
+  const grow = <T extends { falloff?: { cx: number; cy: number; rx: number; ry: number } | undefined; width?: number }>(
+    ink: T | undefined,
+  ): T | undefined => {
+    if (ink === undefined) return undefined;
+    const w = ink.width === undefined ? {} : { width: ink.width * k };
+    if (ink.falloff === undefined) return { ...ink, ...w };
+    return {
+      ...ink,
+      ...w,
+      falloff: {
+        ...ink.falloff,
+        cx: X(ink.falloff.cx),
+        cy: Y(ink.falloff.cy),
+        rx: ink.falloff.rx * k,
+        ry: ink.falloff.ry * k,
+      },
+    };
+  };
+  return { ...s, path, fill: grow(s.fill), stroke: grow(s.stroke) } as Shape;
+}
+
+function detail(name: string): void {
+  const { w, h } = VIEW;
+  const spec = NEBULAE[MAP_NEBULA[MENU_MAP]];
+  const cx = w / 2;
+  const cy = h / 2;
+  const ox = CROP.cx - CROP.w / 2;
+  const oy = CROP.cy - CROP.h / 2;
+  const buf = ground(CROP.w * ZOOM, CROP.h * ZOOM, GROUND_COLOR);
+
+  const nw = coverSpan(spec.parallax, w, w);
+  const nh = coverSpan(spec.parallax, h, h);
+  const sky = nebulaSprite(spec.id, VOID_SEED, nw, nh, 1, w, h).shapes.map((s) =>
+    scale(translate(s, cx, cy), ZOOM, ox, oy),
+  );
+  const stars: Shape[] = [];
+  for (const layer of STAR_LAYERS) {
+    const lw = coverSpan(layer.parallax, w, w);
+    const lh = coverSpan(layer.parallax, h, h);
+    for (const s of starFieldSprite(layer, VOID_SEED, lw, lh).shapes) {
+      stars.push(scale(translate(s, cx, cy), ZOOM, ox, oy));
+    }
+  }
+  if (spec.occludes) {
+    for (const s of stars) paint(buf, s, false);
+    for (const s of sky) paint(buf, s, false);
+  } else {
+    for (const s of sky) paint(buf, s, spec.additive);
+    for (const s of stars) paint(buf, s, false);
+  }
+  write(buf, OUT, `${name}.png`);
+  // eslint-disable-next-line no-console
+  console.log(`${name}.png — ${CROP.w}x${CROP.h} of the menu at ${ZOOM}x, centred (${CROP.cx},${CROP.cy})`);
+}
+
 menuPanel(process.env.A0123_NAME ?? `menu-${VIEW.w}x${VIEW.h}`);
+detail('detail-5x');
