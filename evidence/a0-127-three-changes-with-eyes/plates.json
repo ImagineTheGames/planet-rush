@@ -5,9 +5,18 @@
     "sub": "Production bundle 0910de2*, ?gate=0, desktop 1280x800 dpr2, no ?freeze. The menu's own ink is painted out; every ring is a candidate the checklist proposed, and the counting is what an eye found inside them. 1 image pixel = 1 device pixel.",
     "width": 1280,
     "blocks": [
-      { "img": "after-menu-desktop-1280x800-marked-r1c1.png", "caption": "SHIPPING BUILD, top-left quadrant of the sky window. Counted here: 15 stars carrying their own halo, 5 of them wearing a cross - the crossed ones at (212,318), (176,417), (36,683), (441,688) and the pair at the right edge (1257,428). The other ten - among them the amber pair at (871,231) and (856,267), the blue orbs at (626,222) and (776,321), and (210,426), (281,424), (180,652) - are haloed with no spikes at all. That is the developer's ask, visible: a bloom and a cross are no longer the same population." },
-      { "img": "after-menu-desktop-1280x800-marked-r2c1.png", "caption": "SHIPPING BUILD, bottom-left quadrant - the densest part of this sky. 22 haloed stars, 10 of them crossed. Rings with nothing but a plain point inside them are the checklist over-collecting (a companion sitting inside a neighbour's glow), which is why the numbers in the manifest are counted and not taken from the ring count." },
-      { "img": "before-menu-desktop-1280x800-marked-r1c1.png", "caption": "THE BUILD BEFORE a0-123 (68bac05*), the same quadrant of the same seeded sky, the same instrument. 24 haloed stars against 15 - and every one of them carries a cross. Both halves of the developer's report are in this pair: there were more blooms, and a bloom always brought spikes with it." }
+      {
+        "img": "after-menu-desktop-1280x800-marked-r1c1.png",
+        "caption": "SHIPPING BUILD, top-left quadrant of the sky window. Counted here: 15 stars carrying their own halo, 5 of them wearing a cross - the crossed ones at (212,318), (176,417), (36,683), (441,688) and the pair at the right edge (1257,428). The other ten - among them the amber pair at (871,231) and (856,267), the blue orbs at (626,222) and (776,321), and (210,426), (281,424), (180,652) - are haloed with no spikes at all. That is the developer's ask, visible: a bloom and a cross are no longer the same population."
+      },
+      {
+        "img": "after-menu-desktop-1280x800-marked-r2c1.png",
+        "caption": "SHIPPING BUILD, bottom-left quadrant - the densest part of this sky. 22 haloed stars, 10 of them crossed. Rings with nothing but a plain point inside them are the checklist over-collecting (a companion sitting inside a neighbour's glow), which is why the numbers in the manifest are counted and not taken from the ring count."
+      },
+      {
+        "img": "before-menu-desktop-1280x800-marked-r1c1.png",
+        "caption": "THE BUILD BEFORE a0-123 (68bac05*), the same quadrant of the same seeded sky, the same instrument. 24 haloed stars against 15 - and every one of them carries a cross. Both halves of the developer's report are in this pair: there were more blooms, and a bloom always brought spikes with it."
+      }
     ]
   },
   {
@@ -16,8 +25,14 @@
     "sub": "The same star, same seed, same viewport, cut at the same rectangle from both builds at 6x nearest neighbour. LEFT = before a0-123 (68bac05*). RIGHT = shipping (0910de2*).",
     "width": 1692,
     "blocks": [
-      { "img": "crops/halo-36x683-before-after.png", "caption": "The star at (36,683). The halo is the same disc, edge for edge, and the cross is still on it - the two panels differ in exactly one place, at the upper left, where a NEIGHBOURING star's horizontal spike is drawn in the before frame and gone in the after. Its own radial profile is identical from r=0 out to the sky on both sides, and falls to within 1 luma of the far sky at r=52 device px in both." },
-      { "img": "crops/halo-626x222-before-after.png", "caption": "The star at (626,222) - one that KEPT its bloom and LOST its cross. Same halo, same size (both fall to sky at r=59), and the four spikes that ran through it before are gone. The only measured difference between the two frames at this star is inside r=3 device px, which is where the spikes crossed the core: 138.6 before against 126.9 after at r=0, then identical from r=4 outward." }
+      {
+        "img": "crops/halo-36x683-before-after.png",
+        "caption": "The star at (36,683). The halo is the same disc, edge for edge, and the cross is still on it - the two panels differ in exactly one place, at the upper left, where a NEIGHBOURING star's horizontal spike is drawn in the before frame and gone in the after. Its own radial profile is identical from r=0 out to the sky on both sides, and falls to within 1 luma of the far sky at r=52 device px in both."
+      },
+      {
+        "img": "crops/halo-626x222-before-after.png",
+        "caption": "The star at (626,222) - one that KEPT its bloom and LOST its cross. Same halo, same size (both fall to sky at r=59), and the four spikes that ran through it before are gone. The only measured difference between the two frames at this star is inside r=3 device px, which is where the spikes crossed the core: 138.6 before against 126.9 after at r=0, then identical from r=4 outward."
+      }
     ]
   },
   {
@@ -26,7 +41,10 @@
     "sub": "Production bundle 0910de2*, reached with real taps: PLAY, PLAY SOLO, then the lobby's arena card. Phone 798x384 at dpr 2, so this plate is 1596x768 - one image pixel per device pixel of the handset. Nothing here is magnified.",
     "width": 1596,
     "blocks": [
-      { "img": "phone-798x384-map-select.png", "caption": "Six cards, two rows of three, each 240x111.5 logical. What is legible at this size, per card: the STATIONS read on all six - eight teal discs, countable, and their arrangement is the map (The Ring's circle, The Line's two columns of four, The Compass's square-plus-midpoints, The Crescents' two arcs). The ORE reads as a field on all six - individual grey rocks about 2 logical px across, so you read where the field IS and its shape, not which rock is which. The STARS read on all six, including bloomed ones with visible spikes. The NEBULA reads on five: The Oval is plainly blue, Double Diamond green-and-warm, The Line amber at its foot, The Crescents dull red, The Compass faintly teal - and The Ring shows none, which is correct rather than missing, since octagon's sky is NONE in the registry. It is not mush: at this size the four things the developer asked for are separable by colour and by size. The one thing that is NOT legible is the fifth ask by implication - which berths are EMPTY - because every berth is drawn the same teal disc." }
+      {
+        "img": "phone-798x384-map-select.png",
+        "caption": "Six cards, two rows of three, each 240x111.5 logical. What is legible at this size, per card: the STATIONS read on all six - eight teal discs, countable, and their arrangement is the map (The Ring's circle, The Line's two columns of four, The Compass's square-plus-midpoints, The Crescents' two arcs). The ORE reads as a field on all six - individual grey rocks about 2 logical px across, so you read where the field IS and its shape, not which rock is which. The STARS read on all six, including bloomed ones with visible spikes. The NEBULA reads on five: The Oval is plainly blue, Double Diamond green-and-warm, The Line amber at its foot, The Crescents dull red, The Compass faintly teal - and The Ring shows none, which is correct rather than missing, since octagon's sky is NONE in the registry. It is not mush: at this size the four things the developer asked for are separable by colour and by size. The one thing that is NOT legible is the fifth ask by implication - which berths are EMPTY - because every berth is drawn the same teal disc."
+      }
     ]
   },
   {
@@ -35,9 +53,18 @@
     "sub": "Nearest-neighbour magnification of the card rects of the frame above. No verdict is read off this plate; it exists so a reader can see the detail the attestation names.",
     "width": 1920,
     "blocks": [
-      { "img": "crops/phone-798x384-card-octagon-4x.png", "caption": "The Ring. Eight teal berths on a circle; a broken annulus of grey rocks off-centre in the middle; stars, two of them bloomed with visible spikes; no nebula. The white rule is the arena's own bounds - a square, because octagon is 2400x2400 - and the sky is drawn a few logical px wider than it on both sides." },
-      { "img": "crops/phone-798x384-card-line-4x.png", "caption": "The Line. Eight berths in two columns of four; the ore in a vertical band down the middle with a cluster at its centre; an amber wash bottom-centre (Deep Ember). The bounds rule is wide - 3200x2000 - and the aspect difference between this card and The Ring's is the map's own." },
-      { "img": "crops/phone-798x384-card-oval-4x.png", "caption": "The Oval. Berths on an ellipse; ore through the middle; the sky is the brightest of the six and plainly blue. This is the card that shows the nebula most clearly at true size." }
+      {
+        "img": "crops/phone-798x384-card-octagon-4x.png",
+        "caption": "The Ring. Eight teal berths on a circle; a broken annulus of grey rocks off-centre in the middle; stars, two of them bloomed with visible spikes; no nebula. The white rule is the arena's own bounds - a square, because octagon is 2400x2400 - and the sky is drawn a few logical px wider than it on both sides."
+      },
+      {
+        "img": "crops/phone-798x384-card-line-4x.png",
+        "caption": "The Line. Eight berths in two columns of four; the ore in a vertical band down the middle with a cluster at its centre; an amber wash bottom-centre (Deep Ember). The bounds rule is wide - 3200x2000 - and the aspect difference between this card and The Ring's is the map's own."
+      },
+      {
+        "img": "crops/phone-798x384-card-oval-4x.png",
+        "caption": "The Oval. Berths on an ellipse; ore through the middle; the sky is the brightest of the six and plainly blue. This is the card that shows the nebula most clearly at true size."
+      }
     ]
   },
   {
@@ -46,10 +73,22 @@
     "sub": "The production bundle in a window big enough to hold the whole arena (The Line 3300x2100, The Ring 2500x2500, dpr 1), ship flown to the arena centre with real clicks. The board frames are shown here at half size; the full-size specimens are shots/board-line.png and shots/board-octagon.png.",
     "width": 1650,
     "blocks": [
-      { "img": "board-line.png", "caption": "THE LINE, the whole board: eight stations in two columns of four, left and right, and the ore field down the middle. Nothing else is on the flanks." },
-      { "img": "crops/phone-798x384-card-line-4x.png", "caption": "THE LINE's card: eight berths in two columns of four, left and right, ore down the middle. Same arrangement, same proportions, same emptiness on the flanks. The rocks are not the same rocks - the card is built at preview seed 0 and this match ran at match seed 1 - so the field matches in shape and extent, not rock for rock." },
-      { "img": "board-octagon.png", "caption": "THE RING, the whole board: eight stations evenly on one circle, the field in the middle, and no nebula anywhere in the frame - stars on black." },
-      { "img": "crops/phone-798x384-card-octagon-4x.png", "caption": "THE RING's card: eight berths evenly on one circle, field in the middle, no nebula. The card's ore sits a little right of centre and the board's a little left, which is the seed difference again; the ring of berths is identical because berths are pure geometry and ignore the seed." }
+      {
+        "img": "board-line.png",
+        "caption": "THE LINE, the whole board: eight stations in two columns of four, left and right, and the ore field down the middle. Nothing else is on the flanks."
+      },
+      {
+        "img": "crops/phone-798x384-card-line-4x.png",
+        "caption": "THE LINE's card: eight berths in two columns of four, left and right, ore down the middle. Same arrangement, same proportions, same emptiness on the flanks. The rocks are not the same rocks - the card is built at preview seed 0 and this match ran at match seed 1 - so the field matches in shape and extent, not rock for rock."
+      },
+      {
+        "img": "board-octagon.png",
+        "caption": "THE RING, the whole board: eight stations evenly on one circle, the field in the middle, and no nebula anywhere in the frame - stars on black."
+      },
+      {
+        "img": "crops/phone-798x384-card-octagon-4x.png",
+        "caption": "THE RING's card: eight berths evenly on one circle, field in the middle, no nebula. The card's ore sits a little right of centre and the board's a little left, which is the seed difference again; the ring of berths is identical because berths are pure geometry and ignore the seed."
+      }
     ]
   },
   {
@@ -58,8 +97,14 @@
     "sub": "Production bundle 0910de2*, phone 798x384 dpr2, reached through the front door with real taps (PLAY, PLAY SOLO, RUSH!). The browser's Fullscreen API is stubbed - the same stub tests/live-stage/fullscreen.spec.ts installs - because headless Chromium grants no element fullscreen. Nothing about the game is stubbed. Both crops are cut from the BUTTON's rect, so they are the same region of the screen.",
     "width": 1936,
     "blocks": [
-      { "img": "crops/corner-d1-before-exit-corner-4x.png", "caption": "Still fullscreen: no button. HOME, its 100/100 and the bar sit in the corner at x=628 with nothing over them." },
-      { "img": "crops/corner-d1-after-exit-corner-4x.png", "caption": "The player has backed out of fullscreen and the re-enter button is up at {738,12 48x48}. The whole column has stepped 46px left - station-hp is now at x=582 - and the readout is WHOLE: 100/100 complete, HOME complete with its E clear of the button's stroke, the blue bar ending before the button, and VIEW below it moved with the cluster. Measured on the same frame: 0% of the readout is under the button, and there is 1.5 logical px of air between them. a0-122 measured 31% of this readout covered on 462 frames; on this build it is zero." }
+      {
+        "img": "crops/corner-d1-before-exit-corner-4x.png",
+        "caption": "Still fullscreen: no button. HOME, its 100/100 and the bar sit in the corner at x=628 with nothing over them."
+      },
+      {
+        "img": "crops/corner-d1-after-exit-corner-4x.png",
+        "caption": "The player has backed out of fullscreen and the re-enter button is up at {738,12 48x48}. The whole column has stepped 46px left - station-hp is now at x=582 - and the readout is WHOLE: 100/100 complete, HOME complete with its E clear of the button's stroke, the blue bar ending before the button, and VIEW below it moved with the cluster. Measured on the same frame: 0% of the readout is under the button, and there is 1.5 logical px of air between them. a0-122 measured 31% of this readout covered on 462 frames; on this build it is zero."
+      }
     ]
   },
   {
@@ -68,18 +113,34 @@
     "sub": "Production bundle 0910de2*, phone 798x384 dpr2, ?debug=1, a held siege (damageCore(0,2) every 400ms above a 30 HP floor). One fresh boot per stop; the ship flown with real taps to a standoff directly below its own station, and BUILD pressed for real at each.",
     "width": 1596,
     "blocks": [
-      { "img": "wheel-d5-aim140.png", "caption": "STANDOFF 152.7 world units - inside dock range. The alarm is up (the red frame is hard against all four edges), the build wheel is open and drawn at {239.7,32.7 318.5x318.5} - a0-122's own rect - and THERE IS NO ARROW HOME, because home is on screen: you can see the station itself at the top edge, behind the wave clock's compact row. The clock's line is drawn across the station's body here, which is the one legibility cost visible in this frame." },
-      { "img": "wheel-d5-aim220.png", "caption": "STANDOFF 200 world units - outside dock range. The alarm is still up and the ARROW HOME is drawn, at {384.9,69 21x22.9}: top-centre, 3.6 logical px from the horizontal middle of the glass, and below the wave clock's rule (a0-116 holding). BUILD was pressed at this stop too and NO WHEEL APPEARED - the wheel is live only while docked. The two states in this plate are the two the game has; there is no third in which both are drawn." },
-      { "img": "crops/wheel-d5-aim220-topcentre-3x.png", "caption": "The top-centre of the second frame at 3x. WAVE 1/5 . Outer Drift, NEXT 0:40 and MATCH 1:51 all read in full, the arrow sits below the rule pointing straight up at the station, and the space the wheel's halo would occupy is empty sky. MATCH 1:51 is drawn in grey over the grey of the station's hull, which is the weakest contrast in the frame." }
+      {
+        "img": "wheel-d5-aim140.png",
+        "caption": "STANDOFF 152.7 world units - inside dock range. The alarm is up (the red frame is hard against all four edges), the build wheel is open and drawn at {239.7,32.7 318.5x318.5} - a0-122's own rect - and THERE IS NO ARROW HOME, because home is on screen: you can see the station itself at the top edge, behind the wave clock's compact row. The clock's line is drawn across the station's body here, which is the one legibility cost visible in this frame."
+      },
+      {
+        "img": "wheel-d5-aim220.png",
+        "caption": "STANDOFF 200 world units - outside dock range. The alarm is still up and the ARROW HOME is drawn, at {384.9,69 21x22.9}: top-centre, 3.6 logical px from the horizontal middle of the glass, and below the wave clock's rule (a0-116 holding). BUILD was pressed at this stop too and NO WHEEL APPEARED - the wheel is live only while docked. The two states in this plate are the two the game has; there is no third in which both are drawn."
+      },
+      {
+        "img": "crops/wheel-d5-aim220-topcentre-3x.png",
+        "caption": "The top-centre of the second frame at 3x. WAVE 1/5 . Outer Drift, NEXT 0:40 and MATCH 1:51 all read in full, the arrow sits below the rule pointing straight up at the station, and the space the wheel's halo would occupy is empty sky. MATCH 1:51 is drawn in grey over the grey of the station's hull, which is the weakest contrast in the frame."
+      }
     ]
   },
   {
     "id": "a0-127-the-build-stamp-under-the-back-plate",
     "title": "Not one of the five - on MAP SELECT the BACK plate is drawn over the build stamp",
-    "sub": "Production bundle 0910de2*, phone 798x384 dpr2, MAP SELECT reached with real taps. 4x nearest-neighbour crop of the bottom-left corner of that frame.",
+    "sub": "Production bundle 0910de2*, MAP SELECT reached with real taps on both profiles. Nearest-neighbour crops of the bottom-left corner of each frame.",
     "width": 1200,
     "blocks": [
-      { "img": "crops/phone-798x384-map-select-badge-corner-4x.png", "caption": "The stamp reads 0910de2* at {8,363 43.5x13} - and the BACK plate's angled corner is drawn over its right-hand half, with the plate's white accent bar landing on the final character. Measured off these pixels: 55% of the stamp's registered rect is over the plate's body. The plate is translucent there, so the stamp is still readable - dimmed, not lost - which is why this is filed as a cover and not as an erasure. It is invisible to every instrument this repo has: the layout registry is built only on the ?debug=1 boot, which has no menus at all, so no sweep can see any screen reached through the front door." }
+      {
+        "img": "crops/phone-798x384-map-select-badge-corner-4x.png",
+        "caption": "The stamp reads 0910de2* at {8,363 43.5x13} - and the BACK plate's angled corner is drawn over its right-hand half, with the plate's white accent bar landing on the final character. Measured off these pixels: 55% of the stamp's registered rect is over the plate's body. The plate is translucent there, so the stamp is still readable - dimmed, not lost - which is why this is filed as a cover and not as an erasure. It is invisible to every instrument this repo has: the layout registry is built only on the ?debug=1 boot, which has no menus at all, so no sweep can see any screen reached through the front door."
+      },
+      {
+        "img": "crops/desktop-1280x800-map-select-badge-corner-3x.png",
+        "caption": "The SAME screen on desktop 1280x800, 3x: the stamp sits below and to the left of the plate with clear space around it, nothing over it. So this is a phone finding and not a screen finding - the plate and the stamp are both anchored bottom-left, and only the narrow viewport brings them into the same pixels."
+      }
     ]
   }
 ]
