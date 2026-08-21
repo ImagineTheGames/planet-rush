@@ -20,8 +20,19 @@ import type { Rect, Viewport } from '@platform/layout-registry';
 import { rectContains } from '@platform/layout-registry';
 import { TOUCH_MIN } from '../art/materials';
 import { countPrimaries, singlePrimary } from './gantry';
+import { ShipClass } from '@shared/types';
+import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import { DEFAULT_MAP_ID, MAPS } from '../sim/maps';
-import { MAP_ORDER, VETERAN_MAP_ID, mapPreview, registryStations } from './map-picker';
+import { createWorld } from '../sim/state';
+import type { PlayerSpec } from '../sim/state';
+import {
+  MAP_ORDER,
+  MAP_PREVIEW_SEED,
+  MAP_PREVIEW_SLOTS,
+  VETERAN_MAP_ID,
+  mapPreview,
+  registryStations,
+} from './map-picker';
 import {
   MAP_SELECT_GUEST_HINT,
   MAP_SELECT_HINT,
@@ -183,6 +194,111 @@ describe('the map registry and its guarantees are untouched', () => {
         expect(card.preview.stations[i]!.x * map.bounds.width).toBeCloseTo(raw[i]!.x, 3);
       }
     }
+  });
+
+  /**
+   * ---------------------------------------------------------------------------
+   * a0-124 — THE PREVIEW IS A RENDERING, NOT A PICTURE OF ONE
+   * ---------------------------------------------------------------------------
+   * The developer, on the picker: *"for the previews of the maps i'd like to see a
+   * more accurate image of them when choosing the map showing the ores, empty
+   * stations locations, the nebulas and stars in the back… just more accurate
+   * overall."* The card showed berths and nothing else, and the header said why —
+   * the dots were read off the registry, and **the registry does not know where the
+   * ore is**. A `MapDef` owns the arena bounds and the `StationPlacement` list;
+   * the field is stamped at world build by `../sim/waves` `spawnHomeFields` and the
+   * opening `spawnWave`, out of the seeded RNG.
+   *
+   * So there are exactly two ways a card can show ore: run the generator, or write
+   * a second one. This test is the one that says which happened. It builds the
+   * world **the way the match builds it** and holds every berth and every rock on
+   * the card against it — so a preview that drifted, sampled, decorated or
+   * hand-listed any part of the board fails here, and so does today's code, which
+   * has no ore on the card at all.
+   */
+  describe('the board on the card is the board the match builds (a0-124)', () => {
+    /** The roster a preview's world is built with — `./map-picker` `PREVIEW_ROSTER`,
+     *  restated rather than exported, so this spec is an independent witness to the
+     *  world rather than a call into the code it is checking. */
+    const roster: PlayerSpec[] = Array.from({ length: MAP_PREVIEW_SLOTS }, (_, id) => ({
+      id,
+      shipClass: ShipClass.Vanguard,
+    }));
+
+    it('a preview is generated from the map the match will build', () => {
+      const model = mapSelectModel({ mapId: DEFAULT_MAP_ID, canPick: true });
+      expect(model.picker.cards).toHaveLength(MAPS.length);
+
+      for (const card of model.picker.cards) {
+        const map = MAPS.find((m) => m.id === card.id)!;
+        // The match's own constructor, on the map's own bounds. Not `map.stations`
+        // and not a re-derivation of the field: the thing `bootOfflineMatch` calls.
+        const world = createWorld({
+          seed: MAP_PREVIEW_SEED,
+          players: roster,
+          mapId: map.id,
+          abundance: DEFAULT_ABUNDANCE,
+        });
+        const { width, height } = world.bounds;
+        expect(width).toBeGreaterThan(0);
+        expect(height).toBeGreaterThan(0);
+        expect(card.preview.aspect).toBeCloseTo(width / height, 6);
+
+        // --- The berths ---------------------------------------------------------
+        // Every board position, at its own place and its own size. `MapDef` does
+        // declare these, so this half could have been faked off the registry — it is
+        // held against the world anyway, because the card must not be half a
+        // rendering.
+        expect(card.preview.stations).toHaveLength(world.stations.length);
+        world.stations.forEach((station, i) => {
+          const berth = card.preview.stations[i]!;
+          expect(berth.x * width).toBeCloseTo(station.pos.x, 3);
+          expect(berth.y * height).toBeCloseTo(station.pos.y, 3);
+          expect(berth.r * width).toBeCloseTo(station.radius, 3);
+        });
+
+        // --- The ore ------------------------------------------------------------
+        // The half no `MapDef` declares, and the half this brief is about. A
+        // generated field is not a short list: every rock the world opens with is on
+        // the card, at its own place and its own size, in the order the generator
+        // stamped them.
+        expect(world.asteroids.length).toBeGreaterThan(MAP_PREVIEW_SLOTS);
+        expect(card.preview.ore).toHaveLength(world.asteroids.length);
+        world.asteroids.forEach((rock, i) => {
+          const drawn = card.preview.ore[i]!;
+          expect(drawn.x * width).toBeCloseTo(rock.pos.x, 3);
+          expect(drawn.y * height).toBeCloseTo(rock.pos.y, 3);
+          expect(drawn.r * width).toBeCloseTo(rock.radius, 3);
+        });
+      }
+    });
+
+    it('shows the ore that tells one board from another — not one field six times', () => {
+      // The point of showing the field at all: `spawnHomeFields` gives every player
+      // an identical neighbourhood BY CONSTRUCTION and the commons is `N`-fold
+      // symmetric, so what differs between The Line and The Ring is where all of
+      // that sits. If six cards drew the same scatter, the picture would be
+      // decoration.
+      const fingerprints = MAPS.map((map) =>
+        mapPreview(map)
+          .ore.map((r) => `${r.x.toFixed(4)},${r.y.toFixed(4)}`)
+          .join('|'),
+      );
+      expect(new Set(fingerprints).size).toBe(MAPS.length);
+    });
+
+    it('builds each board ONCE — the per-frame model may not build six worlds', () => {
+      // `mapSelectModel` runs every frame (`./map-select`), and `createWorld` is not
+      // free. The memo is load-bearing, not an optimisation: identity across frames
+      // is the only cheap proof that no second world was built.
+      const first = mapSelectModel({ mapId: DEFAULT_MAP_ID, canPick: true });
+      const second = mapSelectModel({ mapId: 'line', canPick: false });
+      for (const card of first.picker.cards) {
+        const twin = second.picker.cards.find((c) => c.id === card.id)!;
+        expect(twin.preview).toBe(card.preview);
+        expect(mapPreview(MAPS.find((m) => m.id === card.id)!)).toBe(card.preview);
+      }
+    });
   });
 
   it('lights exactly one card, and it is the selection', () => {
