@@ -225,11 +225,56 @@ export function designEffect(clusterWins: readonly number[], clusterSizes: reado
  * bound clear the ceiling. Answers "run more matches" with a number instead of
  * a shrug.
  */
+export const SAMPLE_SEARCH_CAP = 200_000;
+
+/**
+ * Binary search on n, not a ladder: the lower bound rises monotonically with n
+ * at fixed p, so a ladder that steps 2% at a time spends ~300 evaluations where
+ * 18 will do — and for the *exact* variant each evaluation is a 200-step
+ * bisection over O(n) tail sums, which makes the difference a hang rather than
+ * a slowdown.
+ *
+ * Capped at {@link SAMPLE_SEARCH_CAP}: a rate a hair over the ceiling needs an
+ * unbounded sample, and "more matches than this project will ever run" is
+ * better reported as `Infinity` than searched for.
+ */
+function smallestN(separates: (n: number) => boolean): number {
+  if (!separates(SAMPLE_SEARCH_CAP)) return Infinity;
+  let lo = 1;
+  let hi = SAMPLE_SEARCH_CAP;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (separates(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
 export function sampleFor(p: number, ceiling: number, conf = 0.95, deff = 1): number {
   if (p <= ceiling) return Infinity;
-  for (let n = 8; n <= 2_000_000; n = Math.ceil(n * 1.02) + 1) {
-    const wins = Math.round(p * n);
-    if (wilson(wins, n, conf, deff).lo > ceiling) return n;
+  return smallestN((n) => wilson(Math.round(p * n), n, conf, deff).lo > ceiling);
+}
+
+/**
+ * The same question against the **exact** interval, which is the one the verdict
+ * is read off (`targets.ts` `verdictOf`). Quoting a Wilson-sized sample beside a
+ * Clopper–Pearson verdict would understate the run a lane has to fund — at the
+ * knife edge the two differ by a factor, not a rounding.
+ *
+ * `deff` has no exact analogue, so a clustered design is handled by asking for
+ * `n × deff` matches: the exact interval is computed on the effective count and
+ * the answer is scaled back up to matches actually played.
+ */
+export function sampleForExact(p: number, ceiling: number, conf = 0.95, deff = 1): number {
+  if (p <= ceiling) return Infinity;
+  // Bracketed below by the Wilson answer, which is always the smaller of the
+  // two, then walked up in 1% steps: the exact bound is a step function of n
+  // (`wins` is an integer) and is not perfectly monotone across a single step,
+  // so it is confirmed upward rather than bisected.
+  const start = sampleFor(p, ceiling, conf);
+  if (!Number.isFinite(start)) return Infinity;
+  for (let n = Math.max(8, start); n <= SAMPLE_SEARCH_CAP; n += Math.max(1, Math.floor(n * 0.01))) {
+    if (clopper(Math.round(p * n), n, conf).lo > ceiling) return Math.ceil(n * Math.max(deff, 1));
   }
   return Infinity;
 }

@@ -33,6 +33,7 @@ import {
   lnBinomPmf,
   normalCdf,
   sampleFor,
+  sampleForExact,
   wilson,
   zFor,
 } from '../../evidence/a0-126-the-last-two-points/stats';
@@ -255,6 +256,17 @@ describe('sampleFor answers "run more matches" with a number', () => {
 
   it('says a0-121 was an order of magnitude short of its own question', () => {
     expect(sampleFor(127 / 223, 0.55) / 223).toBeGreaterThan(8);
+  });
+
+  it('the exact variant asks for at least as many matches as the Wilson one', () => {
+    for (const p of [0.57, 0.6, 0.65, 0.83]) {
+      expect(sampleForExact(p, 0.55)).toBeGreaterThanOrEqual(sampleFor(p, 0.55));
+      expect(clopper(Math.round(p * sampleForExact(p, 0.55)), sampleForExact(p, 0.55)).lo).toBeGreaterThan(0.55);
+    }
+  });
+
+  it('scales by the design effect, in matches actually played', () => {
+    expect(sampleForExact(0.6, 0.55, 0.95, 2)).toBeGreaterThan(sampleForExact(0.6, 0.55, 0.95, 1));
   });
 });
 
