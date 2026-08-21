@@ -30,7 +30,11 @@ they are about. Only the readings are hand-written, and they are marked.
 
 ## Targets at a glance
 
-{{VERDICT}}
+| target | source | shipped tree | this branch | verdict |
+|---|---|---|---|---|
+| `excavator` — ship-class contest | GDD §2.11 | 198/256 (**77.3%**) | 124/255 (**48.6%**) | **INSIDE** |
+| Warden — cast contest (top of the shipped cast) | GDD §3.8 | 163/223 (**73.1%**) | 127/223 (**57.0%**) | **OVER** |
+| top of the cast, whoever it now is | GDD §3.8 | 163/223 (**73.1%**) | 127/223 (**57.0%**) | **OVER** |
 
 ---
 
@@ -81,7 +85,7 @@ everyone but can't run."*
 **And §2.11 is vague about the size of it, in the one way that matters.** It states
 the penalty as *ratios* and never states the absolutes those ratios multiply.
 `BASE_SPEED` (260 u/s), `BASE_ACCEL` (900 u/s²) and `BASE_TURN_RATE`
-({{BASE_TURN_RATE}} rad/s) are not §2.11 values — they are derived-physics
+(6.5 rad/s) are not §2.11 values — they are derived-physics
 constants that §2.8 does not carry either, flagged TUNABLE and handed over with no
 target attached to them. A ratio is only a penalty if the quantity it scales is
 scarce. §2.11 fixes the ratio and leaves the scarcity to a constant it never
@@ -95,13 +99,18 @@ because as written it does not say how much 80% is supposed to hurt.
 
 ### 3.1 · The design column beside the simulation column — the tree a0-121 was handed
 
-{{COLUMNS}}
+| hull | GDD §2.11 · speed / accel / turn | sim top speed | sim accel | sim turn rate | 180° flip | 0 → 90% top speed |
+|---|---|---|---|---|---|---|
+| `interceptor` | 130% / 120% / 140% | 338.0 u/s | 1080 u/s² | 9.10 rad/s | **0.345 s** | 0.621 s |
+| `vanguard` | 100% / 100% / 100% | 260.0 u/s | 900 u/s² | 6.50 rad/s | **0.483 s** | 0.505 s |
+| `excavator` | 90% / 100% / 80% | 234.0 u/s | 900 u/s² | 5.20 rad/s | **0.604 s** | 0.404 s |
+| `hauler` | 85% / 80% / 85% | 221.0 u/s | 720 u/s² | 5.52 rad/s | **0.569 s** | 0.588 s |
 
 Two things to read off it before anything else.
 
-**The 80% is 0.12 seconds.** The Excavator comes about in {{EXC_FLIP_BEFORE}} s
-against the Vanguard's {{VAN_FLIP}} s. That is the entire penalty §2.11 states on
-this column, and it is a third of one `fireInterval` ({{FIRE_INTERVAL}} s).
+**The 80% is 0.12 seconds.** The Excavator comes about in 0.60 s
+against the Vanguard's 0.48 s. That is the entire penalty §2.11 states on
+this column, and it is a third of one `fireInterval` (0.35 s).
 
 **The hull with the mobility penalty is the most responsive hull on the board.**
 §2.11 gives it accel 100% and top speed 90%; the simulation applies both
@@ -117,9 +126,14 @@ feels when getting away from a standing start is this one.
 Read on **this branch's** tree, not the shipped one, so that the single cell
 a0-121 moves is declared in the same table that checks the other twenty-three:
 
-{{TRANSCRIPTION}}
+| hull | speed | accel | turn | hull HP | power | cargo |
+|---|---|---|---|---|---|---|
+| `interceptor` | 130 ✓ | 120 ✓ | 140 ✓ | 35 ✓ | 8 ✓ | 2 ✓ |
+| `vanguard` | 100 ✓ | 100 ✓ | 100 ✓ | 50 ✓ | 10 ✓ | 2 ✓ |
+| `excavator` | 90 ✓ | 100 ✓ | 80 → **25** | 55 ✓ | 13 ✓ | 2 ✓ |
+| `hauler` | 85 ✓ | 80 ✓ | 85 ✓ | 70 ✓ | 9 ✓ | 3 ✓ |
 
-{{DRIFT}}
+- `excavator` turn: §2.11 says 80, the sim now reads **25**
 
 The answer on the tree this brief was handed was **every cell, exactly**. The
 sentence this brief was written on — *"a speed-and-turn penalty the simulation
@@ -134,9 +148,21 @@ absolute §2.11 does not contain.
 Time to kill, stock hulls, no upgrades — `hull HP ÷ weapon dps`, both read out of
 the class table:
 
-{{DUEL}}
+| pairing | A kills B in | B kills A in | winner | margin |
+|---|---|---|---|---|
+| `interceptor` vs `vanguard` | 6.25 s | 3.50 s | **`vanguard`** | 1.79× |
+| `interceptor` vs `excavator` | 6.88 s | 2.69 s | **`excavator`** | 2.55× |
+| `interceptor` vs `hauler` | 8.75 s | 3.89 s | **`hauler`** | 2.25× |
+| `vanguard` vs `excavator` | 5.50 s | 3.85 s | **`excavator`** | 1.43× |
+| `vanguard` vs `hauler` | 7.00 s | 5.56 s | **`hauler`** | 1.26× |
+| `excavator` vs `hauler` | 5.38 s | 6.11 s | **`excavator`** | 1.13× |
 
-{{SCORE}}
+| hull | mining (ore/s) | weapon dps | hull hp | top speed | `dps × hp` — the duel score |
+|---|---|---|---|---|---|
+| `excavator` | 0.650 | 13 | 55 | 234 u/s | **715** |
+| `hauler` | 0.450 | 9 | 70 | 221 u/s | **630** |
+| `vanguard` | 0.500 | 10 | 50 | 260 u/s | **500** |
+| `interceptor` | 0.400 | 8 | 35 | 338 u/s | **280** |
 
 *Hand-written reading.* §2.11 promises a triangle and the class table describes a
 **total order**. The Excavator wins every duel in the game, including the one the
@@ -154,7 +180,14 @@ to work with, and §8.5 says which number carries it.
 Each row deletes or changes **one cell** of the class table and re-runs the same
 64-match ship-class contest. The shipped tree is the first row.
 
-{{ABLATION}}
+| candidate | matches | `excavator` | `interceptor` | `vanguard` | `hauler` | vs 55% | median length |
+|---|---|---|---|---|---|---|---|
+| shipped tree | 64 | 51 / 64 (**79.7%**) | 7.8% | 7.8% | 4.7% | **OVER** | 13:33 |
+| excavator `turnMul` 0.8 → **1.0** (turn penalty deleted) | 64 | 47 / 64 (**73.4%**) | 0.0% | 12.5% | 14.1% | **OVER** | 13:32 |
+| excavator `speedMul` 0.9 → **1.0** (speed penalty deleted) | 64 | 54 / 64 (**84.4%**) | 0.0% | 4.7% | 10.9% | **OVER** | 13:30 |
+| excavator `power` 13 → 11 | 64 | 27 / 64 (**42.2%**) | 4.7% | 20.3% | 32.8% | under | 13:38 |
+| excavator `power` 13 → 10 | 64 | 12 / 64 (**18.8%**) | 1.6% | 45.3% | 34.4% | under | 13:32 |
+| excavator `speedMul` 0.80 **and** `turnMul` 0.40 | 64 | 40 / 64 (**62.5%**) | 3.1% | 21.9% | 12.5% | **OVER** | 13:38 |
 
 *Hand-written reading.* ±1 SE is about 6 points at 64 matches, so the difference
 between two of these rows carries about ±8.5.
@@ -182,7 +215,17 @@ between two of these rows carries about ±8.5.
 Every hull's agility, scaled together. §2.11's 140/100/80/85 spread is untouched
 in every row.
 
-{{LADDER_BASE}}
+| candidate | matches | `excavator` | `interceptor` | `vanguard` | `hauler` | vs 55% | median length |
+|---|---|---|---|---|---|---|---|
+| `BASE_TURN_RATE` **6.5** (shipped) | 64 | 51 / 64 (**79.7%**) | 7.8% | 7.8% | 4.7% | **OVER** | 13:33 |
+| `BASE_TURN_RATE` 3.25 | 64 | 48 / 64 (**75.0%**) | 6.3% | 12.5% | 6.3% | **OVER** | 13:33 |
+| `BASE_TURN_RATE` 2.6 | 64 | 42 / 64 (**65.6%**) | 7.8% | 9.4% | 17.2% | **OVER** | 13:38 |
+| `BASE_TURN_RATE` 2.2 | 64 | 41 / 64 (**64.1%**) | 3.1% | 15.6% | 17.2% | **OVER** | 13:30 |
+| `BASE_TURN_RATE` 1.8 | 64 | 42 / 64 (**65.6%**) | 3.1% | 17.2% | 14.1% | **OVER** | 13:34 |
+| `BASE_TURN_RATE` 1.6 | 64 | 33 / 64 (**51.6%**) | 10.9% | 28.1% | 9.4% | under | 13:37 |
+| `BASE_TURN_RATE` 1.4 | 64 | 24 / 64 (**37.5%**) | 12.5% | 32.8% | 17.2% | under | 13:39 |
+| `BASE_TURN_RATE` 1.3 | 64 | 21 / 64 (**32.8%**) | 29.7% | 26.6% | 10.9% | under | 13:32 |
+| `BASE_TURN_RATE` 0.65 | 64 | 24 / 64 (**37.5%**) | 28.1% | 21.9% | 12.5% | under | 13:29 |
 
 *Hand-written reading.* **This dial is a cliff, not a slope, and it is the wrong
 one.** From 6.5 down to 1.8 — every hull's agility slowed by 3.6×, which is not a
@@ -212,10 +255,19 @@ constant this target is reachable from.
 The other three hulls keep `BASE_TURN_RATE` × their own §2.11 multiplier in every
 row below. Nothing about the cast moves.
 
-{{LADDER_HULL}}
+| candidate | matches | `excavator` | `interceptor` | `vanguard` | `hauler` | vs 55% | median length |
+|---|---|---|---|---|---|---|---|
+| `turnMul` 1.0 — penalty **deleted** | 64 | 47 / 64 (**73.4%**) | 0.0% | 12.5% | 14.1% | **OVER** | 13:32 |
+| `turnMul` **0.8** — GDD §2.11, shipped | 64 | 51 / 64 (**79.7%**) | 7.8% | 7.8% | 4.7% | **OVER** | 13:33 |
+| `turnMul` 0.40 | 64 | 43 / 64 (**67.2%**) | 4.7% | 20.3% | 7.8% | **OVER** | 13:32 |
+| `turnMul` 0.35 | 64 | 40 / 64 (**62.5%**) | 1.6% | 18.8% | 17.2% | **OVER** | 13:32 |
+| `turnMul` 0.30 | 64 | 39 / 64 (**60.9%**) | 1.6% | 14.1% | 23.4% | **OVER** | 13:36 |
+| `turnMul` **0.25** — this branch | 64 | 35 / 64 (**54.7%**) | 4.7% | 28.1% | 12.5% | under | 13:32 |
+| `turnMul` 0.20 | 64 | 15 / 64 (**23.4%**) | 6.3% | 42.2% | 28.1% | under | 13:36 |
+| `turnMul` 0.10 | 64 | 0 / 64 (**0.0%**) | 4.7% | 67.2% | 28.1% | under | 13:34 |
 
 *Hand-written reading.* Same stat, spent on one hull instead of four, and the
-band is reached at **0.25** — 1.63 rad/s, a {{EXC_FLIP_AFTER}} s half-turn — with
+band is reached at **0.25** — 1.63 rad/s, a 1.93 s half-turn — with
 every other hull still turning exactly as it did on the shipped tree.
 
 The regime change is at the same place in both ladders, which is the tell: it is
@@ -236,25 +288,56 @@ and that it costs nobody else anything.
 
 ### 7.1 · The ship-class contest — 64 seeds × 4 rotations
 
-{{CLASS_COMPARE}}
+| contestant | shipped tree | candidate | move | fair share | ±1 SE (candidate) | vs 55% |
+|---|---|---|---|---|---|---|
+| Excavator | 198 / 256 (**77.3%**) | 124 / 255 (**48.6%**) | −28.7 pts | 25.0% | 3.1 pts | under |
+| Vanguard | 28 / 256 (**10.9%**) | 70 / 255 (**27.5%**) | +16.5 pts | 25.0% | 2.8 pts | under |
+| Hauler | 23 / 256 (**9.0%**) | 52 / 255 (**20.4%**) | +11.4 pts | 25.0% | 2.5 pts | under |
+| Interceptor | 7 / 256 (**2.7%**) | 9 / 255 (**3.5%**) | +0.8 pts | 25.0% | 1.2 pts | under |
 
 ### 7.2 · The cast contest, cut by silhouette — 32 seeds × 7 rotations
 
-{{ROSTER_CLASS_COMPARE}}
+| contestant | shipped tree | candidate | move | fair share | ±1 SE (candidate) | vs 55% |
+|---|---|---|---|---|---|---|
+| Excavator | 197 / 223 (**88.3%**) | 184 / 223 (**82.5%**) | −5.8 pts | 28.6% | 2.5 pts | **OVER** |
+| Hauler | 15 / 223 (**6.7%**) | 12 / 223 (**5.4%**) | −1.3 pts | 28.6% | 1.5 pts | under |
+| Interceptor | 6 / 223 (**2.7%**) | 20 / 223 (**9.0%**) | +6.3 pts | 28.6% | 1.9 pts | under |
+| Vanguard | 5 / 223 (**2.2%**) | 7 / 223 (**3.1%**) | +0.9 pts | 14.3% | 1.2 pts | under |
 
 ### 7.3 · The cast contest, cut by character
 
-{{CHARACTER_COMPARE}}
+| contestant | shipped tree | candidate | move | fair share | ±1 SE (candidate) | vs 55% |
+|---|---|---|---|---|---|---|
+| Warden | 163 / 223 (**73.1%**) | 127 / 223 (**57.0%**) | −16.1 pts | 14.3% | 3.3 pts | **OVER** |
+| Foreman | 34 / 223 (**15.2%**) | 57 / 223 (**25.6%**) | +10.3 pts | 14.3% | 2.9 pts | under |
+| Patch | 8 / 223 (**3.6%**) | 6 / 223 (**2.7%**) | −0.9 pts | 14.3% | 1.1 pts | under |
+| Rusty | 7 / 223 (**3.1%**) | 6 / 223 (**2.7%**) | −0.4 pts | 14.3% | 1.1 pts | under |
+| Vulture | 5 / 223 (**2.2%**) | 7 / 223 (**3.1%**) | +0.9 pts | 14.3% | 1.2 pts | under |
+| Bolt | 3 / 223 (**1.3%**) | 5 / 223 (**2.2%**) | +0.9 pts | 14.3% | 1.0 pts | under |
+| Sable | 3 / 223 (**1.3%**) | 15 / 223 (**6.7%**) | +5.4 pts | 14.3% | 1.7 pts | under |
 
 ### 7.4 · What actually moved in the class table
 
-{{MOVED}}
+| hull | `turnMul` before | `turnMul` after | turn rate before | turn rate after | 180° flip before | 180° flip after |
+|---|---|---|---|---|---|---|
+| `interceptor` | 1.40 | 1.40 — **unchanged** | 9.10 rad/s | 9.10 rad/s | 0.345 s | 0.345 s |
+| `vanguard` | 1.00 | 1.00 — **unchanged** | 6.50 rad/s | 6.50 rad/s | 0.483 s | 0.483 s |
+| `excavator` | 0.80 | **0.25** | 5.20 rad/s | **1.63 rad/s** | 0.604 s | **1.933 s** |
+| `hauler` | 0.85 | 0.85 — **unchanged** | 5.52 rad/s | 5.52 rad/s | 0.569 s | 0.569 s |
 
-{{COLUMNS_AFTER}}
+| hull | GDD §2.11 · speed / accel / turn | sim top speed | sim accel | sim turn rate | 180° flip | 0 → 90% top speed |
+|---|---|---|---|---|---|---|
+| `interceptor` | 130% / 120% / 140% | 338.0 u/s | 1080 u/s² | 9.10 rad/s | **0.345 s** | 0.621 s |
+| `vanguard` | 100% / 100% / 100% | 260.0 u/s | 900 u/s² | 6.50 rad/s | **0.483 s** | 0.505 s |
+| `excavator` | 90% / 100% / 80% | 234.0 u/s | 900 u/s² | 1.63 rad/s | **1.933 s** | 0.404 s |
+| `hauler` | 85% / 80% / 85% | 221.0 u/s | 720 u/s² | 5.52 rad/s | **0.569 s** | 0.588 s |
 
 ### 7.5 · The third target — Bolt, in the Easy pool at a fixed hull
 
-{{EASY_POOL}}
+| tree | easy-pool matches | draws | decided | Bolt | ±1 SE | vs 55% |
+|---|---|---|---|---|---|---|
+| shipped tree | 64 | **52** | 12 | 10 / 12 (**83.3%**) | 10.8 pts | **OVER** |
+| this branch | 64 | **52** | 12 | 10 / 12 (**83.3%**) | 10.8 pts | **OVER** |
 
 *Hand-written reading.* **Unchanged, and structurally so.** The `tier` section
 seats every one of its eight slots in a **Vanguard** (`harness/mirrors.ts`
@@ -270,7 +353,10 @@ trees, it was never reachable from a constant, and this brief did not reach it.
 
 ### 7.6 · Match length — the target a hull nerf can trade away
 
-{{LENGTHS}}
+| run | matches | decided | median shipped | median candidate | min | max | inside 10–15 shipped | inside 10–15 candidate |
+|---|---|---|---|---|---|---|---|---|
+| ship-class contest (64 seeds × 4 rotations) | 256 | 255 | 13:33 | **13:34** | 10:17 | 14:10 | 99.2% | **100.0%** |
+| cast contest (32 seeds × 7 rotations) | 224 | 223 | 13:51 | **13:52** | 13:19 | 14:06 | 100.0% | **100.0%** |
 
 ---
 

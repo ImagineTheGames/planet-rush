@@ -85,12 +85,18 @@ function timeToFraction(cls: ShipClass, frac: number): number {
   return target >= vTerm ? Number.POSITIVE_INFINITY : -Math.log(1 - target / vTerm) / DRAG;
 }
 
-/** The design column beside the simulation column, in the units a ship moves in. */
-function columnsTable(): string {
+/**
+ * The design column beside the simulation column, in the units a ship moves in.
+ *
+ * `turnOf` is passed in rather than read, because this table is printed twice —
+ * once for the tree a0-121 was handed and once for the tree it ships — and a
+ * "before" column rendered from the branch's own constants would be a lie.
+ */
+function columnsTable(turnOf: (c: ShipClass) => number): string {
   return table(
     ['hull', 'GDD §2.11 · speed / accel / turn', 'sim top speed', 'sim accel', 'sim turn rate', '180° flip', '0 → 90% top speed'],
     ORDER.map((c) => {
-      const s = SHIP_STATS[c];
+      const s = { ...SHIP_STATS[c], turnMul: turnOf(c) };
       const g = GDD[c];
       return [
         `\`${c}\``,
@@ -262,6 +268,36 @@ function lengths(pairs: readonly (readonly [string, string, string, 'class' | 'r
   );
 }
 
+/**
+ * The third target — Bolt, inside the Easy pool at a fixed hull. It is cut out
+ * separately because `winsBy`'s denominator is the whole section, and this
+ * contest's denominator is one pool of it.
+ */
+function easyPoolTable(): string {
+  const rows: string[][] = [];
+  for (const [label, dir] of [
+    ['shipped tree', 'tests/reports/a0-121-data/before'],
+    ['this branch', 'tests/reports/a0-121-data/after'],
+  ] as const) {
+    if (!has(`${dir}/tier.json`)) continue;
+    const run = read(`${dir}/tier.json`);
+    const easy = run.matches.filter((m) => String((m as unknown as { lineup?: string }).lineup ?? '').startsWith('easy'));
+    const dec = easy.filter((m) => m.winner !== null);
+    const bolt = dec.filter((m) => m.winner === 'bolt').length;
+    const rate = dec.length === 0 ? 0 : bolt / dec.length;
+    rows.push([
+      label,
+      String(easy.length),
+      `**${easy.length - dec.length}**`,
+      String(dec.length),
+      `${bolt} / ${dec.length} (**${pct(rate)}**)`,
+      `${(winSE(rate, dec.length) * 100).toFixed(1)} pts`,
+      band(rate),
+    ]);
+  }
+  return table(['tree', 'easy-pool matches', 'draws', 'decided', 'Bolt', '±1 SE', 'vs 55%'], rows);
+}
+
 /** The headline line the brief asks for at the top: which targets are inside. */
 function verdictTable(): string {
   const bc = read('tests/reports/a0-121-data/before/class.json');
@@ -335,7 +371,25 @@ const ABLATION = [
 
 const REPLACEMENTS: Record<string, string> = {
   VERDICT: verdictTable(),
-  COLUMNS: columnsTable(),
+  COLUMNS: columnsTable((c) => (c === ShipClass.Excavator ? SHIPPED_EXCAVATOR_TURN : SHIP_STATS[c].turnMul)),
+  COLUMNS_AFTER: columnsTable((c) => SHIP_STATS[c].turnMul),
+  MOVED: table(
+    ['hull', '`turnMul` before', '`turnMul` after', 'turn rate before', 'turn rate after', '180° flip before', '180° flip after'],
+    ORDER.map((c) => {
+      const before = c === ShipClass.Excavator ? SHIPPED_EXCAVATOR_TURN : SHIP_STATS[c].turnMul;
+      const after = SHIP_STATS[c].turnMul;
+      const same = before === after;
+      return [
+        `\`${c}\``,
+        f(before),
+        same ? `${f(after)} — **unchanged**` : `**${f(after)}**`,
+        `${f(BASE_TURN_RATE * before)} rad/s`,
+        same ? `${f(BASE_TURN_RATE * after)} rad/s` : `**${f(BASE_TURN_RATE * after)} rad/s**`,
+        `${f(flip180(before), 3)} s`,
+        same ? `${f(flip180(after), 3)} s` : `**${f(flip180(after), 3)} s**`,
+      ];
+    }),
+  ),
   TRANSCRIPTION: transcription,
   DRIFT: drift.length === 0 ? '_No cell of §2.11 is diverged from on this branch._' : drift.map((d) => `- ${d}`).join('\n'),
   DUEL: duelTable(),
@@ -346,6 +400,7 @@ const REPLACEMENTS: Record<string, string> = {
   CLASS_COMPARE: compare('tests/reports/a0-121-data/before', 'tests/reports/a0-121-data/after', 'class', 'class'),
   ROSTER_CLASS_COMPARE: compare('tests/reports/a0-121-data/before', 'tests/reports/a0-121-data/after', 'roster', 'hull'),
   CHARACTER_COMPARE: compare('tests/reports/a0-121-data/before', 'tests/reports/a0-121-data/after', 'roster', 'character'),
+  EASY_POOL: easyPoolTable(),
   LENGTHS: lengths([
     ['ship-class contest (64 seeds × 4 rotations)', 'tests/reports/a0-121-data/before', 'tests/reports/a0-121-data/after', 'class'],
     ['cast contest (32 seeds × 7 rotations)', 'tests/reports/a0-121-data/before', 'tests/reports/a0-121-data/after', 'roster'],
