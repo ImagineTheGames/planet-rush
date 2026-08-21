@@ -4057,6 +4057,15 @@ async function boot(): Promise<void> {
     hudFrame.hostChrome = hostChrome;
     // …and whether the button is up, which is what moves the HOME column out of
     // the corner it shares with it (a0-125 D1, `@ui` `glassCornerReserve`).
+    //
+    // Read off the element rather than off `fullscreen.affordanceVisible()`,
+    // because the element is what is DRAWN and the column is stepping aside for a
+    // drawn rect. Both are a frame behind: `feedHud` runs above `fullscreen.sync()`
+    // in this same loop, so the frame on which the button first appears still has
+    // HOME in the corner and the column moves on the next one. One frame, at the
+    // moment the browser is already animating its way out of fullscreen — and the
+    // alternative is re-ordering the fullscreen block above the whole HUD feed for
+    // 16 ms, which is a bigger claim than this defect is worth.
     hudFrame.fullscreenAffordance = fsAffordance.visible;
 
     const station = stationOf(world, LOCAL_PLAYER);
