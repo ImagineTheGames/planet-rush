@@ -1,0 +1,105 @@
+[
+  {
+    "arena": "line",
+    "arenaName": "The Line",
+    "bounds": {
+      "width": 3200,
+      "height": 2000
+    },
+    "viewport": {
+      "width": 3300,
+      "height": 2100
+    },
+    "dpr": 1,
+    "spawn": {
+      "x": 682.68,
+      "y": 1186.16,
+      "vx": 0,
+      "vy": 0
+    },
+    "ship": {
+      "x": 1594.1596463625272,
+      "y": 1002.6780079650079,
+      "vx": -3.064505579357684e-7,
+      "vy": 1.4034736951179406e-7
+    },
+    "visibleWorld": {
+      "left": -55.84035368955597,
+      "top": -47.32199201113906,
+      "right": 3244.1596463104443,
+      "bottom": 2052.678007988861,
+      "width": 3300,
+      "height": 2100
+    },
+    "wholeArenaInFrame": true,
+    "matchClock": 1337,
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "ids": [
+      "ship-local",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "controls-strip",
+      "station-hp",
+      "healthbars",
+      "nameplates",
+      "ore-hold",
+      "minimap"
+    ]
+  },
+  {
+    "arena": "octagon",
+    "arenaName": "The Ring",
+    "bounds": {
+      "width": 2400,
+      "height": 2400
+    },
+    "viewport": {
+      "width": 2500,
+      "height": 2500
+    },
+    "dpr": 1,
+    "spawn": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "ship": {
+      "x": 1180.509856121991,
+      "y": 1200,
+      "vx": -0.00011874018567179458,
+      "vy": 0
+    },
+    "visibleWorld": {
+      "left": -69.49016405882685,
+      "top": -50,
+      "right": 2430.509835941173,
+      "bottom": 2450,
+      "width": 2500,
+      "height": 2500
+    },
+    "wholeArenaInFrame": true,
+    "matchClock": 886,
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "ids": [
+      "ship-local",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "controls-strip",
+      "station-hp",
+      "onboarding",
+      "healthbars",
+      "nameplates",
+      "ore-hold",
+      "minimap"
+    ]
+  }
+]

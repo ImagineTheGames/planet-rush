@@ -1,0 +1,134 @@
+{
+  "tag": "before",
+  "base": "http://localhost:4328",
+  "frames": [
+    {
+      "name": "before-menu-desktop-1280x800",
+      "profile": "desktop-1280x800",
+      "stamp": {
+        "text": "68bac05*",
+        "visible": true
+      },
+      "screen": "menu",
+      "tiles": [
+        {
+          "file": "before-menu-desktop-1280x800-tile-r1c1",
+          "origin": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "file": "before-menu-desktop-1280x800-tile-r1c2",
+          "origin": {
+            "x": 1280,
+            "y": 0
+          },
+          "size": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "file": "before-menu-desktop-1280x800-tile-r2c1",
+          "origin": {
+            "x": 0,
+            "y": 800
+          },
+          "size": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "file": "before-menu-desktop-1280x800-tile-r2c2",
+          "origin": {
+            "x": 1280,
+            "y": 800
+          },
+          "size": {
+            "width": 1280,
+            "height": 800
+          }
+        }
+      ],
+      "ink": [
+        {
+          "x": 466,
+          "y": 445,
+          "width": 1608,
+          "height": 730
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 2560,
+          "height": 200
+        },
+        {
+          "x": 0,
+          "y": 1368,
+          "width": 2560,
+          "height": 232
+        }
+      ]
+    },
+    {
+      "name": "before-menu-phone-798x384",
+      "profile": "phone-798x384",
+      "stamp": {
+        "text": "68bac05*",
+        "visible": true
+      },
+      "screen": "menu",
+      "tiles": [
+        {
+          "file": "before-menu-phone-798x384-tile-r1c1",
+          "origin": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 798,
+            "height": 768
+          }
+        },
+        {
+          "file": "before-menu-phone-798x384-tile-r1c2",
+          "origin": {
+            "x": 798,
+            "y": 0
+          },
+          "size": {
+            "width": 798,
+            "height": 768
+          }
+        }
+      ],
+      "ink": [
+        {
+          "x": 281,
+          "y": 116,
+          "width": 1008,
+          "height": 552
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1596,
+          "height": 96
+        },
+        {
+          "x": 0,
+          "y": 657,
+          "width": 1596,
+          "height": 111
+        }
+      ]
+    }
+  ]
+}
