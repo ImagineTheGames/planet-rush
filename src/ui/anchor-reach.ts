@@ -48,7 +48,11 @@
  * reach check that measured to the glass would flag the fix as the bug. So
  * every element is measured against the frame it was laid out in, and
  * {@link CONTENT_BOUND_IDS} is the list of ids for which that frame is the
- * content box rather than the viewport.
+ * content box rather than the viewport. Since a0-125 that distinction has a
+ * name — {@link LayoutSurface} — and a check of its own,
+ * {@link cornerRivals}: an anchor says WHERE an element goes and cannot say
+ * WHOSE BOX it goes in, and two elements reaching one corner from two boxes
+ * satisfied both halves of this contract while covering each other.
  *
  * **3. A real gap is allowed only if something declares it**
  * ({@link LAYOUT_RESERVATIONS}). Some elements genuinely cannot touch their
@@ -76,8 +80,9 @@
  * registry's convention, unchanged.
  */
 
-import type { AnchorRegion, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import { ORE_LABEL_LEADING, stationChromeHeight } from './hud-geometry';
+import type { AnchorRegion, AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { rectOverlap } from './layout-exclusions';
+import { glassCornerReserve, ORE_LABEL_LEADING, stationChromeHeight } from './hud-geometry';
 import { hudMetrics, hudSpace, SCRIM_CORE } from './instrument';
 import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
@@ -167,6 +172,20 @@ export interface ReservationContext {
    * `collapsedRect`.
    */
   readonly fireCorner?: boolean;
+  /**
+   * Is the re-enter-fullscreen affordance drawn this frame
+   * (`FullscreenLifecycle.affordanceVisible`)? Not `isTouch`: the button appears
+   * only after a real exit from fullscreen, and a0-103's ruling about the FIRE
+   * column — *"reserved when the button is there and not otherwise"* — is the
+   * same ruling one corner over. Default `false`, the honest default for an
+   * unreserved corner.
+   */
+  readonly affordanceUp?: boolean;
+  /** The GLASS width, CSS px — the frame the affordance is laid out in, which is
+   *  deliberately not the content box (see {@link LayoutSurface}). Defaults to
+   *  the frame's own width, which is correct on every display where the two are
+   *  the same rect. */
+  readonly glassWidth?: number;
   /**
    * The rect another element registered this frame, or `undefined` when it did
    * not register at all.
@@ -285,6 +304,33 @@ export const LAYOUT_RESERVATIONS: readonly EdgeReservation[] = [
       'reserves the first.',
   },
   {
+    id: 'station-hp',
+    edge: 'right',
+    px: ({ frame, glassWidth, affordanceUp }) =>
+      glassCornerReserve(glassWidth ?? frame.width, frame.x + frame.width, affordanceUp === true),
+    why:
+      'The re-enter-fullscreen affordance (`@render/fullscreen-affordance`) declares ' +
+      'the SAME `top-right` and hugs the top-right of the GLASS at margin 12, while ' +
+      'this cluster hugs the top-right of the CONTENT BOX at `HUD_PAD` 16. On a phone ' +
+      'those are the same corner, and the button took 44x30 px of a 140x30 px readout ' +
+      '— 31% of the own-station HP GDD §2.2 puts there, on 462 swept frames (a0-125 D1). ' +
+      'The affordance is the OUTER of the two, so it reaches the corner and HOME reserves ' +
+      'it: the same ruling the zoom-control row above makes one axis across. The number ' +
+      'is `./hud-geometry` `glassCornerReserve` — a rect intersection, so it is 0 on the ' +
+      'ultrawides by arithmetic, and 0 on every frame the button is not drawn.',
+  },
+  {
+    id: 'zoom-control',
+    edge: 'right',
+    px: ({ frame, glassWidth, affordanceUp }) =>
+      glassCornerReserve(glassWidth ?? frame.width, frame.x + frame.width, affordanceUp === true),
+    why:
+      'The VIEW chip hangs off the HOME cluster (see the `zoom-control`/`top` row) and ' +
+      'is right-aligned with it, so it takes whatever HOME took: a column whose two rows ' +
+      'are 46 px out of line is not a column. Same call, same number, so the two cannot ' +
+      'disagree.',
+  },
+  {
     id: 'build-badge',
     edge: 'bottom',
     px: ({ isTouch }) => (isTouch ? 0 : BADGE_STRIP_LIFT_MIRROR),
@@ -383,6 +429,12 @@ export interface ReachOptions {
   /** Is a touch FIRE button drawn in the bottom-right this frame? See
    *  {@link ReservationContext.fireCorner}. */
   readonly fireCorner?: boolean;
+  /** Is the re-enter-fullscreen affordance drawn this frame? See
+   *  {@link ReservationContext.affordanceUp}. */
+  readonly affordanceUp?: boolean;
+  /** The glass width, CSS px, when it is not the frame's. See
+   *  {@link ReservationContext.glassWidth} and {@link LayoutSurface}. */
+  readonly glassWidth?: number;
   /** Sub-pixel slop, matching `rectContains`'s own default. */
   readonly tolerance?: number;
   /** The frame an element was laid out in, when it is not the viewport. Return
@@ -412,6 +464,8 @@ export function reachViolations(
   const tolerance = opts.tolerance ?? 0.5;
   const isTouch = opts.isTouch ?? false;
   const fireCorner = opts.fireCorner ?? false;
+  const affordanceUp = opts.affordanceUp ?? false;
+  const glassWidth = opts.glassWidth ?? viewport.width;
   const table = opts.reservations ?? LAYOUT_RESERVATIONS;
   const viewportRect: Rect = { x: 0, y: 0, width: viewport.width, height: viewport.height };
   const out: ReachViolation[] = [];
@@ -427,7 +481,12 @@ export function reachViolations(
     const frame = opts.frameFor?.(entry.id) ?? viewportRect;
     const margin = Math.max(0, entry.anchor.margin ?? 0);
     for (const edge of edges) {
-      const reserved = reservedPx(entry.id, edge, { frame, isTouch, fireCorner, boundsOf }, table);
+      const reserved = reservedPx(
+        entry.id,
+        edge,
+        { frame, isTouch, fireCorner, affordanceUp, glassWidth, boundsOf },
+        table,
+      );
       const allowed = margin + reserved;
       const gap = edgeGap(entry.bounds, frame, edge);
       if (gap > allowed + tolerance) {
@@ -473,8 +532,35 @@ export function describeReachViolation(v: ReachViolation): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * **Whose box does this element go in?** — the word the registry does not have,
+ * and a0-125's finding that it is missing.
+ *
+ * An {@link AnchorSpec} says `top-right`. It does not say *the top-right of
+ * what*, and since a0-74 this game has had two answers on the same screen:
+ *
+ *  - `glass`   — the logical viewport, edge to edge. `main.ts` lays the build
+ *                stamp, the ping stamp and the re-enter-fullscreen affordance out
+ *                against it (`layoutBounds(logicalWidth, logicalHeight)`).
+ *  - `content` — the centred, reference-aspect content box (`./viewport`
+ *                `contentBox`), which the HUD's corner chrome is bound to so that
+ *                on a 32:9 display the instruments stay within one glance of each
+ *                other instead of a head-turn apart.
+ *
+ * On every 16:9-or-narrower display the two are the same rect, which is exactly
+ * why the gap went unnoticed for so long: a0-103 asserted that each element
+ * reaches the corner its anchor names, and **nobody asked whether two elements
+ * were reaching the same one**. On a 798x384 phone `fullscreen-reenter` (glass,
+ * margin 12) and `station-hp` (content, margin 16) both reached the top-right and
+ * the button took 31% of the readout, on 462 swept frames, with both halves of
+ * the placement contract green. {@link cornerRivals} is the question nobody
+ * asked, made mechanical.
+ */
+export type LayoutSurface = 'glass' | 'content';
+
+/**
  * The registry ids whose frame is the HUD's content box rather than the raw
- * viewport (`./viewport` `contentBox`, `./hud` `layout`).
+ * viewport (`./viewport` `contentBox`, `./hud` `layout`) — the data behind
+ * {@link surfaceOf}.
  *
  * On every 16:9-or-narrower display — and everything under the reference width,
  * so every phone — the two are the same rect and this list changes nothing. It
@@ -483,7 +569,10 @@ export function describeReachViolation(v: ReachViolation): string {
  *
  * The badges and the fullscreen affordance are absent on purpose: `main.ts`
  * lays those out against the logical viewport (`layoutBounds(w, h)`), so the
- * viewport is the frame they promised.
+ * viewport is the frame they promised. That absence used to be a fact only
+ * {@link reachViolations} consulted; since a0-125 it is also what tells
+ * {@link cornerRivals} that those three are in a different box from the HUD
+ * chrome they share a corner with.
  */
 export const CONTENT_BOUND_IDS: readonly string[] = [
   'ore-hud',
@@ -492,3 +581,100 @@ export const CONTENT_BOUND_IDS: readonly string[] = [
   'zoom-control',
   'minimap',
 ];
+
+/** Which box `id` was laid out in. `glass` unless {@link CONTENT_BOUND_IDS} says
+ *  otherwise — the honest default, since an element that has not declared itself
+ *  bound to the content box was laid out against the viewport. */
+export function surfaceOf(id: string, ids: readonly string[] = CONTENT_BOUND_IDS): LayoutSurface {
+  return ids.includes(id) ? 'content' : 'glass';
+}
+
+/** The frame `id` was laid out in, given both boxes — what
+ *  {@link ReachOptions.frameFor} needs, spelled with {@link surfaceOf} instead of
+ *  with an inline `includes`. */
+export function anchorFrame(
+  id: string,
+  glass: Rect,
+  content: Rect,
+  ids: readonly string[] = CONTENT_BOUND_IDS,
+): Rect {
+  return surfaceOf(id, ids) === 'content' ? content : glass;
+}
+
+/** Two elements that declare the same anchor region in two different boxes, and
+ *  whose rects really meet. */
+export interface CornerRival {
+  /** The region both of them declared. */
+  readonly region: AnchorRegion;
+  readonly a: LayoutEntry;
+  readonly b: LayoutEntry;
+  /** Which box each was laid out in — always two different ones. */
+  readonly surfaceA: LayoutSurface;
+  readonly surfaceB: LayoutSurface;
+  /** The pixels they share. Never zero-area. */
+  readonly overlap: Rect;
+}
+
+/**
+ * **Every pair of elements that reach the same corner from two different boxes.**
+ * a0-125 D1's whole class, in one check.
+ *
+ * Not "every pair that overlaps" — that is `tests/adversarial/layout-overlap`'s
+ * job and it needs draw order and roles to say anything useful. This is the
+ * narrower question the *registry* can answer on its own and could not: two
+ * elements declaring one region while being measured against two different
+ * rectangles is a bug generator, because the day the two rectangles converge (a
+ * narrower display, a smaller content box) the two elements land on each other
+ * and **both halves of the placement contract stay green**. Containment passes:
+ * each is inside its own zone. Reach passes: each is at its own margin. a0-103
+ * asserted both, and D1 shipped anyway.
+ *
+ * A pair whose rects do not actually meet is not reported: `top-right` on the
+ * glass and `top-right` in a 32:9 content box are hundreds of px apart, and a
+ * check that flagged them would be telling the ultrawide fix that it is the bug.
+ *
+ * @param entries The frame's registry entries.
+ * @param glass   The logical viewport rect, `{0, 0, W, H}`.
+ * @param content The HUD's content box (`./viewport` `contentBox`).
+ */
+export function cornerRivals(
+  entries: readonly LayoutEntry[],
+  glass: Rect,
+  content: Rect,
+  ids: readonly string[] = CONTENT_BOUND_IDS,
+): CornerRival[] {
+  const out: CornerRival[] = [];
+  // Only regions that promise an edge can be "the same corner": `full` and
+  // `center` name a zone and make no claim to a bezel, so two of them sharing a
+  // region says nothing (ANCHOR_EDGES, and the header's §1).
+  for (let i = 0; i < entries.length; i++) {
+    const a = entries[i]!;
+    if (anchorEdges(a.anchor.region).length === 0) continue;
+    const sa = surfaceOf(a.id, ids);
+    for (let j = i + 1; j < entries.length; j++) {
+      const b = entries[j]!;
+      if (b.anchor.region !== a.anchor.region) continue;
+      const sb = surfaceOf(b.id, ids);
+      if (sa === sb) continue;
+      const overlap = rectOverlap(a.bounds, b.bounds);
+      if (!overlap) continue;
+      out.push({ region: a.anchor.region, a, b, surfaceA: sa, surfaceB: sb, overlap });
+    }
+  }
+  // `glass`/`content` are named in the signature so a caller cannot forget which
+  // box is which, and so a future check here can measure against them.
+  void glass;
+  void content;
+  return out;
+}
+
+/** One rival pair as a line a human can act on. */
+export function describeCornerRival(r: CornerRival): string {
+  return (
+    `"${r.a.id}" (${r.surfaceA}) and "${r.b.id}" (${r.surfaceB}) both declare ` +
+    `"${r.region}" and reach the same one: they share ` +
+    `{x:${r.overlap.x.toFixed(1)}, y:${r.overlap.y.toFixed(1)}, ` +
+    `w:${r.overlap.width.toFixed(1)}, h:${r.overlap.height.toFixed(1)}}. ` +
+    `An anchor names a region, not a box — see LayoutSurface.`
+  );
+}

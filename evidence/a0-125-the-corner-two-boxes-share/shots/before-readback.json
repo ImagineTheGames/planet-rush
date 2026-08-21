@@ -1,0 +1,69 @@
+[
+  {
+    "stop": "quiet",
+    "affordance": {
+      "x": 738,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "stationDrawn": {
+      "x": 628,
+      "y": 16,
+      "width": 154.5,
+      "height": 39
+    },
+    "stationInk": {
+      "x": 642.5,
+      "y": 16,
+      "width": 140,
+      "height": 30
+    },
+    "overlap": {
+      "x": 738,
+      "y": 16,
+      "width": 44.5,
+      "height": 30
+    },
+    "fraction": 0.31785714285714284,
+    "air": 0,
+    "arrow": null,
+    "arrowOverlap": null
+  },
+  {
+    "stop": "alarm",
+    "affordance": {
+      "x": 738,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "stationDrawn": {
+      "x": 628,
+      "y": 16,
+      "width": 154.5,
+      "height": 39
+    },
+    "stationInk": {
+      "x": 642.5,
+      "y": 16,
+      "width": 140,
+      "height": 30
+    },
+    "overlap": {
+      "x": 738,
+      "y": 16,
+      "width": 44.5,
+      "height": 30
+    },
+    "fraction": 0.31785714285714284,
+    "air": 0,
+    "arrow": {
+      "x": 672.3082840110735,
+      "y": 57,
+      "width": 24.82754437377821,
+      "height": 19.137506523212664
+    },
+    "arrowOverlap": null
+  }
+]

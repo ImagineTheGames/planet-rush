@@ -152,11 +152,12 @@ import {
   respawnWrapWidth,
   stationChromeHeight,
   waveClockLayout,
+  glassCornerReserve,
   wheelFootprint,
   wheelRadius,
 } from './hud-geometry';
 import type { ClockLayout, OreCounterLayout } from './hud-geometry';
-import { exclusionViolations } from './layout-exclusions';
+import { ARROW_KEEPOUT_IDS, exclusionViolations } from './layout-exclusions';
 import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
 import {
   hitZoomControl,
@@ -261,6 +262,18 @@ const PROMPT_TICK_FRACTION = 0.55;
  * its element lights up — nothing here has to change, and nothing outside
  * `src/ui/` had to change to land this.
  */
+/**
+ * One piece of host-drawn chrome the HUD must lay out around but does not draw —
+ * see {@link HudFrame.hostChrome}. A registry id and the rect it drew, which is
+ * all any keep-out table has ever needed.
+ */
+export interface HostChromeRect {
+  /** Layout-registry id (`build-badge`, `net-ping`, `fullscreen-reenter`). */
+  readonly id: string;
+  /** The rect it drew this frame, HUD screen space, CSS px. */
+  readonly bounds: Rect;
+}
+
 export interface HudFrame {
   /** Local ship's held ore (GDD §2.3). */
   readonly cargo: number;
@@ -288,6 +301,42 @@ export interface HudFrame {
   readonly controlScheme: ControlScheme;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
+  /**
+   * Is the re-enter-fullscreen affordance (`@render/fullscreen-affordance`)
+   * drawn this frame? `FullscreenLifecycle.affordanceVisible`, fed straight
+   * through by `src/main.ts`.
+   *
+   * The HUD needs it because that button and own-station HP **both declare
+   * `top-right`** and are laid out in two different boxes — the button on the
+   * glass at margin 12, the HOME column in the content box at `HUD_PAD` 16 — so
+   * on a phone they reach the same corner and the button took 31% of the readout
+   * (a0-125 D1). The column steps aside by exactly the intrusion:
+   * `./hud-geometry` `glassCornerReserve`, which argues the whole ruling.
+   *
+   * Optional and defaulting to `false`, so a host that has not been taught about
+   * the affordance lays the column out exactly where it shipped — the honest
+   * default, since an unreserved corner is what a0-103 asked for.
+   */
+  readonly fullscreenAffordance?: boolean;
+  /**
+   * The rects of the platform chrome drawn **over** the HUD this frame — the
+   * build stamp and the ping stamp on `main.ts`'s `badgeRoot` (added to the stage
+   * after `gameRoot`, so they are over the whole game), and the re-enter-
+   * fullscreen affordance.
+   *
+   * The HUD cannot measure any of them: they are `@render`/`@net` elements whose
+   * widths come from their own measured text, and this file draws none of them.
+   * They are here because the arrow home has to clear them
+   * (`./layout-exclusions` `ARROW_KEEPOUT_IDS`) — a0-122 found the arrow 63%
+   * under one stamp and 62% under the other — and the only honest way to clear a
+   * rect is to be given the rect rather than to re-derive it from constants the
+   * drawing end is free to change.
+   *
+   * Ids are layout-registry ids, so a keep-out here and a `?debug=1` readback name
+   * the same thing. Optional and defaulting to none: a host that hands nothing in
+   * gets exactly the arrow that shipped before a0-125.
+   */
+  readonly hostChrome?: readonly HostChromeRect[];
   /**
    * The live view-zoom rung — how many times more world is across the screen than
    * at the shipped camera (`./viewport` `VIEW_ZOOM_STEPS`, a0-74). Drives the
@@ -872,6 +921,19 @@ export class Hud extends Container {
    */
   private content: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
+  /**
+   * Is the re-enter-fullscreen affordance standing in the glass's top-right
+   * corner this frame? ({@link HudFrame.fullscreenAffordance}.) Held here rather
+   * than read per draw because it is what {@link topRightReserve} is computed
+   * from, and that reserve moves a GROUP — a placement, not a paint.
+   */
+  private affordanceUp = false;
+
+  /** How far the top-right column is standing off its own corner this frame,
+   *  CSS px — `./hud-geometry` `glassCornerReserve`, recomputed only when the
+   *  affordance appears or disappears or the viewport changes. */
+  private topRightReserve = 0;
+
   constructor(
     private screenWidth: number,
     private screenHeight: number,
@@ -1090,7 +1152,12 @@ export class Hud extends Container {
     this.oreGroup.y = PAD;
     this.waveGroup.x = box.x + box.width / 2;
     this.waveGroup.y = PAD;
-    this.stationGroup.x = box.x + box.width - PAD;
+    // The top-right column stands off its corner by whatever the re-enter-
+    // fullscreen affordance is taking of it (a0-125 D1). Zero on every frame the
+    // button is not drawn, and zero by arithmetic on an ultrawide, where the
+    // content box is nowhere near the glass corner the button hugs.
+    this.topRightReserve = glassCornerReserve(this.screenWidth, box.x + box.width, this.affordanceUp);
+    this.stationGroup.x = box.x + box.width - PAD - this.topRightReserve;
     this.stationGroup.y = PAD;
     this.stripGroup.x = box.x;
     this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
@@ -1157,6 +1224,14 @@ export class Hud extends Container {
   /** Draw one frame. Pull the pure models, then update the Pixi children. */
   update(frame: HudFrame): void {
     this.frameTime = frame.time;
+    // Before anything in the top-right corner draws: the affordance appearing or
+    // disappearing moves the HOME column, and a group's x is a placement, so it
+    // is re-run through `layout()` rather than patched here (a0-125 D1).
+    const affordanceUp = frame.fullscreenAffordance === true;
+    if (affordanceUp !== this.affordanceUp) {
+      this.affordanceUp = affordanceUp;
+      this.layout();
+    }
     this.updateOre(frame);
     this.updateLootTell(frame);
     // The alarm runs first now, because three things downstream read its verdict:
@@ -1732,8 +1807,12 @@ export class Hud extends Container {
       this.zoomRect = null;
       return;
     }
-    // Content-box space → screen space, the one offset every corner element takes.
-    const rect: Rect = { ...local, x: local.x + box.x };
+    // Content-box space → screen space, the one offset every corner element takes
+    // — less the reserve HOME took above it, because the VIEW chip hangs off that
+    // cluster and a column whose two rows are 46 px out of line is not a column
+    // (a0-125 D1). It is the same number, from the same call, so the two cannot
+    // disagree.
+    const rect: Rect = { ...local, x: local.x + box.x - this.topRightReserve };
     this.zoomRect = rect;
     this.zoomStep = frame.viewZoom ?? DEFAULT_VIEW_ZOOM;
     this.zoomGroup.visible = true;
@@ -1964,7 +2043,23 @@ export class Hud extends Container {
    *  each of these elements makes its real anchor claim (and argues it). */
   private static readonly KEEPOUT_ANCHOR: AnchorSpec = { region: 'full' };
 
-  private readoutKeepOut(): Rect[] {
+  /**
+   * Every fixed element on this frame that a keep-out table could name, with its
+   * drawn rect — the candidates, before any table has ruled on them.
+   *
+   * Two tables read this list and they are two different questions (see
+   * `./layout-exclusions`): {@link HUD_READOUT_IDS} is what a **world label** may
+   * not be drawn inside, and {@link ARROW_KEEPOUT_IDS} is what the **arrow home**
+   * may not share pixels with. Offering the candidates once and letting each
+   * table pick is what keeps the two answers from being two hand-maintained
+   * lists of `offer` calls that drift — a0-125's whole finding about the arrow is
+   * that it had been given the wrong one of the two.
+   *
+   * `hostChrome` is the part the HUD cannot measure: the two dev stamps and the
+   * re-enter-fullscreen affordance are drawn by `main.ts` over the entire game,
+   * and their rects come in on the frame ({@link HudFrame.hostChrome}).
+   */
+  private keepOutCandidates(frame?: HudFrame): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
     const offer = (id: string, group: Container): void => {
       if (!group.visible) return;
@@ -1980,11 +2075,30 @@ export class Hud extends Container {
     offer('wave-clock', this.waveGroup);
     offer('station-hp', this.stationGroup);
     offer(ZOOM_CONTROL_ID, this.zoomGroup);
-    // The id table decides, not this list: `offer` puts every candidate forward
-    // and `./layout-exclusions` `HUD_READOUT_IDS` picks the ones a world label may
-    // not enter. Take a row out of that table and the element stops being a
-    // keep-out here, which is what makes it the contract rather than a comment.
-    return readoutRects(entries);
+    offer('controls-strip', this.stripGroup);
+    for (const c of frame?.hostChrome ?? []) {
+      if (c.bounds.width <= 0 || c.bounds.height <= 0) continue;
+      entries.push({ id: c.id, anchor: Hud.KEEPOUT_ANCHOR, bounds: c.bounds });
+    }
+    return entries;
+  }
+
+  private readoutKeepOut(): Rect[] {
+    // The id table decides, not the candidate list: `keepOutCandidates` puts every
+    // candidate forward and `./layout-exclusions` `HUD_READOUT_IDS` picks the ones
+    // a world label may not enter. Take a row out of that table and the element
+    // stops being a keep-out here, which is what makes it the contract rather than
+    // a comment.
+    return readoutRects(this.keepOutCandidates());
+  }
+
+  /**
+   * What the screen-edge arrow home gives up radius to clear — a0-125's rule,
+   * `./layout-exclusions` `ARROW_KEEPOUT_IDS`, which argues at length why it is a
+   * second table and not this one's.
+   */
+  private arrowKeepOut(frame: HudFrame): Rect[] {
+    return readoutRects(this.keepOutCandidates(frame), ARROW_KEEPOUT_IDS);
   }
 
   /** ?debug=1 live-stage seam: arm the nameplate layer's drawn-label capture so
@@ -2433,14 +2547,18 @@ export class Hud extends Container {
     // ray from the ship to the station, still at the same angle
     // (./hud-geometry `arrowClearOfReadouts`).
     //
-    // The rects are {@link readoutKeepOut}'s — a0-115's list, measured off the
-    // drawn groups, in this container's screen space. One keep-out for both
-    // collisions: a world label may not be drawn in a readout, and neither may
-    // the mark that points home. The ray runs from the ship, which the follow
-    // camera holds at the middle of the box (and the box is centred, so that is
-    // the screen's middle too).
+    // The rects are {@link arrowKeepOut}'s — `./layout-exclusions`
+    // `ARROW_KEEPOUT_IDS`, a0-125's list and NOT the world label's. a0-116 gave
+    // this mark the label's list because it was already there; a0-122 then found
+    // the arrow under both dev stamps and standing in the desktop strip's type,
+    // three findings that list does not name. The question here is not "would a
+    // caption be rude", it is "can this triangle be read", and the answer is no
+    // for anything fixed on the glass — in EITHER direction, since a mark drawn
+    // over the arrow hides it exactly as well as the arrow hides a readout. The
+    // ray runs from the ship, which the follow camera holds at the middle of the
+    // box (and the box is centred, so that is the screen's middle too).
     const centre = { x: box.x + box.width / 2, y: box.height / 2 };
-    const arrow = arrowClearOfReadouts(onEdge, centre, this.readoutKeepOut());
+    const arrow = arrowClearOfReadouts(onEdge, centre, this.arrowKeepOut(frame));
     this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn where the two clamps above left

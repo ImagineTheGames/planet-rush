@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>a0-125 — the corner two boxes share</title>
+    <!--
+      Dev-server only: `npx vite`, then open
+      /evidence/a0-125-the-corner-two-boxes-share/corner.html.
+      Not linked from the game and not in the bundle. See corner.ts.
+
+      The @font-face rules are copied from index.html because the finding is
+      about how much of the HOME readout a 48x48 button covers, and the readout's
+      own width is its type's width — Trebuchet would put the label and the value
+      somewhere else. `awaitRatifiedFaces` below is the same gate the game boots
+      behind, imported rather than re-implemented.
+    -->
+    <link rel="preload" href="/fonts/Audiowide-Regular-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Oxanium-Variable-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face {
+        font-family: 'Audiowide';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url('/fonts/Audiowide-Regular-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Oxanium';
+        font-style: normal;
+        font-weight: 200 800;
+        font-display: block;
+        src: url('/fonts/Oxanium-Variable-latin.woff2') format('woff2');
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #05070b;
+        color: #9fb0c4;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      figure.cell {
+        margin: 0 0 20px;
+      }
+      figure.cell canvas {
+        display: block;
+        outline: 1px solid #223;
+      }
+      figure.cell figcaption {
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { awaitRatifiedFaces } from '/src/ui/font-boot.ts';
+      import { mountCorner } from './corner.ts';
+      await awaitRatifiedFaces();
+      await mountCorner(document.getElementById('root'));
+    </script>
+  </body>
+</html>

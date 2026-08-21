@@ -569,6 +569,94 @@ export function stationChromeWidth(scale: number): number {
   return HP_BAR_WIDTH + hudSpace(STATION_CHROME_PAD_X, { scale });
 }
 
+// ---------------------------------------------------------------------------
+// Whose corner is it? — the top-right column and the glass (a0-125)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirror of `@render/fullscreen-affordance` `FS_AFFORDANCE_MARGIN` (12) — the
+ * re-enter-fullscreen button's inset from the top and right edges of the
+ * **glass**.
+ *
+ * Mirrored rather than imported for the reason this whole file is Pixi-free (see
+ * the header): that module carries `pixi.js`, and `./hud-geometry.test.ts` pins
+ * the two together so the mirror cannot drift. The same discipline
+ * `./anchor-reach.ts` keeps for `BADGE_STRIP_LIFT`.
+ */
+export const FS_AFFORDANCE_MARGIN_MIRROR = 12;
+
+/** Mirror of `@render/fullscreen-affordance` `2 * FS_AFFORDANCE_RADIUS` (48) —
+ *  the button's drawn box, and the thumb-scale hit target it clears. Pinned in
+ *  `./hud-geometry.test.ts` beside {@link FS_AFFORDANCE_MARGIN_MIRROR}. */
+export const FS_AFFORDANCE_SIZE_MIRROR = 48;
+
+/**
+ * Air between the top-right HUD column and the affordance standing in its
+ * corner, CSS px — the same two pixels {@link READOUT_KEEPOUT_PAD} keeps between
+ * a mark and a readout, and for the same reason: a bar whose end is a button's
+ * edge reads as part of the button.
+ */
+export const GLASS_CORNER_GAP = READOUT_KEEPOUT_PAD;
+
+/**
+ * How far the top-right HUD column steps **left** because the re-enter-fullscreen
+ * affordance is standing in that corner — a0-125's D1, and the arithmetic the
+ * layout registry could not do.
+ *
+ * ## The defect this closes
+ *
+ * `station-hp` and `fullscreen-reenter` both declare `top-right`. The affordance
+ * hugs the top-right of the **glass** at margin {@link FS_AFFORDANCE_MARGIN_MIRROR}
+ * 12; the HOME readout hugs the top-right of the **content box** (a0-74;
+ * `./anchor-reach` `CONTENT_BOUND_IDS`) at {@link HUD_PAD} 16. a0-103 asserted
+ * that each one reaches its own corner. Nobody asked whether they reach the same
+ * one — and on a 798x384 phone they do, so the button took 44x30 px of a 140x30
+ * px readout, 31% of the own-station HP GDD §2.2 puts there, on 462 swept frames.
+ *
+ * ## Why the HUD is the one that yields
+ *
+ * Because the affordance is the **outer** of the two: margin 12 against
+ * `HUD_PAD` 16, so it is what actually reaches the corner. This is verbatim the
+ * ruling `./anchor-reach` `LAYOUT_RESERVATIONS` already made for the VIEW chip
+ * under HOME — *"two elements in one corner: the first reaches it, the second
+ * reserves the first"* — one corner over and one axis across.
+ *
+ * ## Why it is a rect intersection and not a constant
+ *
+ * The two corners only collide when they are near each other. On 21:9 and 32:9
+ * the content box sits hundreds of px inside the glass (a0-74), the button is
+ * nowhere near HOME, and this returns **0** by arithmetic rather than by a
+ * special case — so the profiles that are already correct are untouched, which is
+ * what a0-125 asks for in as many words.
+ *
+ * ## Why it is gated on the button being drawn
+ *
+ * a0-103's own ruling, in its own words: the FIRE column is *"reserved when the
+ * button is there and not otherwise"*, after a 132 px gap with nothing in it
+ * shipped on a phone. `FullscreenLifecycle.affordanceVisible` is touch-only and
+ * false while the game is fullscreen — which is most frames — so a column that
+ * reserved unconditionally would be that same dead gap on every phone that never
+ * leaves fullscreen.
+ *
+ * @param viewportWidth The **glass** width, CSS px — the frame `main.ts` lays the
+ *                      affordance out in (`layoutBounds(logicalWidth, …)`), which
+ *                      is deliberately not the content box.
+ * @param contentRight  Screen-space x of the content box's right edge
+ *                      (`contentBox.x + contentBox.width`), the frame the HUD's
+ *                      corner chrome is laid out in.
+ * @param affordanceUp  Is the button actually drawn this frame?
+ */
+export function glassCornerReserve(
+  viewportWidth: number,
+  contentRight: number,
+  affordanceUp: boolean,
+): number {
+  if (!affordanceUp) return 0;
+  const affordanceLeft = viewportWidth - FS_AFFORDANCE_MARGIN_MIRROR - FS_AFFORDANCE_SIZE_MIRROR;
+  const columnRight = contentRight - HUD_PAD;
+  return Math.max(0, columnRight + GLASS_CORNER_GAP - affordanceLeft);
+}
+
 export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
   const width = Math.max(HP_BAR_WIDTH, labelWidth);
   return {

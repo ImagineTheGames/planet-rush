@@ -287,6 +287,81 @@ export const HUD_READOUT_IDS: readonly string[] = [
 ];
 
 /**
+ * The registry ids the **screen-edge arrow home** keeps clear of — a0-125's one
+ * rule for the arrow, and deliberately *not* {@link HUD_READOUT_IDS}.
+ *
+ * ── WHY IT IS A SECOND LIST ─────────────────────────────────────────────────
+ *
+ * a0-116 gave the arrow {@link HUD_READOUT_IDS} because that list was already
+ * there and the collision it had just found (the wave clock) was in it. That was
+ * the right rect and the wrong reason, and a0-122's sweep priced the difference:
+ * **three of its five findings are this arrow**, covered from three different
+ * directions by three elements that list does not name.
+ *
+ * The two lists answer two different questions.
+ *
+ *  - {@link HUD_READOUT_IDS} is *what a **world label** may not be drawn inside*.
+ *    A nameplate is a caption on a thing in the world; it may pass behind chrome
+ *    and it may lie over a thumb's furniture, because it is not competing with
+ *    either for the eye. Its exclusions say so in as many words: the strip and
+ *    the touch affordances are *"furniture the thumb finds, not type the eye
+ *    reads"*.
+ *  - This list is *what the **arrow** may not share pixels with, in either
+ *    direction*. The arrow is not a caption. It is the under-attack tell (GDD
+ *    §2.2) — the one mark on the screen whose whole job is to be found fast, on
+ *    the frames a player is least able to hunt for it. So the question is not
+ *    "would a label be rude here", it is "can this triangle be read", and the
+ *    answer is no for **anything fixed on the glass**, whether the arrow is drawn
+ *    over it or it is drawn over the arrow. a0-122 found the arrow under a dev
+ *    stamp at 63% (D2), under the other stamp at 62% (D3), and standing in the
+ *    desktop controls strip's type at 21x17 px (D4) — where the strip's "thumb
+ *    furniture" argument does not even apply, because a desktop has no thumb and
+ *    the strip is nothing but `WASD Thrust`.
+ *
+ * ── WHAT IT MAY OVERLAP: THE WORLD, AND PICTURES OF IT ──────────────────────
+ *
+ * The exclusions are the rule's other half and they are one word: **world**.
+ * `minimap` is out (*"a map of the world is a world surface, and a name over it
+ * is a name over the thing it names"* — a0-115's argument, and the arrow is a
+ * world mark by it), as are `healthbars` and `nameplates`, which travel with the
+ * things they label. The touch sticks are out for a0-115's reason unchanged: they
+ * are drawn under the thumb, they move, and a tell that dodged a stick would
+ * spend a siege dodging the player's own hand.
+ *
+ * ── HOW IT IS APPLIED ──────────────────────────────────────────────────────
+ *
+ * The arrow gives up **radius, never bearing** — `./hud-geometry`
+ * `arrowClearOfReadouts`, unchanged since a0-116, which slides it inward along
+ * its own ray until its triangle is clear. That is why nothing **centred** can be
+ * on this list: pulling a mark toward the middle cannot get it out of the middle.
+ * The open build wheel is the one such element and it is argued where it is
+ * measured (a0-125 D5, `tests/adversarial/layout-model.ts`).
+ *
+ * Two of these ids are not the HUD's own: the build stamp and the ping stamp are
+ * `@render`/`@net` elements on `main.ts`'s `badgeRoot`, which is added to the
+ * **stage** after `gameRoot` — over the whole game, not merely over the HUD. The
+ * HUD cannot measure them, so the host hands their rects in
+ * ({@link ./hud} `HudFrame.hostChrome`) and this table decides what to do with
+ * them, exactly as it decides for the HUD's own groups. `fullscreen-reenter`
+ * arrives the same way, and is on this list because a0-125's D1 fix moved the
+ * HOME cluster out of that corner: the arrow had been kept out of it by HOME's
+ * rect all along, and the moment HOME stepped aside the arrow rode straight under
+ * the button. That is the D6 a0-125 was told to prevent, caught by the sweep in
+ * the same run that healed D1.
+ */
+export const ARROW_KEEPOUT_IDS: readonly string[] = [
+  'ore-hud',
+  'banked-total',
+  'wave-clock',
+  'station-hp',
+  'zoom-control',
+  'controls-strip',
+  'build-badge',
+  'net-ping',
+  'fullscreen-reenter',
+];
+
+/**
  * Clear air a mark keeps from a readout's rect, CSS px.
  *
  * Not zero, unlike {@link LayoutExclusion.gap}'s default. A bare exclusion is

@@ -130,7 +130,8 @@ rule at all.
 ## 3. Every intersection the sweep found
 
 Twelve `(coverer, covered)` classes across the 1,896 frames. Seven are declared
-exceptions; **five are defects**, and all five are new.
+exceptions; **five are defects**, and all five are new. *(a0-125 fixed four of
+the five; §3a carries each one's disposition.)*
 
 ### 3a. Defects — pinned in `KNOWN_COVERS`, not fixed
 
@@ -138,7 +139,13 @@ QA owns `tests/` and `harness/`. Each of these is a reproduction a ui brief can
 be built from, and the third assertion in the gate fails **the day one is fixed**,
 so none can be quietly forgotten and none can be quietly re-broken.
 
-#### D1 — the re-enter-fullscreen affordance over own-station HP
+> **a0-125 (2026-08-21): four of the five are fixed, and `KNOWN_COVERS` is one
+> line.** D1, D2, D3 and D4 no longer reproduce; D5 is measured, argued and kept.
+> Each heading below carries its disposition, and the rows are left standing
+> rather than struck because the measurements are what the fixes were built from.
+> Evidence for D1: `evidence/a0-125-the-corner-two-boxes-share/`.
+
+#### D1 — the re-enter-fullscreen affordance over own-station HP — **FIXED (a0-125)**
 
 | | |
 |---|---|
@@ -162,7 +169,18 @@ worth writing down: `FullscreenLifecycle.affordanceVisible` is **touch-only**
 and 32:9 the content box is far enough inside the glass that the two corners are
 hundreds of px apart.
 
-#### D2 — the ping stamp over the arrow home
+> **a0-125.** The sentence above is the finding, and the fix is named after it:
+> the registry now has a word for *whose box* — `LayoutSurface` in
+> `src/ui/anchor-reach.ts`, with `CONTENT_BOUND_IDS` as its data and
+> `cornerRivals()` as the check nobody had ("every pair declaring one region from
+> two different boxes whose rects really meet"). The HOME column and the VIEW chip
+> under it step left by exactly the button's intrusion while the button is up —
+> `glassCornerReserve`, two declared rows in `LAYOUT_RESERVATIONS` — which is 0 on
+> both ultrawides by arithmetic and 0 on every frame the button is down, so the
+> three profiles that were already correct are untouched. Measured on the bench:
+> 32% → 0%, air 0 → 1.5 px.
+
+#### D2 — the ping stamp over the arrow home — **FIXED (a0-125)**
 
 | | |
 |---|---|
@@ -171,7 +189,7 @@ hundreds of px apart.
 | **worst** | **63%** of the arrow (phone, bearing 155°) |
 | **rects** | `net-ping {8,349 160×12}` ∩ `alarm-arrow {33.7,343.3 24.8×19}` = `{33.7,349 24.8×12}` |
 
-#### D3 — the build stamp over the arrow home
+#### D3 — the build stamp over the arrow home — **FIXED (a0-125)**
 
 | | |
 |---|---|
@@ -189,7 +207,18 @@ the arrow is more than half under a stamp. Neither stamp is in
 `HUD_READOUT_IDS`, so a0-116's yield never considers them, and neither is
 registered as something the arrow must clear.
 
-#### D4 — the arrow home over the controls strip
+> **a0-125.** D2, D3 and D4 are answered once, not three times:
+> `src/ui/layout-exclusions.ts` `ARROW_KEEPOUT_IDS` states what the arrow may
+> share pixels with, and it is deliberately a second table from the world label's.
+> The arrow gives up radius — never bearing — to clear every FIXED rect on the
+> glass, in either direction, and may overlap only WORLD surfaces. The stamps are
+> `@render`/`@net` elements the HUD cannot measure, so `main.ts` hands their rects
+> in on the frame (`HudFrame.hostChrome`). The same rule caught a **fourth** cover
+> of this mark that the D1 fix created — with HOME out of the corner the arrow rode
+> straight under the fullscreen button, 100% — photographed in
+> `evidence/a0-125-the-corner-two-boxes-share/`.
+
+#### D4 — the arrow home over the controls strip — **FIXED (a0-125)**
 
 | | |
 |---|---|
@@ -211,7 +240,14 @@ tell should win) is a ui/design call and **not QA's**. It is pinned so that the
 call gets made rather than forgotten. The phone is clean because
 `showControlsStrip(isTouch)` draws no strip there at all.
 
-#### D5 — the wheel's halo over the arrow home
+> **a0-125 made the call: fix.** The strip's exclusion argument — *"furniture the
+> thumb finds, not type the eye reads"* — was written in a0-115 about a world
+> LABEL landing on a thumb target. On a desktop there is no thumb and the strip is
+> nothing but type, and the arrow is not a caption: it is the tell the player is
+> least able to hunt for. `controls-strip` is on `ARROW_KEEPOUT_IDS`; the arrow
+> clears the band and keeps its bearing bit-identical.
+
+#### D5 — the wheel's halo over the arrow home — **KEPT (a0-125), pinned**
 
 | | |
 |---|---|
