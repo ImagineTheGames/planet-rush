@@ -66,9 +66,11 @@ npx vite-node evidence/a0-126-the-last-two-points/render.ts
 **Why the three sections are not run to the same depth.** The roster contest is
 this brief's actual question and gets 512 seeds — 16× a0-121's run — because the
 sample size §2.5 computes for a 57% rate is an order of magnitude past what
-a0-121 could afford. The class and tier sections get 256 seeds, 8×, which is
-past what their own verdicts need and no further: §4.4 and §4.5 report intervals
-narrow enough to resolve both, and matches spent past that would buy nothing.
+a0-121 could afford. The class and tier sections each get 256 seeds, which is 4×
+a0-121's class run and 8× its tier run — the two started at different depths —
+and which is past what their own verdicts need and no further: §4.4 and §4.5
+report intervals narrow enough to resolve both, and matches spent past that would
+buy nothing.
 Depth is a decision with a cost and it is stated rather than defaulted.
 
 **On the harness.** A section is a clean cross product of lineups × seeds and
