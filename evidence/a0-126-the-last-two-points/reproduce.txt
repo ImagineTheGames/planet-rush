@@ -1,0 +1,12 @@
+--- roster: a0-121's 224 matches, lifted back out of a0-126's 3584 ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 224
+  rows differing: 0
+  IDENTICAL — the tree is unchanged since a0-121, and the deep run contains its run exactly.
+
+--- class: a0-121's 256 matches, lifted back out of a0-126's 1024 ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 256
+  rows differing: 0
+  IDENTICAL — the tree is unchanged since a0-121, and the deep run contains its run exactly.
+

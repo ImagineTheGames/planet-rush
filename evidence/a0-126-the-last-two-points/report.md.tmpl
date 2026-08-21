@@ -290,6 +290,7 @@ it and because a 16× sample is a better measurement of it than a 1× sample was
 | `stats.ts` `designEffect` | ICC and variance inflation over the seed clusters | 223 matches are not 223 observations until this says so |
 | `stats.ts` `mcnemar` | exact paired test on discordant matches | the same-seeds design is thrown away without it |
 | `stats.ts` `sampleFor`/`sampleForExact` | the n at which a rate separates from the ceiling | turns "run more matches" into a number |
+| `stats.ts` `exactLoAbove` | "does the exact lower bound clear the ceiling", by one tail sum | the long form spends 200 bisections on it, and wedged the first deep render |
 | `targets.ts` `verdictOf` | INSIDE / OVER / **UNRESOLVED** | a two-state verdict cannot say "the run does not know" |
 | `harness/mirrors` `mergeSections` | folds sharded seed spans into one section | the deep run is unaffordable single-file |
 | `harness/cli` `--from` | seeds `[s, s+n)` | what makes a shard addressable |

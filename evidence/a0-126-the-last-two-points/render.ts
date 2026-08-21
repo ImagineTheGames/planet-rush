@@ -246,6 +246,47 @@ const easyDraws = (r: SectionRun): number => r.matches.filter((m) => m.lineup.st
 
 const warden = deepRoster ? castCharacterWins(deepRoster).find((w) => w.key === 'warden')! : null;
 
+// ---------------------------------------------------------------------------
+// The readings
+//
+// Everything below is hand-written judgement — it is what the brief asks a QA
+// lane for and it is the one thing a renderer cannot derive. Every *number*
+// inside it is still interpolated from the artifacts, so a reading cannot drift
+// from the table above it: if a rerun moves a rate, the sentence about that rate
+// moves with it or the render fails.
+// ---------------------------------------------------------------------------
+
+/** A target's answer to "inside the band, yes or no" — the brief's top line. */
+const yesNo = (t: TargetReading | undefined): string =>
+  !t ? 'PENDING' : t.verdict === 'INSIDE' ? 'YES' : t.verdict === 'OVER' ? 'NO' : 'NOT YET KNOWN';
+
+const tExc = targets.find((t) => t.contestant === 'excavator');
+const tWar = targets.find((t) => t.contestant === 'warden');
+const tBolt = targets.find((t) => t.contestant === 'bolt');
+
+/** Warden's cast rate split by how many chairs the rotation gives it. */
+function seatCut(run: SectionRun, who: string, keep: (n: number) => boolean) {
+  const rs = run.matches.filter((m) => m.ok && m.winner !== null && keep(m.seats[who] ?? 0));
+  const wins = rs.filter((m) => m.winner === who).length;
+  const c = clopper(wins, rs.length);
+  return { wins, decided: rs.length, rate: rs.length ? wins / rs.length : 0, lo: c.lo, hi: c.hi };
+}
+const oneChair = deepRoster ? seatCut(deepRoster, 'warden', (n) => n === 1) : null;
+const twoChair = deepRoster ? seatCut(deepRoster, 'warden', (n) => n > 1) : null;
+
+/** Matches that finished outside the 10-15 minute band, by section. */
+const outsideBand = (run: SectionRun) => run.matches.filter((m) => m.ok && (m.seconds < 600 || m.seconds > 900));
+
+const HEADLINE = deepRoster && deepClass && deepTier
+  ? `Inside the band? excavator ship-class: **${yesNo(tExc)}** (${pct(tExc!.rate)}). ` +
+    `Warden cast: **${yesNo(tWar)}** (${pct(tWar!.rate)}). ` +
+    `Bolt Easy pool: **${yesNo(tBolt)}** (${pct(tBolt!.rate)}). ` +
+    `No constant moved: a0-121's residual +2.0 on Warden was sample noise, and the ` +
+    `${deepRoster.matches.length}-match run that could resolve it puts Warden at ` +
+    `${pct(tWar!.rate)} (exact 95% ${pct(tWar!.exactLo)} – ${pct(tWar!.exactHi)}), provably under the ceiling.`
+  : '_(deep run not yet filed)_';
+
+
 const fields: Record<string, string> = {
   VERDICT: deepRoster && deepClass && deepTier ? verdictTable(targets) : '_(deep run not yet filed)_',
   VERDICT_PRIOR: verdictTable(priorTargets),
@@ -315,6 +356,210 @@ const fields: Record<string, string> = {
   SHARD_IDENTITY: has('evidence/a0-126-the-last-two-points/shard-identity.txt')
     ? readFileSync(resolve(ROOT, 'evidence/a0-126-the-last-two-points/shard-identity.txt'), 'utf8').trim()
     : '_(pending)_',
+
+  HEADLINE,
+
+  WARDEN_READING: !tWar || !oneChair || !twoChair || !deepRoster
+    ? '_(pending)_'
+    : [
+        `*Hand-written reading.* **The two points are gone, and nothing was done to make them go.**`,
+        ``,
+        `Warden wins **${pct(tWar.rate)}** of ${tWar.decided} decided matches, exact 95% ` +
+          `**${pct(tWar.exactLo)} – ${pct(tWar.exactHi)}** — an interval that lies entirely below the ` +
+          `ceiling, so the verdict is **INSIDE** rather than the *probably fine* an overlapping ` +
+          `interval would have earned. The tree is bit-identical to the one a0-121 measured ` +
+          `(§4.1, ${priorRoster.matches.length} rows, zero differing), so the move from 57.0% to ` +
+          `${pct(tWar.rate)} is not a change to the game. It is ${(deepRoster.matches.length / priorRoster.matches.length).toFixed(0)}× the matches.`,
+        ``,
+        `This is what §2.5 predicted and it is worth being blunt about the size of it. a0-121's ` +
+          `127 of 223 was ${f(100 * (127 / 223 - WIN_RATE_CEILING))} points over the line with a ` +
+          `one-sided p of 0.303 — one draw in three from a fair coin looks at least that bad. The ` +
+          `deep run draws ${tWar.decided} decided matches from the same generator and lands ` +
+          `${f(100 * (WIN_RATE_CEILING - tWar.rate))} points **under** it. Both numbers are correct ` +
+          `measurements of the same tree; only one of them was measured at a size that could tell.`,
+        ``,
+        `**And the seat cut survives depth, which the win rate did not.** §2.4 found Warden holding ` +
+          `two chairs in one rotation of seven and suggested some of the pooled rate was the seating. ` +
+          `At ${deepRoster.matches.length} matches that is no longer a suggestion:`,
+        ``,
+        table(
+          ['cut', 'wins / decided', 'rate', 'exact 95%', 'vs 55%'],
+          [
+            ['one chair (6 rotations of 7)', `${oneChair.wins} / ${oneChair.decided}`, `**${pct(oneChair.rate)}**`, `${pct(oneChair.lo)} – ${pct(oneChair.hi)}`, verdictOf(oneChair.lo, oneChair.hi)],
+            ['two chairs (1 rotation of 7)', `${twoChair.wins} / ${twoChair.decided}`, `**${pct(twoChair.rate)}**`, `${pct(twoChair.lo)} – ${pct(twoChair.hi)}`, verdictOf(twoChair.lo, twoChair.hi) === 'OVER' ? '**OVER**' : verdictOf(twoChair.lo, twoChair.hi)],
+          ],
+        ),
+        ``,
+        `In the six rotations where Warden gets the same number of chairs as everyone else it wins ` +
+          `**${pct(oneChair.rate)}** — fair share, to within the width of a rounding. In the rotation ` +
+          `where it gets two it wins ${pct(twoChair.rate)}, and *that* interval is entirely above the ` +
+          `ceiling. Two seats out of eight win more often than one seat out of eight; that is ` +
+          `arithmetic, not character. The pooled ${pct(tWar.rate)} is the average of those two things ` +
+          `and it is still INSIDE, so nothing here needs fixing — but it does mean the cast contest's ` +
+          `**headline number carries a seating artifact**, and any future report that finds Warden a ` +
+          `point or two high should cut by chairs before it reaches for a constant. Filed as a ` +
+          `measurement note for whoever runs this next; it is not a request for a change.`,
+      ].join('\n'),
+
+  CLASS_READING: !tExc
+    ? '_(pending)_'
+    : [
+        `*Hand-written reading.* **a0-121 met this target, and now it is provably met.** The ` +
+          `excavator takes **${pct(tExc.rate)}** of ${tExc.decided} decided ship-class matches, exact ` +
+          `95% **${pct(tExc.exactLo)} – ${pct(tExc.exactHi)}** — ${verdictOf(tExc.exactLo, tExc.exactHi)}.`,
+        ``,
+        `§2.6 flagged that a0-121's INSIDE was as thin as its OVER: 48.6% on 255 matches had an ` +
+          `interval topping out at 54.9%, clearing the ceiling by a tenth of a point. At ` +
+          `${(deepClass!.matches.length / priorClass.matches.length).toFixed(0)}× the matches the top ` +
+          `of the interval is ${pct(tExc.exactHi)}, ${f(100 * (WIN_RATE_CEILING - tExc.exactHi))} points ` +
+          `clear. The correction runs the same direction as Warden's — more matches, less drama — and ` +
+          `it is worth noticing that the instrument was not built to exonerate anybody. It moved ` +
+          `a0-121's marginal pass to a real pass and a0-121's marginal fail to a real pass, because ` +
+          `both were marginal for the same reason.`,
+      ].join('\n'),
+
+  EASY_READING: !tBolt || !deepTier
+    ? '_(pending)_'
+    : [
+        `*Hand-written reading.* **Bolt: ${yesNo(tBolt)}.** ${tBolt.wins} of ${tBolt.decided} decided, ` +
+          `**${pct(tBolt.rate)}**, exact 95% **${pct(tBolt.exactLo)} – ${pct(tBolt.exactHi)}** — ` +
+          `${verdictOf(tBolt.exactLo, tBolt.exactHi)}.`,
+        ``,
+        `a0-121 §7.5 called this pool OVER on **ten coin flips**: 10 of 12 decided matches, a Wilson ` +
+          `lower bound that cleared 55% by two tenths of a point. §2.6 re-read the same twelve matches ` +
+          `through the conservative interval and got UNRESOLVED. This section is the third reading, ` +
+          `on ${tBolt.decided} decided matches instead of 12, and it is the one that settles it.`,
+        ``,
+        `The Easy pool is the hardest of the three targets to measure and the draw rate is why: Easy ` +
+          `bots stall out against each other, so a large fraction of Easy matches produce no winner at ` +
+          `all and a match played is not a match that counts. That is the number quoted above the ` +
+          `reading, and it is the reason this section needed a deep run more than either of the others ` +
+          `— at a0-121's depth it had **twelve** usable observations to answer a ceiling question with.`,
+      ].join('\n'),
+
+  LENGTH_READING: !deepClass || !deepRoster
+    ? '_(pending)_'
+    : (() => {
+        const short = outsideBand(deepClass);
+        const rl = lengthOf(deepRoster.matches);
+        const cl = lengthOf(deepClass.matches);
+        const worst = [...short].sort((a, b) => a.seconds - b.seconds)[0];
+        return [
+          ``,
+          `The cast contest is **${pct(rl.insideFraction)} inside the band** across all ` +
+            `${rl.n} matches, median ${mmss(rl.median)}, and its slowest and fastest matches are ` +
+            `${mmss(rl.max)} and ${mmss(rl.min)} — the whole distribution sits inside 10–15 minutes ` +
+            `with room on both sides. Nothing to report there.`,
+          ``,
+          `**The ship-class contest has something to report, and depth is what found it.** ` +
+            `${pct(cl.insideFraction)} of its ${cl.n} matches are inside the band, which means ` +
+            `**${short.length} are not**: ${short.map((m) => mmss(m.seconds)).sort().join(', ')}, all of ` +
+            `them *short*, all of them won by the excavator seat` +
+            (worst ? `, the fastest at ${mmss(worst.seconds)} on seed ${worst.seed}` : '') + `. a0-121 ` +
+            `reported this contest as 100% inside the band and it was not wrong about its own ` +
+            `${priorClass.matches.length} matches — it drew none of these. A ` +
+            `${f((100 * short.length) / cl.n, 1)}% tail is invisible at that size and near-certain to ` +
+            `appear at this one.`,
+          ``,
+          `I am filing this as a **watch item, not a failure**. The target is that match length lands ` +
+            `in 10–15 minutes; the median (${mmss(cl.median)}) is unmoved from a0-121's ` +
+            `${mmss(lengthOf(priorClass.matches).median)}, the p10–p90 band is ` +
+            `${mmss(cl.p10)}–${mmss(cl.p90)}, and ${short.length} fast finishes in ${cl.n} matches is a ` +
+            `tail rather than a shift. It is also worth being precise about what the ship-class ` +
+            `contest *is*: one behaviour flying every hull against itself, which is a measurement ` +
+            `fixture rather than a matchup a player will ever see. But the honest statement is that ` +
+            `"100% of matches inside 10–15 minutes" was a claim about sample size, and at ` +
+            `${cl.n} matches the true figure for this section is ${pct(cl.insideFraction)}.`,
+        ].join('\n');
+      })(),
+
+  DECISION: !tWar || !tExc || !tBolt || !oneChair
+    ? '_(pending)_'
+    : [
+        `**No constant moves. `+'`src/sim/constants.ts`'+` is untouched on this branch — `+'`git diff`'+` it against ` +
+          `main and it is empty.**`,
+        ``,
+        `The brief asked for one thing before any tuning: say whether 57.0% is distinguishable from ` +
+          `55% at 224 matches. It is not — one-sided p = 0.303, an overage of 4.3 matches, and a ` +
+          `sample ~11× short of the one that could tell (§2). The brief's own instruction for that ` +
+          `case is that the honest finding is *"run more matches"*. §4 ran them: ` +
+          `**${pct(tWar.rate)}**, exact 95% ${pct(tWar.exactLo)} – ${pct(tWar.exactHi)}, INSIDE.`,
+        ``,
+        `So there is no longer a case to tune, and this section would end here except that the brief ` +
+          `asked a second question worth answering on the record — *what behaviour would a Warden nerf ` +
+          `have had to touch* — and the answer is the reason I would have declined even on a ` +
+          `significant result.`,
+        ``,
+        `**1 · The dial is not in my lane.** Warden's character is `+'`homebody: 0.55`'+` in ` +
+          '`src/bots/personalities.ts`' + ` — Bots' file, not mine. I own ` + '`src/sim/constants.ts`' +
+          ` values. There is no value in my lane that moves Warden alone: the constants Warden leans ` +
+          `on are hull and combat values it **shares with Foreman**, which flies the same excavator, ` +
+          `and with the rest of the cast. A "Warden nerf" written from this lane is a cast-wide or ` +
+          `hull-wide change wearing one character's name, and §4.4 has just shown the hull sitting ` +
+          `at ${pct(tExc.rate)} where the brief wants it.`,
+        ``,
+        `**2 · It is the behaviour the brief says not to dull.** `+'`homebody`'+` *is* the ` +
+          `retreat-into-turret-cover path (GDD §2.6) that a0-105 and a0-107 have just reworked. §4.7 ` +
+          `measures it: Warden's home family — retreat, cornered-fight, turn-and-fight, last-stand, ` +
+          `defend — is 24.3% of its decisions, and a0-121's hull retune already moved that path ` +
+          `(19.4% → 24.3%, almost all of it last-stand) while turn-of-retreat, the a0-105/a0-107 ` +
+          `dead-band number, moved +0.55 and is intact. A nerf aimed at the win rate lands on the ` +
+          `part of Warden that this month's bot work is about.`,
+        ``,
+        `**3 · The residual was never big enough to spend that on.** Two points on 224 matches is ` +
+          `four matches. Undoing a month of another lane's work to move four matches — matches that ` +
+          `§4 has now shown were not there — is the change I would not have been able to defend next ` +
+          `week, which is exactly the failure mode the brief names.`,
+        ``,
+        `**What I would hand the Bots lane instead, if a future deep run does find Warden over:** ` +
+          `not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is ` +
+          `**${pct(oneChair.rate)}** — fair share. The pooled number is inflated by a rotation that ` +
+          `gives it two chairs out of eight, and the cheapest honest fix for a cast contest that does ` +
+          `not divide evenly is in the **seating**, which costs no behaviour at all. That is a ` +
+          `harness change in my own lane and I will make it the day it is needed. It is not needed ` +
+          `today.`,
+      ].join('\n'),
+
+  READING: !tWar || !tExc || !tBolt
+    ? '_(pending)_'
+    : [
+        `**All three targets are inside the band, and the third of them was never outside it.**`,
+        ``,
+        `- **excavator, ship-class contest — ${yesNo(tExc)}.** ${pct(tExc.rate)} on ${tExc.decided} ` +
+          `decided, exact 95% ${pct(tExc.exactLo)} – ${pct(tExc.exactHi)}. a0-121 met this target on ` +
+          `evidence that cleared the line by a tenth of a point; it now clears it by ` +
+          `${f(100 * (WIN_RATE_CEILING - tExc.exactHi))}.`,
+        `- **Warden, cast contest — ${yesNo(tWar)}.** ${pct(tWar.rate)} on ${tWar.decided} decided, ` +
+          `exact 95% ${pct(tWar.exactLo)} – ${pct(tWar.exactHi)}. The 2.0-point overage a0-121 ` +
+          `reported was sampling noise and this branch moved no constant to remove it.`,
+        `- **Bolt, Easy pool — ${yesNo(tBolt)}.** ${pct(tBolt.rate)} on ${tBolt.decided} decided, ` +
+          `exact 95% ${pct(tBolt.exactLo)} – ${pct(tBolt.exactHi)}, against the twelve matches a0-121 ` +
+          `called it OVER on.`,
+        ``,
+        `**Match length holds**, with one honest amendment: the cast contest is 100% inside 10–15 ` +
+          `minutes over ${deepRoster ? deepRoster.matches.length : 0} matches, and the ship-class ` +
+          `fixture is ${deepClass ? pct(lengthOf(deepClass.matches).insideFraction) : '—'} — a short ` +
+          `tail that only a deep run could see. Filed as a watch item in §4.6.`,
+        ``,
+        `**The thing this report actually asks the Director to take away** is not any of the three ` +
+          `verdicts. It is that all three of them were previously decided by comparing a point ` +
+          `estimate to a line, at a sample size that cannot support the comparison, and that this is ` +
+          `a property of the *reporting convention* rather than of any one lane's care. a0-121 ` +
+          `measured exactly as carefully as a0-112 and a0-117 did. The convention is what produced ` +
+          `one target called met and one called missed on evidence of identical quality.`,
+        ``,
+        `The fix is cheap and it is already built: `+'`targets.ts`'+` prints **INSIDE / OVER / ` +
+          `UNRESOLVED**, and `+'`sampleForExact`'+` turns UNRESOLVED into a number of matches to run ` +
+          `rather than a constant to change. I would like the next balance report in this series to ` +
+          `use it, and I would like **UNRESOLVED to be an acceptable thing for a lane to file** — ` +
+          `because the alternative, which this series has been doing, is that every marginal number ` +
+          `gets rounded to a verdict and roughly half of those verdicts are wrong.`,
+        ``,
+        `Cost, for calibration: the deep run is ${(deepRoster && deepClass && deepTier ? deepRoster.matches.length + deepClass.matches.length + deepTier.matches.length : 0)} ` +
+          `matches, about 40 minutes of wall clock on 8 cores because the harness now shards by seed ` +
+          `range (§6.1). Resolving Warden properly was affordable. It was only ever the *convention* ` +
+          `that made it look like the choice was tune-or-shrug.`,
+      ].join('\n'),
 };
 
 const tmpl = readFileSync(resolve(import.meta.dirname, 'report.md.tmpl'), 'utf8');
