@@ -1,0 +1,118 @@
+[
+  {
+    "name": "phone-798x384-map-select",
+    "profile": "phone-798x384",
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "screen": "map-select",
+    "order": [
+      "octagon",
+      "compass",
+      "oval",
+      "diamond",
+      "line",
+      "crescents"
+    ],
+    "selected": "octagon",
+    "veteran": "diamond",
+    "cards": [
+      {
+        "x": 29,
+        "y": 87,
+        "width": 240,
+        "height": 111.5
+      },
+      {
+        "x": 279,
+        "y": 87,
+        "width": 240,
+        "height": 111.5
+      },
+      {
+        "x": 529,
+        "y": 87,
+        "width": 240,
+        "height": 111.5
+      },
+      {
+        "x": 29,
+        "y": 208.5,
+        "width": 240,
+        "height": 111.5
+      },
+      {
+        "x": 279,
+        "y": 208.5,
+        "width": 240,
+        "height": 111.5
+      },
+      {
+        "x": 529,
+        "y": 208.5,
+        "width": 240,
+        "height": 111.5
+      }
+    ],
+    "elements": []
+  },
+  {
+    "name": "desktop-1280x800-map-select",
+    "profile": "desktop-1280x800",
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "screen": "map-select",
+    "order": [
+      "octagon",
+      "compass",
+      "oval",
+      "diamond",
+      "line",
+      "crescents"
+    ],
+    "selected": "octagon",
+    "veteran": "diamond",
+    "cards": [
+      {
+        "x": 44,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      },
+      {
+        "x": 244.33333333333334,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      },
+      {
+        "x": 444.6666666666667,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      },
+      {
+        "x": 645,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      },
+      {
+        "x": 845.3333333333334,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      },
+      {
+        "x": 1045.6666666666667,
+        "y": 294.5,
+        "width": 190.33333333333334,
+        "height": 240
+      }
+    ],
+    "elements": []
+  }
+]

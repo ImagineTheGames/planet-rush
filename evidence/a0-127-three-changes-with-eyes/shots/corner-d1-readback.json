@@ -1,0 +1,98 @@
+[
+  {
+    "tag": "before-exit",
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "fullscreen": {
+      "active": true,
+      "everEntered": true,
+      "affordanceVisible": false,
+      "bounds": null,
+      "withinAnchor": false
+    },
+    "button": null,
+    "readout": {
+      "x": 628,
+      "y": 16,
+      "width": 154.5,
+      "height": 39
+    },
+    "zoom": {
+      "x": 718,
+      "y": 61,
+      "width": 64,
+      "height": 48
+    },
+    "cover": null,
+    "coverShare": 0,
+    "air": null,
+    "ids": [
+      "ship-local",
+      "build-button",
+      "build-badge",
+      "pause-button",
+      "ore-hud",
+      "banked-total",
+      "station-hp",
+      "zoom-control",
+      "onboarding",
+      "nameplates",
+      "minimap"
+    ]
+  },
+  {
+    "tag": "after-exit",
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "fullscreen": {
+      "active": false,
+      "everEntered": true,
+      "affordanceVisible": true,
+      "bounds": {
+        "x": 738,
+        "y": 12,
+        "width": 48,
+        "height": 48
+      },
+      "withinAnchor": true
+    },
+    "button": {
+      "x": 738,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "readout": {
+      "x": 582,
+      "y": 16,
+      "width": 154.5,
+      "height": 39
+    },
+    "zoom": {
+      "x": 672,
+      "y": 61,
+      "width": 64,
+      "height": 48
+    },
+    "cover": null,
+    "coverShare": 0,
+    "air": 1.5,
+    "ids": [
+      "ship-local",
+      "build-button",
+      "build-badge",
+      "fullscreen-reenter",
+      "pause-button",
+      "ore-hud",
+      "banked-total",
+      "station-hp",
+      "zoom-control",
+      "nameplates",
+      "minimap"
+    ]
+  }
+]

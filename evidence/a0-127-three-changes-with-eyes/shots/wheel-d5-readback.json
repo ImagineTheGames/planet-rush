@@ -1,0 +1,112 @@
+[
+  {
+    "aim": 140,
+    "why": "inside dock range 160 — the wheel is live here",
+    "spawn": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "station": {
+      "x": 2064,
+      "y": 1200
+    },
+    "ship": {
+      "x": 2066.2,
+      "y": 1352.7
+    },
+    "distanceToStation": 152.7,
+    "dyToStation": 152.7,
+    "dockRange": 160,
+    "arrowThresholdDy": 164,
+    "buildButtonPressedAt": {
+      "x": 92,
+      "y": 172
+    },
+    "buildButtonDrawn": true,
+    "alarmPolls": 2,
+    "alarmFrameDrawn": true,
+    "coreHp": 42.35000000000001,
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "wheel": {
+      "x": 239.72777142857143,
+      "y": 32.72777142857143,
+      "width": 318.5444571428571,
+      "height": 318.54445714285714
+    },
+    "arrow": null,
+    "wheelOverArrow": null,
+    "ids": [
+      "ship-local",
+      "build-button",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "station-hp",
+      "zoom-control",
+      "build-wheel",
+      "wheel-hub-back",
+      "alarm-frame",
+      "healthbars",
+      "minimap"
+    ]
+  },
+  {
+    "aim": 220,
+    "why": "outside dock range and past |dy| > 164 — the arrow is drawn here",
+    "spawn": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "station": {
+      "x": 2064,
+      "y": 1200
+    },
+    "ship": {
+      "x": 2071.1,
+      "y": 1399.8
+    },
+    "distanceToStation": 200,
+    "dyToStation": 199.8,
+    "dockRange": 160,
+    "arrowThresholdDy": 164,
+    "buildButtonPressedAt": null,
+    "buildButtonDrawn": false,
+    "alarmPolls": 2,
+    "alarmFrameDrawn": true,
+    "coreHp": 74.425,
+    "stamp": {
+      "text": "0910de2*",
+      "visible": true
+    },
+    "wheel": null,
+    "arrow": {
+      "x": 384.91522991342663,
+      "y": 69,
+      "width": 20.98660751511727,
+      "height": 22.860585905561962
+    },
+    "wheelOverArrow": null,
+    "ids": [
+      "ship-local",
+      "build-badge",
+      "pause-button",
+      "ore-hud",
+      "banked-total",
+      "station-hp",
+      "zoom-control",
+      "alarm-frame",
+      "alarm-arrow",
+      "onboarding",
+      "healthbars",
+      "nameplates",
+      "minimap"
+    ]
+  }
+]
