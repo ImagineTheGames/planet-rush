@@ -250,6 +250,66 @@ export function runSection(
   };
 }
 
+/**
+ * Fold shard artifacts of the same section back into one {@link SectionRun}.
+ *
+ * A section is a clean cross product of lineups × seeds and `runBotMatch(seed,
+ * slots)` reads nothing but its own two arguments — no shared state, no clock,
+ * no accumulator carried between matches. So splitting a seed span across
+ * processes and concatenating the results is not an approximation of the long
+ * run, it **is** the long run, and a0-126 proves that rather than asserting it
+ * (`evidence/a0-126-the-last-two-points/shard-identity.txt`): the same span run
+ * as one process and as four shards produces byte-identical match rows.
+ *
+ * That matters because the sample size a ceiling question needs is an order of
+ * magnitude past what a "did this move" question needed. 223 matches is 45
+ * seconds a shard and six minutes single-file; 2400 is an hour of one core and
+ * eight minutes of eight.
+ *
+ * Rejects a mixed bag loudly: shards of different sections, or two shards
+ * claiming the same seed, are a mistake in the run script and not something to
+ * average over.
+ */
+export function mergeSections(shards: readonly SectionRun[]): SectionRun {
+  if (shards.length === 0) throw new Error('mergeSections: no shards');
+  const head = shards[0]!;
+  const pools = { leavesBy: {}, decisionsBy: {}, deathsBy: {}, seatMatchesBy: {} } as Pick<
+    SectionRun,
+    'leavesBy' | 'decisionsBy' | 'deathsBy' | 'seatMatchesBy'
+  >;
+  const matches: MatchRow[] = [];
+  const seeds: number[] = [];
+  const seen = new Set<string>();
+  for (const shard of shards) {
+    if (shard.section !== head.section) {
+      throw new Error(`mergeSections: shard is section ${shard.section}, expected ${head.section}`);
+    }
+    if (shard.rotations !== head.rotations) {
+      throw new Error(`mergeSections: shard has ${shard.rotations} rotations, expected ${head.rotations}`);
+    }
+    if (shard.ceilingSeconds !== head.ceilingSeconds) {
+      throw new Error(`mergeSections: shard ran under a ${shard.ceilingSeconds}s ceiling, expected ${head.ceilingSeconds}`);
+    }
+    for (const row of shard.matches) {
+      const key = `${row.lineup}#${row.seed}`;
+      if (seen.has(key)) throw new Error(`mergeSections: ${key} appears in two shards`);
+      seen.add(key);
+      matches.push(row);
+    }
+    for (const seed of shard.seeds) if (!seeds.includes(seed)) seeds.push(seed);
+    for (const [c, by] of Object.entries(shard.leavesBy)) {
+      const into = (pools.leavesBy[c] ??= {});
+      for (const [leaf, ticks] of Object.entries(by)) add(into, leaf, ticks);
+    }
+    for (const [c, n] of Object.entries(shard.decisionsBy)) add(pools.decisionsBy, c, n);
+    for (const [c, n] of Object.entries(shard.deathsBy)) add(pools.deathsBy, c, n);
+    for (const [c, n] of Object.entries(shard.seatMatchesBy)) add(pools.seatMatchesBy, c, n);
+  }
+  seeds.sort((a, b) => a - b);
+  matches.sort((a, b) => (a.lineup === b.lineup ? a.seed - b.seed : a.lineup < b.lineup ? -1 : 1));
+  return { ...head, seeds, matches, ...pools };
+}
+
 // ---------------------------------------------------------------------------
 // The five sections
 // ---------------------------------------------------------------------------
