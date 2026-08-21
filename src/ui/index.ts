@@ -33,7 +33,7 @@
  */
 
 export { Hud } from './hud';
-export type { HudFrame } from './hud';
+export type { HudFrame, HostChromeRect } from './hud';
 
 // The latch every screen shell tears down through, so a promise, a timer or a
 // socket message that lands after `teardown()` cannot draw into destroyed

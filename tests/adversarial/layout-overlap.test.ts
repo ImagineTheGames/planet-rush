@@ -75,81 +75,73 @@ import {
 import type { Cover, Frame } from './layout-model';
 
 /**
- * **The a0-122 findings, pinned.**
+ * **The a0-122 findings, pinned — one line left of twenty-four.**
  * `state | viewport | coverer | covered`, one line per cell that breaches today.
  *
- * Five defects, and every one of them is the same class as the six above: a
- * fixed element drawn over another fixed element, on a screen shape nobody had
- * put a ruler to. They ship pinned rather than fixed because QA does not own
- * `src/` — `tests/reports/a0-122-overlaps.md` is the write-up each one is a
- * reproduction for, with the rects and the frame counts.
+ * a0-122 pinned five defects here because QA does not own `src/`. **a0-125 landed
+ * four of the five**, and the arithmetic of that is in the list below: it was
+ * twenty-four lines and it is one.
  *
- *  1. **`fullscreen-reenter` over `station-hp`** — 462 frames, phone only, every
- *     match state. The re-enter-fullscreen affordance
- *     (`@render/fullscreen-affordance`) hugs the top-right of the GLASS at margin
- *     12; the HOME readout hugs the top-right of the CONTENT BOX at `HUD_PAD` 16.
- *     Both are `top-right`, a0-103 asserted each reaches its own corner, and
- *     nobody asked whether they reach the same one. On the phone the affordance
- *     takes 44×30 of a 140×30 readout — 31% of own-station HP, the number GDD
- *     §2.2 puts in that corner — from the moment the player leaves fullscreen.
- *     Desktop is clear because `FullscreenLifecycle.affordanceVisible` is
- *     touch-only; the ultrawides are clear because the box is far inside the glass.
+ *  1. **`fullscreen-reenter` over `station-hp`** — 462 frames, phone, every match
+ *     state. **FIXED (a0-125 D1).** The affordance hugged the top-right of the
+ *     GLASS at margin 12 and the HOME readout the top-right of the CONTENT BOX at
+ *     `HUD_PAD` 16; a0-103 asserted each reached its own corner and nobody asked
+ *     whether they reached the same one. The HOME column now steps left by exactly
+ *     the intrusion while the button is up — `src/ui/hud-geometry.ts`
+ *     `glassCornerReserve`, declared as a row in `src/ui/anchor-reach.ts`
+ *     `LAYOUT_RESERVATIONS` — and the missing word the registry could not say has
+ *     one: `LayoutSurface`, with `cornerRivals` as the check nobody had.
  *  2. **`net-ping` over `alarm-arrow`** and
- *  3. **`build-badge` over `alarm-arrow`** — 21 and 22 frames. The two dev stamps
- *     stack in the bottom-left on `badgeRoot`, which `main.ts` adds to the stage
- *     AFTER `gameRoot`, so they are over the whole game. On the bearings that put
- *     the arrow home in that corner the ping stamp takes 16% of it. a0-103 lifted
- *     both stamps clear of the controls strip; nothing lifted them clear of a mark
- *     that moves.
- *  4. **`alarm-arrow` over `controls-strip`** — 440 of 1,440 alarm frames, on the
- *     desktop and both ultrawides. This is a0-116 exactly, one element over: the
- *     arrow yields to `HUD_READOUT_IDS` and that list leaves the strip out with an
- *     argument — *"furniture the thumb finds, not type the eye reads"*. The
- *     argument was written about a world LABEL landing on it (a0-115), and on a
- *     desktop there is no thumb and the strip is nothing but type. Whether it is a
- *     defect or an accepted exception is a ui/design call and not QA's; it is
- *     pinned so that the call gets made rather than forgotten.
- *  5. **`build-wheel` over `alarm-arrow`** — 38 frames, phone only. The wheel's
- *     registered footprint is what it FILLS, halo included (a0-100's own finding:
- *     318.5px against a 276.5px disc), and on a 384px-tall screen that reaches the
- *     edge inset the arrow rides. It is the HALO the arrow is under, not the disc.
+ *  3. **`build-badge` over `alarm-arrow`** — 21 and 22 frames. **FIXED (a0-125).**
+ *  4. **`alarm-arrow` over `controls-strip`** — 440 of 1,440 alarm frames, desktop
+ *     and both ultrawides. **FIXED (a0-125).** All three are one rule and were
+ *     answered once: the arrow home gives up radius — never bearing — to clear
+ *     every FIXED rect on the glass, in either direction, and may overlap only
+ *     WORLD surfaces. `src/ui/layout-exclusions.ts` `ARROW_KEEPOUT_IDS`, which is
+ *     deliberately not `HUD_READOUT_IDS`: that list is what a world LABEL may not
+ *     enter, and its "furniture the thumb finds" argument was written about a
+ *     nameplate, not about a screen mark on a desktop that has no thumb. The two
+ *     stamps are `@render`/`@net` elements the HUD cannot measure, so `main.ts`
+ *     hands their rects in on the frame (`HudFrame.hostChrome`).
+ *  5. **`build-wheel` over `alarm-arrow`** — 38 frames, phone only, wheel open
+ *     under alarm. **KEPT, and the one line below.** a0-125 measured it and found
+ *     no position that fixes it:
+ *
+ *      - The yield that answered 2–4 cannot answer this one. It slides the arrow
+ *        INWARD along its own ray, and the wheel is CENTRED: pulling a mark toward
+ *        the middle cannot get it out of the middle. Fed the wheel's rect, the
+ *        solver walks the arrow through the centre and out the far side, which is
+ *        an arrow that lies about the bearing — the one thing a0-116 forbids.
+ *      - On **18 of the 38 frames the arrow is not within the wheel's filled halo
+ *        at all.** The registered footprint is a square that models a circle
+ *        (`wheelFootprint`, 318.5 px on this phone), and at the diagonal bearings
+ *        the arrow sits in a corner of that square — 213.9 px from the centre of a
+ *        halo whose outermost filled band ends at 159.3. This is limit #4 of the
+ *        a0-122 report, "a layout rect is not always an ink box", the same one
+ *        `entry-eyebrow` over `entry-title` is carried for.
+ *      - On the other 20 the arrow reaches the halo's outer bands, and on **7 of
+ *        those it reaches the wheel's drawn disc — by 3.3 px, at its deepest**,
+ *        with the arrow's bounding box; the triangle's own ink less than that.
+ *        Those 7 are the top-centre bearings on a 384 px-tall phone, where the
+ *        wave clock's own rect (a0-116, which the arrow must clear) ends 31.7 px
+ *        down and the wheel's footprint begins at 32.75. **There is one pixel of
+ *        band between them and the arrow is 23 px tall**: no position on that edge
+ *        clears both, and the ruling that the clock wins is a0-116's, already made.
+ *
+ *     So it is carried as a pin and not as an allowance, on purpose. An allowance
+ *     would excuse this pair anywhere in that state, including a future frame where
+ *     the arrow lands in the middle of the disc; the pin excuses exactly one cell,
+ *     and it fails the day the halo's span or the clock's compact row changes the
+ *     geometry that makes it unavoidable — which is when the call should be re-made.
  *
  * The list is subtracted rather than skipped at measurement time, so a cell that
  * is pinned AND breaches for a second, unrelated reason is still only one line to
  * remove once the first is fixed.
  */
 const KNOWN_COVERS: readonly string[] = [
-  // 1 — the re-enter-fullscreen affordance over own-station HP.
-  'match-hud | phone-798x384 | fullscreen-reenter | station-hp',
-  'match-prompt | phone-798x384 | fullscreen-reenter | station-hp',
-  'match-wheel | phone-798x384 | fullscreen-reenter | station-hp',
-  'match-alarm | phone-798x384 | fullscreen-reenter | station-hp',
-  'match-alarm-wheel | phone-798x384 | fullscreen-reenter | station-hp',
-  // 2 — the ping stamp over the arrow home.
-  'match-alarm | phone-798x384 | net-ping | alarm-arrow',
-  'match-alarm | desktop-1280x800 | net-ping | alarm-arrow',
-  'match-alarm | ultrawide-3840x1080 | net-ping | alarm-arrow',
-  'match-alarm-wheel | phone-798x384 | net-ping | alarm-arrow',
-  'match-alarm-wheel | desktop-1280x800 | net-ping | alarm-arrow',
-  // 3 — the build stamp over the arrow home.
-  'match-alarm | phone-798x384 | build-badge | alarm-arrow',
-  'match-alarm | desktop-1280x800 | build-badge | alarm-arrow',
-  'match-alarm | ultrawide-3440x1440 | build-badge | alarm-arrow',
-  'match-alarm | ultrawide-3840x1080 | build-badge | alarm-arrow',
-  'match-alarm-wheel | phone-798x384 | build-badge | alarm-arrow',
-  'match-alarm-wheel | desktop-1280x800 | build-badge | alarm-arrow',
-  'match-alarm-wheel | ultrawide-3840x1080 | build-badge | alarm-arrow',
-  // 4 — the arrow home over the controls strip (a0-116, one element over).
-  'match-alarm | desktop-1280x800 | alarm-arrow | controls-strip',
-  'match-alarm | ultrawide-3440x1440 | alarm-arrow | controls-strip',
-  'match-alarm | ultrawide-3840x1080 | alarm-arrow | controls-strip',
-  'match-alarm-wheel | desktop-1280x800 | alarm-arrow | controls-strip',
-  'match-alarm-wheel | ultrawide-3440x1440 | alarm-arrow | controls-strip',
-  'match-alarm-wheel | ultrawide-3840x1080 | alarm-arrow | controls-strip',
-  // 5 — the wheel's halo over the arrow home.
+  // 5 — the wheel's halo over the arrow home. Kept, measured, argued above.
   'match-alarm-wheel | phone-798x384 | build-wheel | alarm-arrow',
 ];
-
 /** The cell a finding is pinned under — the base state (variant suffix dropped,
  *  so 360 bearings pin as one line), the viewport, and the ordered pair. */
 const cell = (frame: Frame, over: string, under: string): string =>

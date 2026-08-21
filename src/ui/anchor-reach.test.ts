@@ -10,18 +10,35 @@ import { describe, expect, it } from 'vitest';
 import type { AnchorRegion, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import { BADGE_STRIP_LIFT } from '@render/build-badge';
+import {
+  FS_AFFORDANCE_ANCHOR,
+  FS_AFFORDANCE_ID,
+  writeAffordanceRect,
+} from '@render/fullscreen-affordance';
 import { PING_BADGE_STACK_LIFT } from '../net/ping-badge';
 import {
   ANCHOR_EDGES,
+  CONTENT_BOUND_IDS,
   LAYOUT_RESERVATIONS,
   anchorEdges,
+  anchorFrame,
+  cornerRivals,
+  describeCornerRival,
   describeReachViolation,
   edgeGap,
   reachViolations,
   reservationsFor,
   reservedPx,
+  surfaceOf,
 } from './anchor-reach';
-import { ORE_LABEL_LEADING, stationChromeHeight } from './hud-geometry';
+import {
+  glassCornerReserve,
+  HUD_PAD,
+  ORE_LABEL_LEADING,
+  stationChromeHeight,
+  stationHpBounds,
+} from './hud-geometry';
+import { contentBox } from './viewport';
 import { hudMetrics, hudSpace, SCRIM_CORE } from './instrument';
 import { MINIMAP_FIRE_COLUMN, MINIMAP_STRIP_CLEARANCE } from './minimap';
 import { ZOOM_CONTROL_GAP } from './zoom-control';
@@ -263,5 +280,147 @@ describe('LAYOUT_RESERVATIONS — every declared gap, and every number it mirror
   it('an id with no row reserves nothing', () => {
     expect(reservedPx('station-hp', 'right', { frame: FRAME, isTouch: false })).toBe(0);
     expect(reservedPx('ore-hud', 'top', { frame: FRAME, isTouch: false })).toBe(0);
+  });
+});
+
+/**
+ * a0-125 D1 — the word the registry did not have.
+ *
+ * `station-hp` and `fullscreen-reenter` both declare `top-right`, and until a0-125
+ * nothing anywhere could say that the first means the top-right of the CONTENT BOX
+ * and the second the top-right of the GLASS. On a phone those are the same corner,
+ * the button took 31% of the readout on 462 swept frames, and both halves of the
+ * placement contract were green the whole time.
+ */
+describe('whose box does it go in — LayoutSurface (a0-125)', () => {
+  /** The profile a0-122, a0-118, a0-114 and a0-111 all measured on. */
+  const PHONE: Viewport = { width: 798, height: 384 };
+  /** 32:9 — where the content box sits hundreds of px inside the glass (a0-74). */
+  const ULTRAWIDE: Viewport = { width: 3840, height: 1080 };
+  const glassRect = (vp: Viewport): Rect => ({ x: 0, y: 0, width: vp.width, height: vp.height });
+
+  it('the HUD chrome is content-bound and the host chrome is not', () => {
+    for (const id of CONTENT_BOUND_IDS) expect(surfaceOf(id)).toBe('content');
+    // The three `main.ts` lays out against the logical viewport — the frame they
+    // promised, and the frame the affordance's own margin 12 is measured from.
+    expect(surfaceOf(FS_AFFORDANCE_ID)).toBe('glass');
+    expect(surfaceOf('build-badge')).toBe('glass');
+    expect(surfaceOf('net-ping')).toBe('glass');
+  });
+
+  it('anchorFrame hands each id the box it was laid out in', () => {
+    const glass = glassRect(ULTRAWIDE);
+    const content = contentBox(ULTRAWIDE);
+    expect(anchorFrame('station-hp', glass, content)).toBe(content);
+    expect(anchorFrame(FS_AFFORDANCE_ID, glass, content)).toBe(glass);
+    // The case that hid the defect for so long: on a phone the two boxes ARE the
+    // same rect, so the distinction costs nothing and says nothing — until two
+    // elements reach the same corner from opposite sides of it.
+    const phoneGlass = glassRect(PHONE);
+    const phoneContent = contentBox(PHONE);
+    expect(phoneContent).toEqual(phoneGlass);
+  });
+
+  it('the a0-125 D1 pair is exactly what cornerRivals names, before the fix', () => {
+    // The pre-a0-125 geometry, stated as the two entries the registry really held:
+    // HOME hard against the content box's right edge at HUD_PAD, the button hard
+    // against the glass at its own margin 12.
+    const glass = glassRect(PHONE);
+    const content = contentBox(PHONE);
+    const hp = stationHpBounds(content.width);
+    const before: LayoutEntry[] = [
+      { id: 'station-hp', anchor: { region: 'top-right', margin: HUD_PAD }, bounds: { ...hp, x: content.x + hp.x } },
+      {
+        id: FS_AFFORDANCE_ID,
+        anchor: FS_AFFORDANCE_ANCHOR,
+        bounds: writeAffordanceRect(PHONE.width, PHONE.height, { x: 0, y: 0, width: 0, height: 0 }),
+      },
+    ];
+    // Both halves of a0-103's contract pass on this frame. That is the finding.
+    for (const e of before) {
+      expect(rectContains(resolveAnchor(e.anchor, PHONE), e.bounds)).toBe(true);
+    }
+    expect(reachViolations(before, PHONE, { isTouch: true, frameFor: (id) => (surfaceOf(id) === 'content' ? content : undefined) })).toEqual([]);
+
+    const rivals = cornerRivals(before, glass, content);
+    expect(rivals).toHaveLength(1);
+    expect(rivals[0]!.region).toBe('top-right');
+    expect(new Set([rivals[0]!.surfaceA, rivals[0]!.surfaceB])).toEqual(new Set(['glass', 'content']));
+    // a0-122's own measurement: 44x30 of a 140x30 readout.
+    expect(rivals[0]!.overlap.width).toBeCloseTo(44, 6);
+    expect(rivals[0]!.overlap.height).toBeCloseTo(30, 6);
+    expect(describeCornerRival(rivals[0]!)).toContain('top-right');
+  });
+
+  it('…and nothing it names once the column has stepped aside', () => {
+    const glass = glassRect(PHONE);
+    const content = contentBox(PHONE);
+    const reserve = glassCornerReserve(PHONE.width, content.x + content.width, true);
+    expect(reserve).toBeGreaterThan(0);
+    const hp = stationHpBounds(content.width);
+    const after: LayoutEntry[] = [
+      {
+        id: 'station-hp',
+        anchor: { region: 'top-right', margin: HUD_PAD },
+        bounds: { ...hp, x: content.x + hp.x - reserve },
+      },
+      {
+        id: FS_AFFORDANCE_ID,
+        anchor: FS_AFFORDANCE_ANCHOR,
+        bounds: writeAffordanceRect(PHONE.width, PHONE.height, { x: 0, y: 0, width: 0, height: 0 }),
+      },
+    ];
+    expect(cornerRivals(after, glass, content)).toEqual([]);
+    // …and the gap it now leaves is a DECLARED one, not drift: the reach check
+    // still passes, because the reservation row speaks for exactly this many px.
+    expect(
+      reachViolations(after, PHONE, {
+        isTouch: true,
+        affordanceUp: true,
+        frameFor: (id) => (surfaceOf(id) === 'content' ? content : undefined),
+      }),
+    ).toEqual([]);
+    // With the button down, the same gap is unexplained and the check says so —
+    // which is what stops the column from quietly staying out of its corner.
+    expect(
+      reachViolations(after, PHONE, {
+        isTouch: true,
+        affordanceUp: false,
+        frameFor: (id) => (surfaceOf(id) === 'content' ? content : undefined),
+      }).map((v) => `${v.id}|${v.edge}`),
+    ).toEqual(['station-hp|right']);
+  });
+
+  it('the two corners are hundreds of px apart at 32:9, and the reserve is zero', () => {
+    // Both of the reasons a0-125 was told to preserve, as one assertion: the
+    // ultrawides are clean because the content box is nowhere near the glass, so a
+    // fix that moved something on all four profiles would be the bug.
+    const content = contentBox(ULTRAWIDE);
+    expect(glassCornerReserve(ULTRAWIDE.width, content.x + content.width, true)).toBe(0);
+    expect(reservedPx('station-hp', 'right', { frame: content, glassWidth: ULTRAWIDE.width, isTouch: true, affordanceUp: true })).toBe(0);
+  });
+
+  it('HOME and the VIEW chip reserve the same number, so the column stays a column', () => {
+    const content = contentBox(PHONE);
+    const ctx = { frame: content, glassWidth: PHONE.width, isTouch: true, affordanceUp: true };
+    const home = reservedPx('station-hp', 'right', ctx);
+    expect(home).toBeGreaterThan(0);
+    expect(reservedPx('zoom-control', 'right', ctx)).toBe(home);
+    // …and nothing at all while the button is down (a0-103: reserved when the
+    // element is there, and not otherwise).
+    const down = { ...ctx, affordanceUp: false };
+    expect(reservedPx('station-hp', 'right', down)).toBe(0);
+    expect(reservedPx('zoom-control', 'right', down)).toBe(0);
+  });
+
+  it('an element with no edge promise is never a rival', () => {
+    // `full` and `center` name a zone and claim no bezel, so two of them sharing a
+    // region is not the question this check asks (ANCHOR_EDGES, the header's §1).
+    const glass: Rect = { x: 0, y: 0, width: 798, height: 384 };
+    const entries: LayoutEntry[] = [
+      { id: 'onboarding', anchor: { region: 'full', margin: 16 }, bounds: { x: 0, y: 0, width: 100, height: 100 } },
+      { id: 'ore-hud', anchor: { region: 'full', margin: 16 }, bounds: { x: 0, y: 0, width: 100, height: 100 } },
+    ];
+    expect(cornerRivals(entries, glass, glass)).toEqual([]);
   });
 });

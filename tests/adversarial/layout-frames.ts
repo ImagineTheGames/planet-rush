@@ -96,12 +96,18 @@ import {
   promptLineBox,
   promptWithdraws,
   promptWrapWidth,
+  glassCornerReserve,
   stationHpBounds,
   waveClockLayout,
   wheelFootprint,
 } from '../../src/ui/hud-geometry';
 import { homeArrow } from '../../src/ui/alarm';
-import { HUD_READOUT_IDS, labelRepeatsOwner, labelYieldsToReadouts } from '../../src/ui/layout-exclusions';
+import {
+  ARROW_KEEPOUT_IDS,
+  HUD_READOUT_IDS,
+  labelRepeatsOwner,
+  labelYieldsToReadouts,
+} from '../../src/ui/layout-exclusions';
 import type { PlacedLabel } from '../../src/ui/layout-exclusions';
 import {
   NAMEPLATE_FONT_SIZE,
@@ -311,37 +317,38 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
     note: 'the asteroid-wave clock (GDD §2.2, top-centre)',
   });
 
-  const hp = stationHpBounds(box.width);
+  // Every fixed rect on the glass comes from ONE place (`fixedChrome`), because
+  // the two keep-out tables pick from it and a builder that computed its own copy
+  // would let the frame and the keep-out disagree about where an element is —
+  // which is the whole class a0-122 exists to find. `./hud` `keepOutCandidates`
+  // is the same arrangement in the shipped view.
+  const chrome = fixedChrome(p, s);
   out.push({
     id: 'station-hp',
     role: 'read',
     surface: 'canvas',
-    bounds: { ...hp, x: box.x + hp.x },
+    bounds: chrome['station-hp'] as Rect,
     note: 'own-station HP (GDD §2.2, top-right)',
   });
 
-  const zoom = zoomControlBounds(box.width, box.height, isTouch);
+  const zoom = chrome[ZOOM_CONTROL_ID];
   if (zoom) {
     out.push({
       id: ZOOM_CONTROL_ID,
       role: 'press',
       surface: 'canvas',
-      bounds: { ...zoom, x: box.x + zoom.x },
+      bounds: zoom,
       note: 'the VIEW zoom chip (a0-74, touch only)',
     });
   }
 
-  if (showControlsStrip(isTouch)) {
+  const strip = chrome['controls-strip'];
+  if (strip) {
     out.push({
       id: 'controls-strip',
       role: 'read',
       surface: 'canvas',
-      bounds: {
-        x: box.x,
-        y: vp.height - MIRRORED.STRIP_ROW - MIRRORED.STRIP_PAD,
-        width: box.width,
-        height: MIRRORED.STRIP_ROW + MIRRORED.STRIP_PAD,
-      },
+      bounds: strip,
       note: 'the key-binding strip along the bottom (GDD §2.2)',
     });
   }
@@ -382,7 +389,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
         note: 'the under-attack frame’s stroke',
       });
     }
-    const arrow = alarmArrow(p, s, s.bypass === 'a0-116' ? [] : readoutsFor(p, s));
+    const arrow = alarmArrow(p, s, s.bypass === 'a0-116' ? [] : arrowKeepOutFor(p, s));
     if (arrow) {
       out.push({
         id: 'alarm-arrow',
@@ -425,29 +432,18 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
 
   // --- platform chrome, over the HUD ----------------------------------------
 
-  const lift = showControlsStrip(isTouch) ? BADGE_STRIP_LIFT : 0;
-  const scratch: Rect = { x: 0, y: 0, width: 0, height: 0 };
   out.push({
     id: 'build-badge',
     role: 'read',
     surface: 'canvas',
-    bounds: { ...writeBadgeRect(STAMP_TEXT.width, STAMP_TEXT.height, vp.width, vp.height, { ...scratch }, lift) },
+    bounds: chrome['build-badge'] as Rect,
     note: 'the build stamp (every evidence frame is read off it)',
   });
   out.push({
     id: 'net-ping',
     role: 'read',
     surface: 'canvas',
-    bounds: {
-      ...writePingRect(
-        STAMP_TEXT.width,
-        STAMP_TEXT.height,
-        vp.width,
-        vp.height,
-        { ...scratch },
-        lift + PING_BADGE_STACK_LIFT,
-      ),
-    },
+    bounds: chrome['net-ping'] as Rect,
     note: 'the ping stamp',
   });
   // The re-enter-fullscreen button (`@render/fullscreen-affordance`), drawn only
@@ -455,12 +451,13 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
   // — only on TOUCH: *"desktop is untouched; keyboard/mouse never auto-fullscreens"*.
   // So this is a phone element, and painting it on a desktop frame would be the
   // sweep inventing a defect rather than finding one.
-  if (isTouch) {
+  const fsRect = chrome[FS_AFFORDANCE_ID];
+  if (fsRect) {
     out.push({
       id: FS_AFFORDANCE_ID,
       role: 'press',
       surface: 'canvas',
-      bounds: { ...writeAffordanceRect(vp.width, vp.height, { ...scratch }) },
+      bounds: fsRect,
       note: 'the re-enter-fullscreen affordance (drawn after a real exit, touch only)',
     });
   }
@@ -527,26 +524,83 @@ function waveClock(p: Profile, wheelOpen: boolean): Rect {
   return { ...layout.bounds, x: layout.bounds.x + box.x };
 }
 
-/** The readout rects a world mark must clear this frame — a0-115's own list
- *  (`HUD_READOUT_IDS`), built from the same geometry the frame paints. */
-function readoutsFor(p: Profile, s: HudSignals): Rect[] {
-  const box = contentBox(p.vp);
+/**
+ * Every FIXED rect on the glass this frame, by registry id — the candidate list
+ * both keep-out tables pick from (`src/ui/hud.ts` `keepOutCandidates`, the same
+ * arrangement in the shipped view).
+ *
+ * `null` means the element is not drawn on this profile, and an element that is
+ * not drawn is not in anybody's way: the strip is desktop-only
+ * (`showControlsStrip`), the VIEW chip and the re-enter-fullscreen button are
+ * touch-only.
+ *
+ * The top-right column's `x` carries `glassCornerReserve` — a0-125's D1. The
+ * affordance is drawn on exactly the frames this record gives it a rect on, so
+ * "the button is up" and "the column stands off its corner" are one condition
+ * here as they are in `./hud`.
+ */
+function fixedChrome(p: Profile, s: HudSignals): Record<string, Rect | null> {
+  const { vp, isTouch } = p;
+  const box = contentBox(vp);
   const ore = oreCluster(p);
+  const reserve = glassCornerReserve(vp.width, box.x + box.width, isTouch);
   const hp = stationHpBounds(box.width);
-  const zoom = zoomControlBounds(box.width, box.height, p.isTouch);
-  const byId: Record<string, Rect | null> = {
+  const zoom = zoomControlBounds(box.width, box.height, isTouch);
+  const lift = showControlsStrip(isTouch) ? BADGE_STRIP_LIFT : 0;
+  const blank = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
+  return {
     'ore-hud': ore.cluster,
     'banked-total': ore.numeral,
     'wave-clock': waveClock(p, s.wheelOpen),
-    'station-hp': { ...hp, x: box.x + hp.x },
-    'zoom-control': zoom ? { ...zoom, x: box.x + zoom.x } : null,
+    'station-hp': { ...hp, x: box.x + hp.x - reserve },
+    [ZOOM_CONTROL_ID]: zoom ? { ...zoom, x: box.x + zoom.x - reserve } : null,
+    'controls-strip': showControlsStrip(isTouch)
+      ? {
+          x: box.x,
+          y: vp.height - MIRRORED.STRIP_ROW - MIRRORED.STRIP_PAD,
+          width: box.width,
+          height: MIRRORED.STRIP_ROW + MIRRORED.STRIP_PAD,
+        }
+      : null,
+    'build-badge': writeBadgeRect(STAMP_TEXT.width, STAMP_TEXT.height, vp.width, vp.height, blank(), lift),
+    'net-ping': writePingRect(
+      STAMP_TEXT.width,
+      STAMP_TEXT.height,
+      vp.width,
+      vp.height,
+      blank(),
+      lift + PING_BADGE_STACK_LIFT,
+    ),
+    [FS_AFFORDANCE_ID]: isTouch ? writeAffordanceRect(vp.width, vp.height, blank()) : null,
   };
+}
+
+/** The rects named by `ids`, in that order, skipping the ones this profile does
+ *  not draw — `src/ui/layout-exclusions.ts` `readoutRects`, in the model. */
+function pickChrome(chrome: Record<string, Rect | null>, ids: readonly string[]): Rect[] {
   const out: Rect[] = [];
-  for (const id of HUD_READOUT_IDS) {
-    const r = byId[id];
+  for (const id of ids) {
+    const r = chrome[id];
     if (r) out.push(r);
   }
   return out;
+}
+
+/** The readout rects a WORLD LABEL must clear this frame — a0-115's own list
+ *  (`HUD_READOUT_IDS`), built from the same geometry the frame paints. */
+function readoutsFor(p: Profile, s: HudSignals): Rect[] {
+  return pickChrome(fixedChrome(p, s), HUD_READOUT_IDS);
+}
+
+/**
+ * What the ARROW HOME must clear this frame — `ARROW_KEEPOUT_IDS`, a0-125's list
+ * and a longer one: three of a0-122's five findings were this mark covered by an
+ * element the world-label list does not name (both dev stamps and the desktop
+ * strip), and a fourth arrived the moment D1's fix moved the HOME cluster out of
+ * the corner that had been shielding it from the fullscreen button.
+ */
+function arrowKeepOutFor(p: Profile, s: HudSignals): Rect[] {
+  return pickChrome(fixedChrome(p, s), ARROW_KEEPOUT_IDS);
 }
 
 /**

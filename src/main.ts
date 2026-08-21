@@ -353,6 +353,7 @@ import {
 } from './ui';
 import type {
   HudFrame,
+  HostChromeRect,
   Combatant,
   DifficultyTable,
   MinimapInsets,
@@ -2478,6 +2479,15 @@ async function boot(): Promise<void> {
   // FIRE button all live in logical (landscape) space.
   bindTouchControls(app.canvas, touch, window, toLogical);
 
+  /**
+   * The rects of the chrome drawn OVER the HUD, refilled in place every frame and
+   * handed to it on the frame ({@link HudFrame.hostChrome}). Three entries at
+   * most — the two dev stamps and the re-enter-fullscreen affordance — and each
+   * `bounds` aliases that element's own reused Rect, so refilling this allocates
+   * only the three entry objects and only while they are on screen.
+   */
+  const hostChrome: HostChromeRect[] = [];
+
   // --- HUD feed: one reusable mutable HudFrame, overwritten in place every frame
   //     so the feed path allocates nothing (GDD §4.3). All fields are primitives.
   const hudFrame: { -readonly [K in keyof HudFrame]: HudFrame[K] } = {
@@ -4016,6 +4026,38 @@ async function boot(): Promise<void> {
     // holds clear of this; everything hung off the top never needed it, which is
     // why the field was dead until the prompt was found cut off on a phone.
     hudFrame.safeInsets = hudInsets;
+
+    // The chrome that is drawn OVER the HUD, handed to it as rects (a0-125).
+    //
+    // Three elements, none of them the HUD's: the build stamp and the ping stamp
+    // ride `badgeRoot`, which is added to the STAGE after `gameRoot` — so they are
+    // over the whole game, not merely over the HUD — and the re-enter-fullscreen
+    // affordance is the last child of `gameRoot`. a0-122's sweep found the alarm
+    // arrow 63% under one stamp and 62% under the other, and a0-125's D1 fix
+    // (which steps the HOME cluster out of the corner the affordance owns) put the
+    // arrow under the button as well. The HUD gives up radius to clear all three
+    // (`@ui` `ARROW_KEEPOUT_IDS`), and it can only clear a rect it is given: their
+    // widths come from their own measured text, in modules the HUD does not draw.
+    //
+    // `layoutBounds` writes into each element's own reused Rect and hands it back,
+    // so the entries below alias live storage and the array is refilled rather
+    // than rebuilt: no allocation on the steady path (GDD §4.3).
+    const glassW = transform.logicalWidth;
+    const glassH = transform.logicalHeight;
+    hostChrome.length = 0;
+    if (buildBadge.visible) {
+      hostChrome.push({ id: BADGE_ID, bounds: buildBadge.layoutBounds(glassW, glassH) });
+    }
+    if (pingBadge.visible) {
+      hostChrome.push({ id: PING_BADGE_ID, bounds: pingBadge.layoutBounds(glassW, glassH) });
+    }
+    if (fsAffordance.visible) {
+      hostChrome.push({ id: FS_AFFORDANCE_ID, bounds: fsAffordance.layoutBounds(glassW, glassH) });
+    }
+    hudFrame.hostChrome = hostChrome;
+    // …and whether the button is up, which is what moves the HOME column out of
+    // the corner it shares with it (a0-125 D1, `@ui` `glassCornerReserve`).
+    hudFrame.fullscreenAffordance = fsAffordance.visible;
 
     const station = stationOf(world, LOCAL_PLAYER);
     if (station) {

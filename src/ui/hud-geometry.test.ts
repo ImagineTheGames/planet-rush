@@ -39,13 +39,21 @@ import { zoomControlBounds } from './zoom-control';
 import { affordanceRects, buildButtonRect } from '@platform/touch-visuals';
 import { writeBadgeRect } from '../render/build-badge';
 import { writePingRect } from '../net/ping-badge';
-import { writeAffordanceRect } from '../render/fullscreen-affordance';
+import {
+  FS_AFFORDANCE_MARGIN,
+  FS_AFFORDANCE_RADIUS,
+  writeAffordanceRect,
+} from '../render/fullscreen-affordance';
 import type { MinimapInsets } from './minimap';
 import {
   wheelBounds,
   panelBounds,
   panelSize,
   stationHpBounds,
+  glassCornerReserve,
+  GLASS_CORNER_GAP,
+  FS_AFFORDANCE_MARGIN_MIRROR,
+  FS_AFFORDANCE_SIZE_MIRROR,
   stationCoreBarTrack,
   stationCoreBarFill,
   stationShieldBarTrack,
@@ -103,6 +111,7 @@ import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
 // a0-115's keep-out: the rule that a world-anchored label is never drawn inside a
 // fixed readout's rect, stated in the registry's own vocabulary next door.
 import {
+  ARROW_KEEPOUT_IDS,
   HUD_READOUT_IDS,
   READOUT_KEEPOUT_PAD,
   labelRepeatsOwner,
@@ -3380,5 +3389,181 @@ describe('one owner, two nameplates (a0-119)', () => {
     expect(labelRepeatsOwner(RUSTY, rect, [{ owner: SABLE, rect }])).toBe(false);
     // …and an empty frame is the common case, answered without touching anything.
     expect(labelRepeatsOwner(RUSTY, rect, [])).toBe(false);
+  });
+});
+
+/**
+ * a0-125 D1 — the top-right corner, and whose it is.
+ *
+ * `station-hp` declares `top-right` in the CONTENT BOX at `HUD_PAD` 16;
+ * `fullscreen-reenter` declares `top-right` on the GLASS at margin 12. On a phone
+ * that is one corner, and a0-122 measured the button taking 44x30 px of a 140x30 px
+ * readout on 462 frames. {@link glassCornerReserve} is what steps the column aside.
+ */
+describe('the top-right column and the glass corner it shares (a0-125)', () => {
+  /** The profile every one of a0-111/a0-114/a0-118/a0-122's numbers is read on. */
+  const PHONE: Viewport = { width: 798, height: 384 };
+
+  it('the two mirrored affordance constants are its own', () => {
+    // `./hud-geometry` is Pixi-free on purpose and `@render/fullscreen-affordance`
+    // carries PixiJS, so these two are mirrored — and pinned here, the same way
+    // `./anchor-reach.test.ts` pins `BADGE_STRIP_LIFT`. A drift makes the reserve
+    // the wrong size, which is a rect this suite would catch anyway; the pin is so
+    // it is caught as "the mirror moved" rather than as a mystery.
+    expect(FS_AFFORDANCE_MARGIN_MIRROR).toBe(FS_AFFORDANCE_MARGIN);
+    expect(FS_AFFORDANCE_SIZE_MIRROR).toBe(2 * FS_AFFORDANCE_RADIUS);
+  });
+
+  it('reserves nothing while the button is down', () => {
+    // a0-103's ruling, one corner over: reserved when the element is there, and
+    // not otherwise. The affordance appears only after a real exit from
+    // fullscreen, so most phone frames are this one and nothing moves on them.
+    const content = contentBox(PHONE);
+    expect(glassCornerReserve(PHONE.width, content.x + content.width, false)).toBe(0);
+  });
+
+  it('reserves exactly the intrusion, and no more, while it is up', () => {
+    const content = contentBox(PHONE);
+    const reserve = glassCornerReserve(PHONE.width, content.x + content.width, true);
+    const button = writeAffordanceRect(PHONE.width, PHONE.height, { x: 0, y: 0, width: 0, height: 0 });
+    const hp = stationHpBounds(content.width);
+    const moved: Rect = { ...hp, x: content.x + hp.x - reserve };
+    // Clear, by the same convention every other clearance in this repo keeps:
+    // touching is not covering, and the air between them is GLASS_CORNER_GAP.
+    expect(moved.x + moved.width).toBeCloseTo(button.x - GLASS_CORNER_GAP, 6);
+    // …and NOT one pixel further than it had to move: a reserve that overshot
+    // would be the dead corner a0-103 was written about.
+    const tighter = glassCornerReserve(PHONE.width, content.x + content.width, true) - 0.5;
+    expect(content.x + hp.x - tighter + hp.width).toBeGreaterThan(button.x - GLASS_CORNER_GAP);
+  });
+
+  it('is zero on both ultrawides — the profiles that were already correct', () => {
+    // The a0-125 brief's own constraint, as an assertion: on 21:9 and 32:9 the
+    // content box sits far enough inside the glass that the two corners are
+    // hundreds of px apart, and a fix that moved something there would be
+    // "fixing" a profile that had no defect.
+    for (const vp of [
+      { width: 3440, height: 1440 },
+      { width: 3840, height: 1080 },
+    ] as const) {
+      const content = contentBox(vp);
+      expect(content.x).toBeGreaterThan(100);
+      expect(glassCornerReserve(vp.width, content.x + content.width, true)).toBe(0);
+    }
+  });
+
+  it('the readout clears the button on the phone, at every wheel state', () => {
+    // The defect itself, as the rect test that failed before a0-125: 44x30 px of a
+    // 140x30 px readout, 31% of own-station HP.
+    const content = contentBox(PHONE);
+    const button = writeAffordanceRect(PHONE.width, PHONE.height, { x: 0, y: 0, width: 0, height: 0 });
+    const hp = stationHpBounds(content.width);
+    const before: Rect = { ...hp, x: content.x + hp.x };
+    const wasOverlap = rectOverlap(button, before);
+    expect(wasOverlap).not.toBeNull();
+    expect(wasOverlap!.width * wasOverlap!.height).toBeCloseTo(44 * 30, 6);
+
+    const reserve = glassCornerReserve(PHONE.width, content.x + content.width, true);
+    expect(rectOverlap(button, { ...hp, x: content.x + hp.x - reserve })).toBeNull();
+  });
+
+  it('the VIEW chip takes the same step, so the column stays a column', () => {
+    const content = contentBox(PHONE);
+    const reserve = glassCornerReserve(PHONE.width, content.x + content.width, true);
+    const hp = stationHpBounds(content.width);
+    const zoom = zoomControlBounds(content.width, content.height, true);
+    expect(zoom).not.toBeNull();
+    const homeRight = content.x + hp.x - reserve + hp.width;
+    const chipRight = content.x + zoom!.x - reserve + zoom!.width;
+    // They were flush before the step and they are flush after it — one number,
+    // one call, in `./hud` `layout` and `updateZoomControl`.
+    expect(chipRight).toBeCloseTo(homeRight, 6);
+  });
+});
+
+/**
+ * a0-125 D2/D3/D4 — the arrow home, and everything fixed on the glass.
+ *
+ * a0-116 gave this mark the WORLD LABEL's keep-out list because it was already
+ * there. a0-122's sweep then found the same arrow 63% under the ping stamp, 62%
+ * under the build stamp, and standing 21x17 px inside the desktop controls
+ * strip's type — three findings that list does not name. The rule is stated once
+ * in `./layout-exclusions` `ARROW_KEEPOUT_IDS` and applied through the same yield:
+ * radius, never bearing.
+ */
+describe('the arrow home clears everything fixed on the glass (a0-125)', () => {
+  const BEARINGS = Array.from({ length: 360 }, (_, i) => (i * Math.PI * 2) / 360);
+  const FAR = 4000;
+  const DESKTOP: Viewport = { width: 1280, height: 800 };
+
+  it('the arrow list is the readout list plus the four the sweep found', () => {
+    // A superset, not a replacement: everything a world label must clear, the
+    // arrow must clear too — the a0-116 fix is still in force.
+    for (const id of HUD_READOUT_IDS) expect(ARROW_KEEPOUT_IDS).toContain(id);
+    // …and the four a0-122 priced, each one a defect this list retires.
+    for (const id of ['controls-strip', 'build-badge', 'net-ping', 'fullscreen-reenter']) {
+      expect(ARROW_KEEPOUT_IDS).toContain(id);
+    }
+    // The exclusions are the rule's other half and they are one word: WORLD. A
+    // map of the world is a world surface, the sticks are drawn under the thumb
+    // and move, and a tell that dodged either would be dodging the world it is
+    // reporting on.
+    for (const id of ['minimap', 'healthbars', 'nameplates', 'touch-left-stick', 'touch-aim-stick']) {
+      expect(ARROW_KEEPOUT_IDS).not.toContain(id);
+    }
+    // Nothing CENTRED is on it, and cannot be: the yield reduces radius, so a
+    // blocker containing the centre would walk the arrow out the far side and
+    // make it lie about the bearing. `build-wheel` is the element this rules out,
+    // and a0-125's D5 is the finding it leaves standing.
+    expect(ARROW_KEEPOUT_IDS).not.toContain('build-wheel');
+    expect(ARROW_KEEPOUT_IDS).not.toContain('upgrade-wheel');
+  });
+
+  it('at 360 bearings it lands on neither the strip nor either stamp', () => {
+    const vp = DESKTOP;
+    const b = contentBox(vp);
+    const inner: Viewport = { width: b.width, height: b.height };
+    const centre = { x: b.width / 2, y: b.height / 2 };
+    // The three rects a0-122 measured the arrow against, in the arrow's own
+    // (content-box) space. The strip is a band across the bottom; the two stamps
+    // stack in the bottom-left, the ping one row above the build stamp — their
+    // own `writeRect`s, so a change at the drawing end lands here by itself.
+    const scratch = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
+    const lift = 26;
+    const keepOut: { id: string; r: Rect }[] = [
+      { id: 'controls-strip', r: { x: 0, y: b.height - 30, width: b.width, height: 30 } },
+      { id: 'build-badge', r: writeBadgeRect(160, 12, b.width, b.height, scratch(), lift) },
+      { id: 'net-ping', r: writePingRect(160, 12, b.width, b.height, scratch(), lift + 15) },
+    ];
+
+    let covered = 0;
+    let cleared = 0;
+    for (const bearing of BEARINGS) {
+      const home = { x: Math.cos(bearing) * FAR, y: Math.sin(bearing) * FAR };
+      const edge = homeArrow({ x: 0, y: 0 }, home, inner, ARROW_EDGE_INSET);
+      if (edge.onScreen) continue;
+      // What it was: the arrow as a0-116 left it, before this list existed.
+      const wasBox = polyBounds(arrowPoly(edge, ARROW_SIZE));
+      if (keepOut.some((k) => rectOverlap(wasBox, k.r))) covered++;
+      // …and what it is.
+      const clear = arrowClearOfReadouts(edge, centre, keepOut.map((k) => k.r));
+      const box = polyBounds(arrowPoly(clear, ARROW_SIZE));
+      for (const k of keepOut) {
+        expect(
+          rectOverlap(box, k.r),
+          `bearing ${((bearing * 180) / Math.PI).toFixed(0)}°: arrow ${fmt(box)} shares pixels with ${k.id} ${fmt(k.r)}`,
+        ).toBeNull();
+      }
+      // The bearing is the arrow's whole meaning and it is bit-identical: only
+      // the radius moved (a0-116's invariant, re-asserted for the new rects).
+      expect(clear.angle).toBe(edge.angle);
+      expect(clear.onScreen).toBe(edge.onScreen);
+      expect(clear.distance).toBe(edge.distance);
+      if (clear.x !== edge.x || clear.y !== edge.y) cleared++;
+    }
+    // The case can never pass by asserting something that was already true: the
+    // old arrow really did land on these rects, and the new one really does move.
+    expect(covered).toBeGreaterThan(0);
+    expect(cleared).toBeGreaterThan(0);
   });
 });
