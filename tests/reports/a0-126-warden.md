@@ -313,7 +313,7 @@ difference between them is sample size and nothing else.
 
 ### 4.2 · Warden
 
-| contestant | a0-121 · 32 seeds | a0-126 · 512 seeds | move | exact 95% (deep) | width before | width after | verdict (deep) |
+| contestant | a0-121 · 32 seeds × 7 | a0-126 · 512 seeds × 7 | move | exact 95% (deep) | width before | width after | verdict (deep) |
 |---|---|---|---|---|---|---|---|
 | Warden | 127 / 223 (**57.0%**) | 1844 / 3569 (**51.7%**) | -5.3 pts | 50.0% – 53.3% | 13.4 pts | 3.3 pts | INSIDE |
 | Foreman | 57 / 223 (**25.6%**) | 913 / 3569 (**25.6%**) | +0.0 pts | 24.2% – 27.0% | 11.8 pts | 2.9 pts | INSIDE |
@@ -366,7 +366,7 @@ The pooled 51.7% mixes the two and is still INSIDE, so nothing here needs fixing
 
 ### 4.4 · The excavator — the target a0-121 met
 
-| contestant | a0-121 · 32 seeds | a0-126 · 512 seeds | move | exact 95% (deep) | width before | width after | verdict (deep) |
+| contestant | a0-121 · 64 seeds × 4 | a0-126 · 256 seeds × 4 | move | exact 95% (deep) | width before | width after | verdict (deep) |
 |---|---|---|---|---|---|---|---|
 | Excavator | 124 / 255 (**48.6%**) | 481 / 1021 (**47.1%**) | -1.5 pts | 44.0% – 50.2% | 12.6 pts | 6.2 pts | INSIDE |
 | Vanguard | 70 / 255 (**27.5%**) | 265 / 1021 (**26.0%**) | -1.5 pts | 23.3% – 28.8% | 11.3 pts | 5.5 pts | INSIDE |
@@ -375,11 +375,11 @@ The pooled 51.7% mixes the two and is still INSIDE, so nothing here needs fixing
 
 *Hand-written reading.* **a0-121 met this target, and now it is provably met.** The excavator takes **47.1%** of 1021 decided ship-class matches, exact 95% **44.0% – 50.2%** — INSIDE.
 
-§2.6 flagged that a0-121's INSIDE was as thin as its OVER: 48.6% on 255 matches had an interval topping out at 54.9%, clearing the ceiling by a tenth of a point. At 4× the matches the top of the interval is 50.2%, 4.8 points clear. The correction runs the same direction as Warden's — more matches, less drama — and it is worth noticing that the instrument was not built to exonerate anybody. It moved a0-121's marginal pass to a real pass and a0-121's marginal fail to a real pass, because both were marginal for the same reason.
+§2.6 flagged that a0-121's INSIDE was as thin as its OVER: 48.6% on 255 matches had an interval topping out at 54.9%, clearing the ceiling by a tenth of a point. At 4× the matches the top of the interval is 50.2%, 4.8 points clear. The correction runs the same direction as Warden's — more matches, less drama — and it is worth noticing that the instrument was not built to exonerate anybody. It moved a0-121's marginal pass to a real pass and its marginal fail to a real pass, because both were marginal for the same reason — and then, in §4.5, it moved a0-121's third marginal call to a real **failure**. Depth is not a direction.
 
 ### 4.5 · Bolt, and the Easy pool that mostly draws
 
-| contestant | a0-121 · 32 seeds | a0-126 · 512 seeds | move | exact 95% (deep) | width before | width after | verdict (deep) |
+| contestant | a0-121 · 32 seeds × 7 | a0-126 · 256 seeds × 7 | move | exact 95% (deep) | width before | width after | verdict (deep) |
 |---|---|---|---|---|---|---|---|
 | Bolt | 10 / 12 (**83.3%**) | 64 / 95 (**67.4%**) | -16.0 pts | 57.0% – 76.6% | 46.3 pts | 19.7 pts | **OVER** |
 | Rusty | 2 / 12 (**16.7%**) | 31 / 95 (**32.6%**) | +16.0 pts | 23.4% – 43.0% | 46.3 pts | 19.7 pts | INSIDE |

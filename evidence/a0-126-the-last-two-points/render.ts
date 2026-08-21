@@ -87,10 +87,19 @@ function intervalTable(wins: readonly Win[]): string {
 
 /** The deep column beside the a0-121 column, on **the same seeds** for the
  *  overlap — the prior column is this run restricted, not a transcription. */
-function deepVsPriorTable(deepWins: readonly Win[], priorWins: readonly Win[]): string {
+function deepVsPriorTable(
+  deepWins: readonly Win[],
+  priorWins: readonly Win[],
+  deepRun: SectionRun,
+  priorRun: SectionRun,
+): string {
   const byKey = new Map(priorWins.map((w) => [w.key, w]));
+  // The column headers are read off the runs rather than written into the
+  // string: the three sections are deliberately not run to the same depth (§1),
+  // and a hardcoded "512 seeds" was wrong on two of the three tables it printed.
+  const depth = (r: SectionRun): string => `${r.seeds.length} seeds × ${r.rotations}`;
   return table(
-    ['contestant', 'a0-121 · 32 seeds', 'a0-126 · 512 seeds', 'move', 'exact 95% (deep)', 'width before', 'width after', 'verdict (deep)'],
+    ['contestant', `a0-121 · ${depth(priorRun)}`, `a0-126 · ${depth(deepRun)}`, 'move', 'exact 95% (deep)', 'width before', 'width after', 'verdict (deep)'],
     [...deepWins].map((w) => {
       const p = byKey.get(w.key);
       const cw = clopper(w.wins, w.decided);
@@ -330,9 +339,9 @@ const fields: Record<string, string> = {
   A0121_SEATCUT: seatCutTable(priorRoster, 'warden'),
   SAMPLE: sampleTable(127 / 223, 223),
 
-  DEEP_ROSTER: deepRoster ? deepVsPriorTable(castCharacterWins(deepRoster), castCharacterWins(priorRoster)) : '_(pending)_',
-  DEEP_CLASS: deepClass ? deepVsPriorTable(classWins(deepClass), classWins(priorClass)) : '_(pending)_',
-  DEEP_EASY: deepTier ? deepVsPriorTable(poolWins(deepTier, 'easy'), poolWins(priorTier, 'easy')) : '_(pending)_',
+  DEEP_ROSTER: deepRoster ? deepVsPriorTable(castCharacterWins(deepRoster), castCharacterWins(priorRoster), deepRoster, priorRoster) : '_(pending)_',
+  DEEP_CLASS: deepClass ? deepVsPriorTable(classWins(deepClass), classWins(priorClass), deepClass, priorClass) : '_(pending)_',
+  DEEP_EASY: deepTier ? deepVsPriorTable(poolWins(deepTier, 'easy'), poolWins(priorTier, 'easy'), deepTier, priorTier) : '_(pending)_',
   DEEP_CLUSTER: deepRoster ? clusterBlock(deepRoster, 'warden') : '_(pending)_',
   DEEP_ROTATION: deepRoster ? rotationTable(deepRoster, 'warden') : '_(pending)_',
   DEEP_SEATCUT: deepRoster ? seatCutTable(deepRoster, 'warden') : '_(pending)_',
@@ -430,9 +439,10 @@ const fields: Record<string, string> = {
           `${(deepClass!.matches.length / priorClass.matches.length).toFixed(0)}× the matches the top ` +
           `of the interval is ${pct(tExc.exactHi)}, ${f(100 * (WIN_RATE_CEILING - tExc.exactHi))} points ` +
           `clear. The correction runs the same direction as Warden's — more matches, less drama — and ` +
-          `it is worth noticing that the instrument was not built to exonerate anybody. It moved ` +
-          `a0-121's marginal pass to a real pass and a0-121's marginal fail to a real pass, because ` +
-          `both were marginal for the same reason.`,
+          `it is worth noticing that the instrument was not built to exonerate anybody. It ` +
+          `moved a0-121's marginal pass to a real pass and its marginal fail to a real pass, because ` +
+          `both were marginal for the same reason — and then, in §4.5, it moved a0-121's third ` +
+          `marginal call to a real **failure**. Depth is not a direction.`,
       ].join('\n'),
 
   EASY_READING: !tBolt || !deepTier
