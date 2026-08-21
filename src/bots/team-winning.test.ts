@@ -408,12 +408,32 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * matches run less lethal and a survivor spends more of the window flying and
  * fighting rather than docked and shopping. Measured properly, on full matches
  * and both builds, in `evidence/a0-81-fleeing-fire/audit.txt`.
+ *
+ * **And from 4 to 10 when a0-121 landed** (2026-08-21, the Gameplay lane). a0-121
+ * retunes one cell of the GDD §2.11 class table — the Excavator's `turnMul`, 0.8
+ * → 0.25 — so the two Excavator-flying characters in this lineup bring their guns
+ * to bear more slowly, kill and die at different moments, and are somewhere else
+ * when a core goes. Seed 4's window collapsed 13,924 → **1,039 ticks with 0
+ * orders** in it. Fifth instance of the same fixture fragility, fifth time the
+ * prescribed answer is a re-scan rather than the next number.
+ *
+ * Seeds 1–16 re-scanned under the new class table for every quantity asserted
+ * below (`evidence/a0-121-excavator-penalty/team-window-scan.ts`, whose output is
+ * `evidence/a0-121-excavator-penalty/team-window-scan.txt`). The distribution is
+ * bimodal exactly as before — eight of sixteen seeds give under 4,000 ticks and
+ * no orders at all — and **seed 10 is the largest-margin replacement**, on a
+ * bigger margin than seed 4 ever carried: a **4.4-minute window (16,005 ticks,
+ * 25,164 units travelled, 3,265 ticks with the trigger down, 8 orders placed)**,
+ * zero ghost inputs, resolving as a team result with two dead homes. (Seed 7 runs
+ * the longest window at 27,174 ticks but places 5 orders; seed 5 is 25,240 and 5.)
+ * Nothing below was relaxed, added or removed: one number moved, by the
+ * measurement this note asks for.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
   it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 4, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 4 });
+    const world = createWorld({ seed: 10, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 10 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;

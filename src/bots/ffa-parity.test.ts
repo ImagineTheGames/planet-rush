@@ -298,11 +298,50 @@ const SECONDS = 180;
  *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
+ *
+ * ### Re-baselined a seventh time, 2026-08-21 (a0-121, the Gameplay lane)
+ *
+ * `d839695f` → `efc7c046`, `df4873c3` → `7a79fe8c`, `b3055735` → `9410f78e`.
+ *
+ * a0-120 was sent to move `WORLD_SIZE` for these hashes and did not, because no
+ * arena satisfies both constraints. a0-121 was sent after the same target from the
+ * other side and **did** move a constant: the Excavator's `turnMul`, GDD §2.11's
+ * one stated penalty on the hull that takes 77.3% of the ship-class contest, from
+ * the design's 0.8 to a measured 0.25. Two of the eight seats in the shipped cast
+ * fly Excavators (Foreman and Warden, §2.11), so both of them bring their guns to
+ * bear more slowly from the first tick and the board diverges long before 180
+ * seconds are up. The hull's win rate goes 198/256 → 124/255, and the whole
+ * measurement is `tests/reports/a0-121-excavator.md`.
+ *
+ * **The brief's rule for a re-baseline is that a golden you re-bake without
+ * proving it still bites is a deleted test**, so it was proved first, on this
+ * tree, against the *new* hashes:
+ * `evidence/a0-121-excavator-penalty/bite.txt`. Each block is one perturbation
+ * applied to the branch tree and then restored — `WORLD_SIZE` +1 unit, this
+ * brief's own cell moved by 0.01 (0.25 → 0.26), `BASE_TURN_RATE` 6.5 → 6.4, and
+ * the **Interceptor's** `turnMul`, a hull a0-121 does not touch. All three hashes
+ * fail on the first three, and both control blocks are green. The guard on the
+ * guard that a0-120 repaired reads the FFA side live and re-baselines itself, so
+ * it needed no edit here.
+ *
+ * **One block passes, and it is worth reading rather than patching around.** The
+ * Interceptor at `turnMul` 1.4 → **1.41** does not move a single hash; the same
+ * hull at 1.4 → **1.0** fails all three. `turnToward` clamps to the target angle
+ * as soon as the gap is under one tick's step, so a turn rate is observable only
+ * while it is the *binding* constraint. At 9.1 rad/s an Interceptor is on target
+ * in two or three ticks and lands on the identical angle on the identical tick at
+ * 9.165 — the stat has been tuned past the point of mattering, so neither the
+ * simulation nor a hash of it can tell. That is the whole of a0-121 falling out
+ * of a golden: it is exactly what §2.11's 80% was doing on the Excavator, and
+ * exactly why deleting that penalty outright cost the hull nothing measurable.
+ *
+ * Same rule as every entry above: re-baselined for this reason only. Any *other*
+ * red still means revert.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'd839695f'],
-  [7, 'df4873c3'],
-  [991, 'b3055735'],
+  [20260806, 'efc7c046'],
+  [7, '7a79fe8c'],
+  [991, '9410f78e'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */
