@@ -488,11 +488,15 @@ function readSection(section: A0112Section): SectionRun {
  * hundred whole matches, and running them as five processes is the difference
  * between one core for half an hour and five cores for six minutes.
  */
-function mirrors(section: A0112Section, seedCount: number): number {
+function mirrors(section: A0112Section, seedCount: number, seedFrom = 1): number {
   // The slice exists to be compared with a0-107's number, so it runs a0-107's
   // seeds rather than this report's range — same draw, same cast, same ceiling.
   const seeds =
-    section === 'slice' ? A0107_SLICE_SEEDS : section === 'cast' ? A0105_DEATH_SEEDS : seedRange(seedCount);
+    section === 'slice'
+      ? A0107_SLICE_SEEDS
+      : section === 'cast'
+        ? A0105_DEATH_SEEDS
+        : seedRange(seedCount, seedFrom);
   const started = performance.now();
   let last = started;
   const options = {
@@ -1495,7 +1499,9 @@ function pay(seedCount: number): number {
 
 function usage(): number {
   log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay|mirrors> [args]');
-  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n] [--data DIR]  # run one section');
+  log('  mirrors <mirror|roster|tier|class|slice|cast> [--seeds n] [--from s] [--data DIR]  # run one section');
+  log('    --from s  seeds [s, s+n) instead of [1, n) — a section shards by seed range across cores,');
+  log('              and a shard is exact: runBotMatch(seed, slots) reads nothing but its own arguments.');
   log('  mirrors report [--out FILE] [--data DIR]               # render the report from artifacts');
   log('  tuning report [--out FILE]                             # render the a0-117 before/candidate report');
   return 2;
@@ -1530,7 +1536,12 @@ function main(argv: readonly string[]): number {
       if (sub === 'report') return mirrorsReport(outFlag >= 0 ? (rest[outFlag + 1] ?? null) : null);
       if (!(A0112_SECTIONS as readonly string[]).includes(sub)) return usage();
       const seedsFlag = rest.indexOf('--seeds');
-      return mirrors(sub as A0112Section, seedsFlag >= 0 ? Number(rest[seedsFlag + 1] ?? 24) : 24);
+      const fromFlag = rest.indexOf('--from');
+      return mirrors(
+        sub as A0112Section,
+        seedsFlag >= 0 ? Number(rest[seedsFlag + 1] ?? 24) : 24,
+        fromFlag >= 0 ? Number(rest[fromFlag + 1] ?? 1) : 1,
+      );
     }
     case 'tuning': {
       const sub = rest[0] ?? '';
