@@ -36,6 +36,7 @@ import { binomTailGE, clopper, designEffect, sampleForExact, wilson } from './st
 import { readTarget, topOf, verdictOf, verdictTable } from './targets';
 import type { TargetReading } from './targets';
 import { restrict } from './reproduce';
+import { pairedTable } from './paired';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const read = (p: string): SectionRun => JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')) as SectionRun;
@@ -248,6 +249,7 @@ const warden = deepRoster ? castCharacterWins(deepRoster).find((w) => w.key === 
 const fields: Record<string, string> = {
   VERDICT: deepRoster && deepClass && deepTier ? verdictTable(targets) : '_(deep run not yet filed)_',
   VERDICT_PRIOR: verdictTable(priorTargets),
+  PAIRED: pairedTable(),
 
   RUNS: table(
     ['section', 'lineup', 'seeds', 'rotations', 'matches', 'decided', 'draws', 'hangs', 'sim-timeouts'],

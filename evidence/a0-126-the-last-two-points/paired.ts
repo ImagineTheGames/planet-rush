@@ -2,7 +2,7 @@
  * evidence/a0-126-the-last-two-points/paired.ts — was a0-121's move real?
  * OWNER: QA Agent (brief a0-126).
  *
- *   npx vite-node evidence/.../paired.ts
+ *   npx vite-node evidence/.../paired.ts --print
  *
  * a0-121's before and after columns are **the same seeds**, so the comparison
  * between them is paired and the concordant matches — the ones both trees won,
@@ -43,27 +43,45 @@ const CASES: readonly Case[] = [
   { what: '`vanguard` — ship-class contest', section: 'class', won: (r) => String(r.winnerClass) === 'vanguard' },
 ];
 
-console.log('## a0-121, read as the paired experiment it was\n');
-console.log('| what | before | after | move | both won | before only | after only | neither | discordant | McNemar exact p |');
-console.log('|---|---|---|---|---|---|---|---|---|---|');
-for (const c of CASES) {
-  const before = read(`tests/reports/a0-121-data/before/${c.section}.json`);
-  const after = read(`tests/reports/a0-121-data/after/${c.section}.json`);
-  assertSameSeeds({ before, after });
-  const b = order(before.matches);
-  const a = order(after.matches);
-  if (b.length !== a.length) throw new Error(`${c.section}: ${b.length} vs ${a.length} rows`);
-  for (let i = 0; i < b.length; i++) {
-    if (b[i]!.seed !== a[i]!.seed || b[i]!.lineup !== a[i]!.lineup) {
-      throw new Error(`${c.section} row ${i}: ${b[i]!.lineup}#${b[i]!.seed} vs ${a[i]!.lineup}#${a[i]!.seed}`);
+/** The paired table, as markdown. Exported so `render.ts` prints the same rows
+ *  the standalone run does rather than a second implementation of them. */
+export function pairedTable(): string {
+  const lines = [
+    '| what | before | after | move | both won | before only | after only | neither | discordant | McNemar exact p |',
+    '|---|---|---|---|---|---|---|---|---|---|',
+  ];
+  for (const c of CASES) {
+    const before = read(`tests/reports/a0-121-data/before/${c.section}.json`);
+    const after = read(`tests/reports/a0-121-data/after/${c.section}.json`);
+    assertSameSeeds({ before, after });
+    const b = order(before.matches);
+    const a = order(after.matches);
+    if (b.length !== a.length) throw new Error(`${c.section}: ${b.length} vs ${a.length} rows`);
+    for (let i = 0; i < b.length; i++) {
+      if (b[i]!.seed !== a[i]!.seed || b[i]!.lineup !== a[i]!.lineup) {
+        throw new Error(`${c.section} row ${i}: ${b[i]!.lineup}#${b[i]!.seed} vs ${a[i]!.lineup}#${a[i]!.seed}`);
+      }
     }
+    const m = mcnemar(b.map(c.won), a.map(c.won));
+    const move = 100 * (m.afterRate - m.beforeRate);
+    lines.push(
+      `| ${c.what} | ${pct(m.beforeRate)} | ${pct(m.afterRate)} | ${move >= 0 ? '+' : ''}${move.toFixed(1)} pts | ` +
+        `${m.both} | ${m.lostIt} | ${m.gained} | ${m.neither} | ${m.discordant} | ` +
+        `${m.p < 1e-6 ? '< 0.000001' : m.p.toFixed(6)} |`,
+    );
   }
-  const m = mcnemar(b.map(c.won), a.map(c.won));
-  const move = 100 * (m.afterRate - m.beforeRate);
-  console.log(
-    `| ${c.what} | ${pct(m.beforeRate)} | ${pct(m.afterRate)} | ${move >= 0 ? '+' : ''}${move.toFixed(1)} pts | ` +
-      `${m.both} | ${m.lostIt} | ${m.gained} | ${m.neither} | ${m.discordant} | ` +
-      `${m.p < 1e-6 ? '< 0.000001' : m.p.toFixed(6)} |`,
+  lines.push('');
+  lines.push(
+    "*Rates here are over **all** matches of the section, not over the decided ones, because a paired test needs the same denominator in both columns; a0-121's published rates are over decided matches and differ in the third digit.*",
   );
+  return lines.join('\n');
 }
-console.log('\n*Rates here are over **all** matches of the section, not over the decided ones, because a paired test needs the same denominator in both columns; a0-121\'s published rates are over decided matches and differ in the third digit.*');
+
+// vite-node does not put the script path in `process.argv`, so "am I the entry
+// point" cannot be asked the Node way. An explicit flag instead of a guess:
+// `render.ts` imports `pairedTable` and prints nothing, the standalone run says
+// `--print` and files `paired.txt`.
+if (process.argv.includes('--print')) {
+  console.log('## a0-121, read as the paired experiment it was\n');
+  console.log(pairedTable());
+}
