@@ -214,7 +214,7 @@ describe('the class stat table (GDD §2.11)', () => {
   //
   //   Interceptor (Quadfin)     130% / 120% / 140% / 35 /  8 / 2
   //   Vanguard    (Anvil)       100% / 100% / 100% / 50 / 10 / 2
-  //   Excavator   (Pincer)       90% / 100% /  80% / 55 / 13 / 2
+  //   Excavator   (Pincer)       90% / 100% /  80% / 55 / 13 / 2   ← turn: see PENDING below
   //   Hauler      (Hammerhead)   85% /  80% /  85% / 70 /  9 / 3
   const TABLE: Readonly<
     Record<ShipClass, { speed: number; accel: number; turn: number; hull: number; power: number; cargo: number }>
@@ -225,8 +225,62 @@ describe('the class stat table (GDD §2.11)', () => {
     [ShipClass.Hauler]: { speed: 0.85, accel: 0.8, turn: 0.85, hull: 70, power: 9, cargo: 3 },
   };
 
+  /**
+   * The one cell where the simulation is **deliberately ahead of the document**,
+   * and the value it is ahead to (a0-121).
+   *
+   * §2.11 prints the Excavator's turn as 80% and calls the whole table "opening
+   * hypotheses (TUNABLE)"; it also states the target that hypothesis has to meet,
+   * "no class exceeds a 55% win rate". At 80% the hull took 198/256 = 77.3% of the
+   * ship-class contest and deleting the penalty outright cost it nothing, so the
+   * cell was retuned to the measured 0.25 (48.6% of 255 on the same seeds —
+   * `tests/reports/a0-121-excavator.md`). GDD §2.11's printed figure has not
+   * caught up yet.
+   *
+   * This is an exception list of exactly one cell, and it is spelled out rather
+   * than folded into `TABLE`, so that:
+   *   - every OTHER cell of §2.11 is still compared against the document, which
+   *     is the whole job of this block — a0-121 moved one number and must not be
+   *     able to smuggle a second one past it;
+   *   - the divergence is a thing a reader trips over, not a silent edit; and
+   *   - clearing it is a one-line deletion the day the Director folds 25% back
+   *     into §2.11 (at which point the assertion below fails and says so).
+   */
+  const PENDING_AMENDMENT = {
+    cls: ShipClass.Excavator,
+    field: 'turn',
+    gdd: 0.8,
+    sim: 0.25,
+    brief: 'a0-121',
+  } as const;
+
+  /** §2.11 as this build actually reads it: the document, with the one pending
+   *  amendment applied. Everything below compares against this. */
+  const EFFECTIVE = {
+    ...TABLE,
+    [PENDING_AMENDMENT.cls]: { ...TABLE[PENDING_AMENDMENT.cls], turn: PENDING_AMENDMENT.sim },
+  } as typeof TABLE;
+
+  it('has exactly one cell pending a §2.11 amendment, and it is the one a0-121 measured', () => {
+    // If the Director folds 25% into the GDD, `TABLE` above gets the new figure
+    // and this line fails — which is the signal to delete `PENDING_AMENDMENT`.
+    expect(TABLE[PENDING_AMENDMENT.cls].turn).toBe(PENDING_AMENDMENT.gdd);
+    expect(SHIP_STATS[PENDING_AMENDMENT.cls].turnMul).toBe(PENDING_AMENDMENT.sim);
+    // …and nothing else diverges. Every other cell must match the document.
+    for (const cls of ALL_CLASSES) {
+      const row = TABLE[cls];
+      const stats = SHIP_STATS[cls];
+      expect(stats.speedMul).toBeCloseTo(row.speed, 9);
+      expect(stats.accelMul).toBeCloseTo(row.accel, 9);
+      expect(stats.hull).toBe(row.hull);
+      expect(stats.power).toBe(row.power);
+      expect(stats.cargo).toBe(row.cargo);
+      if (cls !== PENDING_AMENDMENT.cls) expect(stats.turnMul).toBeCloseTo(row.turn, 9);
+    }
+  });
+
   it.each(ALL_CLASSES)('derives every stock stat from the table: %s', (cls) => {
-    const row = TABLE[cls];
+    const row = EFFECTIVE[cls];
     const stock = loadout(cls);
 
     expect(shipTopSpeed(stock)).toBeCloseTo(BASE_SPEED * row.speed, 9);
@@ -239,7 +293,7 @@ describe('the class stat table (GDD §2.11)', () => {
 
   it('keeps the constants table and the GDD table in step', () => {
     for (const cls of ALL_CLASSES) {
-      const row = TABLE[cls];
+      const row = EFFECTIVE[cls];
       const stats = SHIP_STATS[cls];
       expect(stats.speedMul).toBeCloseTo(row.speed, 9);
       expect(stats.accelMul).toBeCloseTo(row.accel, 9);

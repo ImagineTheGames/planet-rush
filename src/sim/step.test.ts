@@ -477,6 +477,21 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
   const aim = (x: number, y: number): Action => ({ type: 'aim', dir: { x, y } });
   /** One class turn step, radians per tick. */
   const turnStep = (cls = ShipClass.Vanguard) => BASE_TURN_RATE * SHIP_STATS[cls].turnMul * TICK_DT;
+  /**
+   * Ticks a class needs to swing its nose through `radians`, **derived from its
+   * own turn rate** rather than assumed (a0-121).
+   *
+   * These budgets used to be the literals 20, 60 and 40, which are only generous
+   * at `BASE_TURN_RATE` 6.5: at 40 ticks for π the slowest hull pins the constant
+   * at a floor of 5.89, and a0-117 read that floor as a design invariant and
+   * abandoned a legitimate tuning over it. It never was one. What these cases
+   * assert is that a hull comes about at *exactly* its class rate, monotonically,
+   * and that a faster class arrives first — none of which is a statement about
+   * how large the base is. Deriving the budget keeps every assertion and drops
+   * the accidental pin, so these still bite at any `BASE_TURN_RATE`.
+   */
+  const ticksToTurn = (radians: number, cls = ShipClass.Vanguard) =>
+    Math.ceil(radians / turnStep(cls));
 
   it('3. with no aim and no auto-aim target, the nose turns toward velocity', () => {
     // Moving straight up (+y), facing +x. Nothing aimed, nothing fired.
@@ -487,8 +502,9 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
     // Exactly one turn step toward +y — no snap.
     expect(world.ships[0]!.angle).toBeCloseTo(turnStep(), 9);
 
-    // Converges to the velocity direction and then holds it.
-    for (let t = 0; t < 20; t++) step(world, []);
+    // Converges to the velocity direction and then holds it. One step is already
+    // spent above, and the budget is padded so "and then holds it" is really tested.
+    for (let t = 0; t < ticksToTurn(Math.PI / 2) + 10; t++) step(world, []);
     expect(world.ships[0]!.angle).toBeCloseTo(Math.PI / 2, 6);
   });
 
@@ -497,7 +513,9 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
     const world = emptyWorld({ ships: [ship] });
     const inputs: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: -1, y: 0 } }] }];
 
-    for (let t = 0; t < 60; t++) step(world, inputs);
+    // The nose can only start following travel once the ship is actually moving
+    // (`FACE_VELOCITY_MIN_SPEED`), so the budget is the half-turn plus a ramp.
+    for (let t = 0; t < ticksToTurn(Math.PI) + 30; t++) step(world, inputs);
 
     const s = world.ships[0]!;
     expect(s.vel.x).toBeLessThan(0); // travelling -x
@@ -594,7 +612,7 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
 
       let prev = 0;
       let prevGap = Math.PI;
-      for (let t = 0; t < 40; t++) {
+      for (let t = 0; t < ticksToTurn(Math.PI, cls) + 2; t++) {
         // Thrust keeps the velocity pinned at -x so the target angle is fixed.
         step(world, [{ id: 0, actions: [{ type: 'thrust', dir: { x: -1, y: 0 } }] }]);
         const angle = world.ships[0]!.angle;
@@ -612,7 +630,8 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
     const ticksToFace = (cls: ShipClass): number => {
       const ship = makeShip({ id: 0, shipClass: cls, pos: { x: 900, y: 900 }, vel: { x: 0, y: 240 }, angle: 0 });
       const world = emptyWorld({ ships: [ship] });
-      for (let t = 1; t <= 200; t++) {
+      const budget = ticksToTurn(Math.PI / 2, cls) + 60; // + the ramp to `FACE_VELOCITY_MIN_SPEED`
+      for (let t = 1; t <= budget; t++) {
         step(world, [{ id: 0, actions: [{ type: 'thrust', dir: { x: 0, y: 1 } }] }]);
         if (Math.abs(world.ships[0]!.angle - Math.PI / 2) < 1e-9) return t;
       }
@@ -620,6 +639,82 @@ describe('facing ladder (aim input → auto-aim target → velocity → hold)', 
     };
     // turnMul 1.4 (Quadfin) vs 0.8 (Pincer) — GDD §2.11.
     expect(ticksToFace(ShipClass.Interceptor)).toBeLessThan(ticksToFace(ShipClass.Excavator));
+  });
+
+  /**
+   * The turn column of GDD §2.11 is a **nose** stat, and the sentence beside it —
+   * *"the Excavator out-earns everyone but can't run"* — is a **travel** claim.
+   * These two cases pin the fact that those are different quantities in this
+   * simulation, because a0-121 was briefed on the belief that they were the same
+   * one and the belief cost two lanes a tuning pass.
+   *
+   * `integrate` adds `intent.thrust × accel` in **world** space and never reads
+   * `ship.angle`: thrust and aim are independent verbs (GDD §2.4's six-verb
+   * table), so movement is holonomic and a hull's facing does not gate, scale or
+   * delay where it goes. A slow-turning hull is slow to bring its *gun* to bear
+   * and is not, by that stat, slow to leave. Anything that wants turn rate to
+   * cost travel has to change this, and changing it is a design amendment to
+   * §2.4 — not a tuning. Written down here so the next lane reads it as a
+   * property rather than rediscovering it as a surprise.
+   */
+  describe("facing does not gate travel — the turn column is a nose stat (a0-121)", () => {
+    it('two hulls of one class travel identically from opposite facings', () => {
+      // Same class, same thrust, nose 180° apart. If facing gated travel at all,
+      // these two would separate.
+      const world = emptyWorld({
+        ships: [
+          makeShip({ id: 0, pos: { x: 500, y: 500 }, angle: 0 }),
+          makeShip({ id: 1, pos: { x: 500, y: 500 }, angle: Math.PI }),
+        ],
+      });
+      const push: Action = { type: 'thrust', dir: { x: 1, y: 0 } };
+      const inputs: Inputs = [
+        { id: 0, actions: [push] },
+        { id: 1, actions: [push] },
+      ];
+
+      let gapWhileTurning = 0;
+      for (let t = 0; t < 60; t++) {
+        step(world, inputs);
+        const [p, q] = [world.ships[0]!, world.ships[1]!];
+        // Identical on **every** tick, not just at the end.
+        expect(p.pos.x).toBeCloseTo(q.pos.x, 12);
+        expect(p.pos.y).toBeCloseTo(q.pos.y, 12);
+        expect(p.vel.x).toBeCloseTo(q.vel.x, 12);
+        gapWhileTurning = Math.max(gapWhileTurning, Math.abs(p.angle - q.angle));
+      }
+      // …while one nose spent the run coming about and the other never moved.
+      // The stat is real and it was charged; it just is not travel. (Both noses
+      // do converge on +x by the end — which is the whole point: a half-turn of
+      // difference in facing bought zero difference in where the hull got to.)
+      expect(gapWhileTurning).toBeGreaterThan(Math.PI / 2);
+    });
+
+    it('turn rate does not appear in the reversal a hull needs to run away', () => {
+      // Every class thrusts +x to speed, then reverses to −x. The time to come
+      // about *in travel* is set by accel, drag and top speed — never by
+      // `turnMul`, which is why §2.11's 80% buys the Excavator's pursuers nothing.
+      const reverseTicks = (cls: ShipClass): number => {
+        const world = emptyWorld({ ships: [makeShip({ id: 0, shipClass: cls, pos: { x: 1200, y: 1200 } })] });
+        const fwd: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: 1, y: 0 } }] }];
+        const back: Inputs = [{ id: 0, actions: [{ type: 'thrust', dir: { x: -1, y: 0 } }] }];
+        for (let t = 0; t < 120; t++) step(world, fwd); // at top speed, nose on +x
+        for (let t = 1; t <= 600; t++) {
+          step(world, back);
+          if (world.ships[0]!.vel.x < 0) return t;
+        }
+        return Infinity;
+      };
+
+      // The Interceptor turns its nose 1.75× faster than the Excavator (140% vs
+      // 80%). Its *travel* reversal is no quicker for it — the two differ only by
+      // the momentum each had to shed, so the faster hull is if anything slower.
+      const int = reverseTicks(ShipClass.Interceptor);
+      const exc = reverseTicks(ShipClass.Excavator);
+      expect(int).toBeLessThan(Infinity);
+      expect(exc).toBeLessThan(Infinity);
+      expect(exc).toBeLessThanOrEqual(int);
+    });
   });
 
   it('determinism holds with velocity facing engaged (GDD §4.8)', () => {

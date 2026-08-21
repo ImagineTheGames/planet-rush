@@ -1,0 +1,2077 @@
+{
+ "section": "class",
+ "label": "ship-class contest — behaviour=sable, four hulls, 4 rotations",
+ "seeds": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16
+ ],
+ "rotations": 4,
+ "ceilingSeconds": 1200,
+ "matches": [
+  {
+   "seed": 1,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 788.9999999996111,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 172
+   },
+   "leaves": {
+    "spend": 225,
+    "mine": 38949,
+    "attack": 84048,
+    "haul": 20901,
+    "retreat": 6957,
+    "turn-and-fight": 417,
+    "dead": 51384,
+    "defend": 29616,
+    "cornered-fight": 3381,
+    "fix-base": 597,
+    "scavenge-opportunist": 132,
+    "last-stand": 141537,
+    "hunt": 576
+   },
+   "decisions": 378720
+  },
+  {
+   "seed": 2,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 782.5999999996169,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 121
+   },
+   "leaves": {
+    "spend": 195,
+    "mine": 37521,
+    "defend": 21582,
+    "attack": 69702,
+    "haul": 18291,
+    "retreat": 6783,
+    "dead": 73953,
+    "turn-and-fight": 1110,
+    "last-stand": 142767,
+    "cornered-fight": 2142,
+    "fix-base": 414,
+    "hunt": 1188
+   },
+   "decisions": 375648
+  },
+  {
+   "seed": 3,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 810.1166666662585,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 108
+   },
+   "leaves": {
+    "spend": 147,
+    "mine": 33096,
+    "attack": 53893,
+    "retreat": 6771,
+    "dead": 62350,
+    "cornered-fight": 2163,
+    "defend": 22992,
+    "last-stand": 182624,
+    "haul": 20866,
+    "fix-base": 681,
+    "turn-and-fight": 957,
+    "hunt": 2316
+   },
+   "decisions": 388856
+  },
+  {
+   "seed": 4,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 810.6333333329247,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 73
+   },
+   "leaves": {
+    "spend": 72,
+    "mine": 14856,
+    "defend": 15417,
+    "retreat": 31377,
+    "dead": 138812,
+    "turn-and-fight": 282,
+    "attack": 60923,
+    "cornered-fight": 1419,
+    "last-stand": 120399,
+    "haul": 3528,
+    "fix-base": 114,
+    "hunt": 1875,
+    "roam": 30
+   },
+   "decisions": 389104
+  },
+  {
+   "seed": 5,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 810.9999999995911,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 132
+   },
+   "leaves": {
+    "spend": 204,
+    "mine": 37599,
+    "defend": 27537,
+    "haul": 13203,
+    "retreat": 6879,
+    "cornered-fight": 2286,
+    "dead": 50859,
+    "attack": 60336,
+    "fix-base": 1020,
+    "last-stand": 186735,
+    "turn-and-fight": 309,
+    "scavenge-opportunist": 84,
+    "hunt": 2229
+   },
+   "decisions": 389280
+  },
+  {
+   "seed": 6,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 800.7499999996004,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 149
+   },
+   "leaves": {
+    "spend": 183,
+    "mine": 34485,
+    "attack": 87975,
+    "defend": 24210,
+    "retreat": 8334,
+    "cornered-fight": 2586,
+    "dead": 113532,
+    "haul": 15684,
+    "turn-and-fight": 654,
+    "last-stand": 94215,
+    "fix-base": 678,
+    "hunt": 1824
+   },
+   "decisions": 384360
+  },
+  {
+   "seed": 7,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 831.1166666662394,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 189
+   },
+   "leaves": {
+    "spend": 237,
+    "mine": 32325,
+    "attack": 103733,
+    "retreat": 8148,
+    "cornered-fight": 3591,
+    "dead": 54697,
+    "defend": 36744,
+    "haul": 19719,
+    "turn-and-fight": 498,
+    "last-stand": 135134,
+    "fix-base": 660,
+    "hunt": 3399,
+    "scavenge-opportunist": 51
+   },
+   "decisions": 398936
+  },
+  {
+   "seed": 8,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 797.9999999996029,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 199
+   },
+   "leaves": {
+    "spend": 192,
+    "mine": 33378,
+    "haul": 14406,
+    "attack": 108069,
+    "retreat": 9972,
+    "cornered-fight": 3567,
+    "dead": 57771,
+    "defend": 36906,
+    "last-stand": 116964,
+    "turn-and-fight": 1194,
+    "scavenge-opportunist": 33,
+    "hunt": 588
+   },
+   "decisions": 383040
+  },
+  {
+   "seed": 9,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 820.5333333329157,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 122
+   },
+   "leaves": {
+    "spend": 195,
+    "mine": 38409,
+    "haul": 15219,
+    "defend": 25713,
+    "retreat": 7557,
+    "dead": 119703,
+    "cornered-fight": 2910,
+    "attack": 71741,
+    "turn-and-fight": 426,
+    "last-stand": 110646,
+    "hunt": 938,
+    "fix-base": 315,
+    "scavenge-opportunist": 84
+   },
+   "decisions": 393856
+  },
+  {
+   "seed": 10,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 797.4166666662701,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 101
+   },
+   "leaves": {
+    "spend": 189,
+    "mine": 39210,
+    "defend": 62611,
+    "retreat": 8490,
+    "dead": 28278,
+    "cornered-fight": 2400,
+    "attack": 57026,
+    "scavenge-opportunist": 9,
+    "haul": 17805,
+    "turn-and-fight": 819,
+    "last-stand": 162935,
+    "fix-base": 1188,
+    "hunt": 1800
+   },
+   "decisions": 382760
+  },
+  {
+   "seed": 11,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 823.583333332913,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 149
+   },
+   "leaves": {
+    "spend": 174,
+    "mine": 29817,
+    "haul": 14283,
+    "defend": 22497,
+    "retreat": 8361,
+    "dead": 42665,
+    "attack": 92297,
+    "cornered-fight": 3081,
+    "last-stand": 178222,
+    "turn-and-fight": 168,
+    "fix-base": 300,
+    "scavenge-opportunist": 42,
+    "hunt": 3413
+   },
+   "decisions": 395320
+  },
+  {
+   "seed": 12,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 815.8499999995867,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 114
+   },
+   "leaves": {
+    "spend": 192,
+    "mine": 39090,
+    "attack": 53028,
+    "defend": 64467,
+    "retreat": 4548,
+    "turn-and-fight": 216,
+    "dead": 109539,
+    "cornered-fight": 2301,
+    "fix-base": 519,
+    "last-stand": 99027,
+    "haul": 16374,
+    "hunt": 2166,
+    "scavenge-opportunist": 141
+   },
+   "decisions": 391608
+  },
+  {
+   "seed": 13,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 822.9166666662469,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 149
+   },
+   "leaves": {
+    "spend": 195,
+    "mine": 37107,
+    "defend": 28173,
+    "retreat": 9513,
+    "cornered-fight": 3045,
+    "dead": 140860,
+    "attack": 83896,
+    "haul": 11451,
+    "turn-and-fight": 612,
+    "last-stand": 77321,
+    "fix-base": 966,
+    "hunt": 1861
+   },
+   "decisions": 395000
+  },
+  {
+   "seed": 14,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 800.6166666662672,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 122
+   },
+   "leaves": {
+    "spend": 186,
+    "mine": 35472,
+    "defend": 64243,
+    "retreat": 7587,
+    "dead": 34626,
+    "haul": 16839,
+    "attack": 57323,
+    "cornered-fight": 2250,
+    "fix-base": 831,
+    "last-stand": 162101,
+    "turn-and-fight": 567,
+    "hunt": 2271
+   },
+   "decisions": 384296
+  },
+  {
+   "seed": 15,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 786.8833333329463,
+   "winner": "sable",
+   "winnerClass": "interceptor",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 180
+   },
+   "leaves": {
+    "spend": 222,
+    "mine": 32118,
+    "defend": 57425,
+    "retreat": 8094,
+    "dead": 78914,
+    "attack": 93339,
+    "cornered-fight": 3033,
+    "haul": 15174,
+    "turn-and-fight": 510,
+    "last-stand": 87798,
+    "fix-base": 426,
+    "scavenge-opportunist": 27,
+    "hunt": 624
+   },
+   "decisions": 377704
+  },
+  {
+   "seed": 16,
+   "lineup": "class:rot0",
+   "ok": true,
+   "failure": null,
+   "seconds": 822.0333333329144,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 129
+   },
+   "leaves": {
+    "spend": 201,
+    "mine": 36513,
+    "defend": 24798,
+    "attack": 62257,
+    "retreat": 6216,
+    "cornered-fight": 2739,
+    "dead": 36747,
+    "haul": 18144,
+    "last-stand": 202554,
+    "fix-base": 570,
+    "turn-and-fight": 936,
+    "hunt": 2781,
+    "scavenge-opportunist": 120
+   },
+   "decisions": 394576
+  },
+  {
+   "seed": 1,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 815.5999999995869,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 120
+   },
+   "leaves": {
+    "spend": 159,
+    "mine": 32577,
+    "haul": 16677,
+    "defend": 21978,
+    "attack": 60576,
+    "retreat": 5655,
+    "dead": 92829,
+    "last-stand": 154224,
+    "cornered-fight": 3147,
+    "turn-and-fight": 198,
+    "hunt": 3036,
+    "fix-base": 432
+   },
+   "decisions": 391488
+  },
+  {
+   "seed": 2,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 801.2499999995999,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 168
+   },
+   "leaves": {
+    "spend": 204,
+    "mine": 33807,
+    "defend": 30642,
+    "retreat": 8130,
+    "dead": 48477,
+    "attack": 86721,
+    "haul": 14952,
+    "cornered-fight": 3516,
+    "turn-and-fight": 645,
+    "last-stand": 155613,
+    "fix-base": 648,
+    "hunt": 1245
+   },
+   "decisions": 384600
+  },
+  {
+   "seed": 3,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 822.766666666247,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 142
+   },
+   "leaves": {
+    "spend": 201,
+    "mine": 32526,
+    "attack": 82490,
+    "haul": 15868,
+    "retreat": 8703,
+    "cornered-fight": 3789,
+    "dead": 159231,
+    "defend": 29478,
+    "fix-base": 576,
+    "last-stand": 58916,
+    "hunt": 2406,
+    "turn-and-fight": 744
+   },
+   "decisions": 394928
+  },
+  {
+   "seed": 4,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 785.1666666662812,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 153
+   },
+   "leaves": {
+    "spend": 201,
+    "mine": 28215,
+    "haul": 14055,
+    "defend": 31140,
+    "attack": 80711,
+    "retreat": 5691,
+    "cornered-fight": 2946,
+    "dead": 43962,
+    "last-stand": 167664,
+    "turn-and-fight": 378,
+    "fix-base": 927,
+    "hunt": 978,
+    "scavenge-opportunist": 12
+   },
+   "decisions": 376880
+  },
+  {
+   "seed": 5,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 808.8333333329264,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 138
+   },
+   "leaves": {
+    "spend": 225,
+    "mine": 39462,
+    "haul": 15804,
+    "defend": 59612,
+    "retreat": 7209,
+    "cornered-fight": 3390,
+    "dead": 75902,
+    "attack": 64540,
+    "last-stand": 118748,
+    "fix-base": 1224,
+    "scavenge-opportunist": 189,
+    "hunt": 996,
+    "turn-and-fight": 939
+   },
+   "decisions": 388240
+  },
+  {
+   "seed": 6,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 798.1333333329361,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 93
+   },
+   "leaves": {
+    "spend": 183,
+    "mine": 35409,
+    "haul": 17280,
+    "defend": 17895,
+    "retreat": 5805,
+    "cornered-fight": 1812,
+    "dead": 133473,
+    "attack": 48637,
+    "turn-and-fight": 609,
+    "last-stand": 119496,
+    "fix-base": 1431,
+    "hunt": 1074
+   },
+   "decisions": 383104
+  },
+  {
+   "seed": 7,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 775.7666666662898,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 124
+   },
+   "leaves": {
+    "spend": 204,
+    "mine": 34995,
+    "haul": 18859,
+    "attack": 57622,
+    "defend": 27648,
+    "retreat": 5988,
+    "cornered-fight": 2118,
+    "dead": 35217,
+    "turn-and-fight": 318,
+    "fix-base": 1326,
+    "last-stand": 187776,
+    "hunt": 201,
+    "scavenge-opportunist": 96
+   },
+   "decisions": 372368
+  },
+  {
+   "seed": 8,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 778.5333333329539,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 163
+   },
+   "leaves": {
+    "spend": 192,
+    "mine": 31581,
+    "haul": 14484,
+    "attack": 133316,
+    "defend": 29193,
+    "retreat": 9285,
+    "cornered-fight": 4164,
+    "dead": 121396,
+    "turn-and-fight": 954,
+    "fix-base": 81,
+    "last-stand": 28322,
+    "hunt": 728
+   },
+   "decisions": 373696
+  },
+  {
+   "seed": 9,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 381.2666666666486,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 87
+   },
+   "leaves": {
+    "spend": 144,
+    "mine": 17973,
+    "haul": 6552,
+    "attack": 39868,
+    "retreat": 3585,
+    "cornered-fight": 1503,
+    "dead": 24066,
+    "defend": 20784,
+    "last-stand": 67987,
+    "turn-and-fight": 120,
+    "fix-base": 426
+   },
+   "decisions": 183008
+  },
+  {
+   "seed": 10,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 800.2999999996008,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 119
+   },
+   "leaves": {
+    "spend": 237,
+    "mine": 36477,
+    "defend": 22218,
+    "attack": 66525,
+    "retreat": 6273,
+    "dead": 120669,
+    "cornered-fight": 2235,
+    "haul": 16845,
+    "last-stand": 110391,
+    "fix-base": 1254,
+    "turn-and-fight": 408,
+    "hunt": 612
+   },
+   "decisions": 384144
+  },
+  {
+   "seed": 11,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 829.5333333329075,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 184
+   },
+   "leaves": {
+    "spend": 186,
+    "mine": 26760,
+    "haul": 14097,
+    "defend": 38142,
+    "attack": 98052,
+    "retreat": 11376,
+    "cornered-fight": 4872,
+    "dead": 103948,
+    "turn-and-fight": 1725,
+    "hunt": 3018,
+    "last-stand": 95064,
+    "fix-base": 909,
+    "scavenge-opportunist": 27
+   },
+   "decisions": 398176
+  },
+  {
+   "seed": 12,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 791.5499999996088,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 107
+   },
+   "leaves": {
+    "spend": 192,
+    "mine": 39180,
+    "attack": 102522,
+    "haul": 17691,
+    "retreat": 8070,
+    "dead": 71709,
+    "defend": 19305,
+    "cornered-fight": 2151,
+    "turn-and-fight": 1080,
+    "hunt": 1197,
+    "fix-base": 333,
+    "last-stand": 116502,
+    "roam": 12
+   },
+   "decisions": 379944
+  },
+  {
+   "seed": 13,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 774.8999999996239,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 175
+   },
+   "leaves": {
+    "spend": 201,
+    "mine": 31953,
+    "haul": 18687,
+    "defend": 33846,
+    "retreat": 10047,
+    "dead": 79713,
+    "attack": 104589,
+    "cornered-fight": 4233,
+    "last-stand": 86481,
+    "fix-base": 249,
+    "hunt": 756,
+    "turn-and-fight": 1062,
+    "scavenge-opportunist": 33,
+    "roam": 102
+   },
+   "decisions": 371952
+  },
+  {
+   "seed": 14,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 839.3333333328986,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 203
+   },
+   "leaves": {
+    "spend": 201,
+    "mine": 32466,
+    "haul": 13476,
+    "attack": 109700,
+    "defend": 36219,
+    "retreat": 10455,
+    "cornered-fight": 4020,
+    "dead": 89446,
+    "turn-and-fight": 1674,
+    "hunt": 3470,
+    "fix-base": 234,
+    "last-stand": 101516,
+    "scavenge-opportunist": 3
+   },
+   "decisions": 402880
+  },
+  {
+   "seed": 15,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 796.466666666271,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 113
+   },
+   "leaves": {
+    "spend": 159,
+    "mine": 34602,
+    "haul": 18984,
+    "defend": 25230,
+    "attack": 56755,
+    "retreat": 7296,
+    "cornered-fight": 2166,
+    "dead": 64568,
+    "fix-base": 516,
+    "turn-and-fight": 657,
+    "last-stand": 170441,
+    "hunt": 930
+   },
+   "decisions": 382304
+  },
+  {
+   "seed": 16,
+   "lineup": "class:rot1",
+   "ok": true,
+   "failure": null,
+   "seconds": 836.7999999995676,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 127
+   },
+   "leaves": {
+    "spend": 162,
+    "mine": 33996,
+    "haul": 17454,
+    "attack": 102876,
+    "retreat": 6051,
+    "dead": 67485,
+    "cornered-fight": 2160,
+    "defend": 21660,
+    "last-stand": 145182,
+    "fix-base": 207,
+    "turn-and-fight": 573,
+    "hunt": 3858
+   },
+   "decisions": 401664
+  },
+  {
+   "seed": 1,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 789.7333333329437,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 201
+   },
+   "leaves": {
+    "spend": 249,
+    "mine": 29409,
+    "haul": 22743,
+    "attack": 116948,
+    "retreat": 10473,
+    "dead": 83297,
+    "defend": 37539,
+    "cornered-fight": 5469,
+    "turn-and-fight": 717,
+    "hunt": 984,
+    "last-stand": 70446,
+    "fix-base": 798
+   },
+   "decisions": 379072
+  },
+  {
+   "seed": 2,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 787.9333333329454,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 128
+   },
+   "leaves": {
+    "spend": 180,
+    "mine": 33933,
+    "attack": 61321,
+    "haul": 13764,
+    "defend": 23031,
+    "retreat": 5976,
+    "turn-and-fight": 351,
+    "dead": 134730,
+    "cornered-fight": 1935,
+    "last-stand": 102072,
+    "fix-base": 306,
+    "hunt": 522,
+    "scavenge-opportunist": 87
+   },
+   "decisions": 378208
+  },
+  {
+   "seed": 3,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 814.9999999995874,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 123
+   },
+   "leaves": {
+    "spend": 195,
+    "mine": 34608,
+    "attack": 56964,
+    "haul": 13911,
+    "defend": 23028,
+    "retreat": 4878,
+    "dead": 73878,
+    "cornered-fight": 2217,
+    "fix-base": 435,
+    "turn-and-fight": 327,
+    "hunt": 2268,
+    "last-stand": 177966,
+    "scavenge-opportunist": 306,
+    "roam": 219
+   },
+   "decisions": 391200
+  },
+  {
+   "seed": 4,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 760.0833333329707,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 103
+   },
+   "leaves": {
+    "spend": 171,
+    "mine": 31869,
+    "haul": 11310,
+    "attack": 60301,
+    "defend": 20733,
+    "retreat": 5814,
+    "turn-and-fight": 648,
+    "dead": 97726,
+    "cornered-fight": 2175,
+    "last-stand": 132875,
+    "fix-base": 1113,
+    "hunt": 105
+   },
+   "decisions": 364840
+  },
+  {
+   "seed": 5,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 807.1999999995945,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 123
+   },
+   "leaves": {
+    "spend": 222,
+    "mine": 39759,
+    "haul": 17547,
+    "defend": 22863,
+    "attack": 64716,
+    "retreat": 9720,
+    "dead": 76143,
+    "cornered-fight": 2571,
+    "fix-base": 672,
+    "scavenge-opportunist": 81,
+    "turn-and-fight": 1347,
+    "hunt": 1614,
+    "last-stand": 150201
+   },
+   "decisions": 387456
+  },
+  {
+   "seed": 6,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 819.7499999995831,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 148
+   },
+   "leaves": {
+    "spend": 225,
+    "mine": 36753,
+    "haul": 17727,
+    "defend": 22266,
+    "attack": 74199,
+    "retreat": 7119,
+    "dead": 42426,
+    "cornered-fight": 3789,
+    "fix-base": 432,
+    "hunt": 5775,
+    "last-stand": 181710,
+    "turn-and-fight": 1008,
+    "scavenge-opportunist": 51
+   },
+   "decisions": 393480
+  },
+  {
+   "seed": 7,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 834.7833333329028,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 123
+   },
+   "leaves": {
+    "spend": 186,
+    "mine": 35517,
+    "haul": 19766,
+    "attack": 72122,
+    "defend": 24711,
+    "retreat": 7476,
+    "turn-and-fight": 633,
+    "cornered-fight": 2931,
+    "fix-base": 609,
+    "dead": 78344,
+    "last-stand": 154619,
+    "hunt": 3686,
+    "scavenge-opportunist": 96
+   },
+   "decisions": 400696
+  },
+  {
+   "seed": 8,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 823.5166666662464,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 166
+   },
+   "leaves": {
+    "spend": 213,
+    "mine": 37212,
+    "haul": 11880,
+    "attack": 85815,
+    "defend": 29967,
+    "retreat": 7827,
+    "turn-and-fight": 477,
+    "dead": 84142,
+    "cornered-fight": 3570,
+    "hunt": 2520,
+    "fix-base": 1068,
+    "last-stand": 130525,
+    "scavenge-opportunist": 72
+   },
+   "decisions": 395288
+  },
+  {
+   "seed": 9,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 807.3499999995944,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 181
+   },
+   "leaves": {
+    "spend": 210,
+    "mine": 32763,
+    "defend": 34656,
+    "attack": 101718,
+    "retreat": 8757,
+    "dead": 124599,
+    "turn-and-fight": 1068,
+    "cornered-fight": 4389,
+    "haul": 16575,
+    "hunt": 1404,
+    "last-stand": 60858,
+    "fix-base": 531
+   },
+   "decisions": 387528
+  },
+  {
+   "seed": 10,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 790.916666666276,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 131
+   },
+   "leaves": {
+    "spend": 186,
+    "mine": 37098,
+    "defend": 23559,
+    "haul": 20238,
+    "retreat": 6279,
+    "dead": 37344,
+    "attack": 68529,
+    "cornered-fight": 2151,
+    "turn-and-fight": 624,
+    "hunt": 1353,
+    "last-stand": 181889,
+    "scavenge-opportunist": 78,
+    "fix-base": 312
+   },
+   "decisions": 379640
+  },
+  {
+   "seed": 11,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 830.51666666624,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 147
+   },
+   "leaves": {
+    "spend": 204,
+    "mine": 28938,
+    "haul": 18586,
+    "attack": 87128,
+    "defend": 27231,
+    "retreat": 13497,
+    "dead": 96686,
+    "cornered-fight": 3819,
+    "turn-and-fight": 645,
+    "fix-base": 408,
+    "hunt": 3018,
+    "last-stand": 118488
+   },
+   "decisions": 398648
+  },
+  {
+   "seed": 12,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 817.0166666662523,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 154
+   },
+   "leaves": {
+    "spend": 183,
+    "mine": 33849,
+    "haul": 11983,
+    "attack": 86140,
+    "defend": 73360,
+    "retreat": 11541,
+    "dead": 67175,
+    "cornered-fight": 3381,
+    "last-stand": 100350,
+    "turn-and-fight": 573,
+    "fix-base": 894,
+    "hunt": 2739
+   },
+   "decisions": 392168
+  },
+  {
+   "seed": 13,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 813.4499999995888,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 128
+   },
+   "leaves": {
+    "spend": 186,
+    "mine": 39006,
+    "haul": 16026,
+    "defend": 20625,
+    "retreat": 7383,
+    "dead": 100596,
+    "attack": 78396,
+    "fix-base": 216,
+    "cornered-fight": 2043,
+    "last-stand": 123396,
+    "turn-and-fight": 711,
+    "hunt": 1872
+   },
+   "decisions": 390456
+  },
+  {
+   "seed": 14,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 818.0499999995847,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 130
+   },
+   "leaves": {
+    "spend": 204,
+    "mine": 33318,
+    "haul": 13173,
+    "attack": 76179,
+    "retreat": 7872,
+    "dead": 191685,
+    "defend": 25833,
+    "cornered-fight": 3204,
+    "fix-base": 660,
+    "last-stand": 37062,
+    "turn-and-fight": 1137,
+    "hunt": 2337
+   },
+   "decisions": 392664
+  },
+  {
+   "seed": 15,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 824.3666666662456,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 140
+   },
+   "leaves": {
+    "spend": 198,
+    "mine": 32244,
+    "haul": 17772,
+    "attack": 82206,
+    "retreat": 7080,
+    "cornered-fight": 3102,
+    "dead": 78919,
+    "defend": 22872,
+    "fix-base": 534,
+    "last-stand": 147115,
+    "hunt": 2964,
+    "turn-and-fight": 513,
+    "scavenge-opportunist": 177
+   },
+   "decisions": 395696
+  },
+  {
+   "seed": 16,
+   "lineup": "class:rot2",
+   "ok": true,
+   "failure": null,
+   "seconds": 814.349999999588,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 166
+   },
+   "leaves": {
+    "spend": 234,
+    "mine": 38790,
+    "haul": 19278,
+    "attack": 124980,
+    "defend": 63258,
+    "retreat": 7845,
+    "dead": 49797,
+    "cornered-fight": 3660,
+    "turn-and-fight": 846,
+    "fix-base": 1278,
+    "hunt": 1527,
+    "last-stand": 79299,
+    "scavenge-opportunist": 96
+   },
+   "decisions": 390888
+  },
+  {
+   "seed": 1,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 820.3333333329159,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 171
+   },
+   "leaves": {
+    "spend": 198,
+    "mine": 31653,
+    "attack": 92599,
+    "defend": 35454,
+    "retreat": 8511,
+    "cornered-fight": 4281,
+    "dead": 49347,
+    "haul": 9012,
+    "turn-and-fight": 705,
+    "hunt": 3710,
+    "last-stand": 156592,
+    "fix-base": 1698
+   },
+   "decisions": 393760
+  },
+  {
+   "seed": 2,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 822.2333333329142,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 141
+   },
+   "leaves": {
+    "spend": 231,
+    "mine": 37671,
+    "attack": 74442,
+    "defend": 28053,
+    "retreat": 6660,
+    "dead": 121895,
+    "cornered-fight": 3033,
+    "haul": 15003,
+    "turn-and-fight": 408,
+    "last-stand": 104100,
+    "fix-base": 897,
+    "scavenge-opportunist": 324,
+    "hunt": 1955
+   },
+   "decisions": 394672
+  },
+  {
+   "seed": 3,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 806.6333333329284,
+   "winner": "sable",
+   "winnerClass": "vanguard",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 143
+   },
+   "leaves": {
+    "spend": 228,
+    "mine": 41217,
+    "defend": 24738,
+    "attack": 74823,
+    "dead": 123370,
+    "retreat": 6729,
+    "cornered-fight": 2646,
+    "haul": 18384,
+    "turn-and-fight": 975,
+    "last-stand": 91566,
+    "scavenge-opportunist": 15,
+    "hunt": 1443,
+    "fix-base": 1050
+   },
+   "decisions": 387184
+  },
+  {
+   "seed": 4,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 810.3499999995917,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 164
+   },
+   "leaves": {
+    "spend": 189,
+    "mine": 34353,
+    "attack": 88884,
+    "defend": 32934,
+    "retreat": 8418,
+    "dead": 78948,
+    "cornered-fight": 2766,
+    "last-stand": 129102,
+    "turn-and-fight": 450,
+    "haul": 10077,
+    "scavenge-opportunist": 156,
+    "hunt": 1722,
+    "fix-base": 969
+   },
+   "decisions": 388968
+  },
+  {
+   "seed": 5,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 825.5499999995778,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 123
+   },
+   "leaves": {
+    "spend": 225,
+    "mine": 44745,
+    "haul": 11787,
+    "defend": 24375,
+    "attack": 68301,
+    "retreat": 6606,
+    "dead": 121368,
+    "cornered-fight": 2931,
+    "turn-and-fight": 375,
+    "hunt": 1737,
+    "last-stand": 112623,
+    "fix-base": 1191
+   },
+   "decisions": 396264
+  },
+  {
+   "seed": 6,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 790.1666666662767,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 105
+   },
+   "leaves": {
+    "spend": 150,
+    "mine": 25107,
+    "attack": 67098,
+    "defend": 22737,
+    "haul": 6261,
+    "retreat": 22179,
+    "dead": 100410,
+    "turn-and-fight": 579,
+    "cornered-fight": 2016,
+    "hunt": 1015,
+    "last-stand": 130966,
+    "fix-base": 762
+   },
+   "decisions": 379280
+  },
+  {
+   "seed": 7,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 830.5833333329066,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 130
+   },
+   "leaves": {
+    "spend": 225,
+    "mine": 37662,
+    "attack": 111203,
+    "defend": 26571,
+    "haul": 17247,
+    "retreat": 9066,
+    "cornered-fight": 3792,
+    "dead": 37032,
+    "turn-and-fight": 1371,
+    "last-stand": 150374,
+    "scavenge-opportunist": 291,
+    "hunt": 3060,
+    "fix-base": 717,
+    "roam": 69
+   },
+   "decisions": 398680
+  },
+  {
+   "seed": 8,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 815.8166666662534,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 103
+   },
+   "leaves": {
+    "spend": 162,
+    "mine": 35760,
+    "attack": 51416,
+    "haul": 19935,
+    "defend": 20781,
+    "retreat": 6471,
+    "cornered-fight": 1572,
+    "dead": 104198,
+    "turn-and-fight": 606,
+    "last-stand": 147658,
+    "hunt": 2724,
+    "fix-base": 309
+   },
+   "decisions": 391592
+  },
+  {
+   "seed": 9,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 800.2833333329341,
+   "winner": "sable",
+   "winnerClass": "interceptor",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 166
+   },
+   "leaves": {
+    "spend": 255,
+    "mine": 37557,
+    "defend": 78464,
+    "attack": 82178,
+    "haul": 9483,
+    "retreat": 8100,
+    "cornered-fight": 3996,
+    "dead": 72808,
+    "turn-and-fight": 495,
+    "fix-base": 1758,
+    "last-stand": 87618,
+    "hunt": 1424
+   },
+   "decisions": 384136
+  },
+  {
+   "seed": 10,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 816.2499999995863,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 85
+   },
+   "leaves": {
+    "spend": 147,
+    "mine": 67299,
+    "attack": 49281,
+    "retreat": 13635,
+    "dead": 107514,
+    "defend": 54645,
+    "turn-and-fight": 285,
+    "cornered-fight": 1689,
+    "last-stand": 84318,
+    "fix-base": 1380,
+    "haul": 9165,
+    "hunt": 2439,
+    "scavenge-opportunist": 3
+   },
+   "decisions": 391800
+  },
+  {
+   "seed": 11,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 803.2166666662648,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 180
+   },
+   "leaves": {
+    "spend": 210,
+    "mine": 26904,
+    "defend": 39651,
+    "attack": 99340,
+    "retreat": 10170,
+    "cornered-fight": 4179,
+    "dead": 117257,
+    "haul": 15921,
+    "last-stand": 68435,
+    "turn-and-fight": 1860,
+    "fix-base": 624,
+    "scavenge-opportunist": 72,
+    "hunt": 921
+   },
+   "decisions": 385544
+  },
+  {
+   "seed": 12,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 780.8166666662852,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 147
+   },
+   "leaves": {
+    "spend": 192,
+    "mine": 32346,
+    "attack": 77624,
+    "retreat": 5865,
+    "cornered-fight": 3048,
+    "dead": 42129,
+    "defend": 68461,
+    "haul": 13716,
+    "last-stand": 130046,
+    "fix-base": 963,
+    "turn-and-fight": 102,
+    "hunt": 276,
+    "scavenge-opportunist": 24
+   },
+   "decisions": 374792
+  },
+  {
+   "seed": 13,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 819.0333333329171,
+   "winner": "sable",
+   "winnerClass": "hauler",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 166
+   },
+   "leaves": {
+    "spend": 183,
+    "mine": 30747,
+    "defend": 27951,
+    "attack": 112347,
+    "haul": 15198,
+    "retreat": 7755,
+    "cornered-fight": 3303,
+    "dead": 97837,
+    "turn-and-fight": 420,
+    "fix-base": 276,
+    "hunt": 2433,
+    "last-stand": 94527,
+    "scavenge-opportunist": 12,
+    "roam": 147
+   },
+   "decisions": 393136
+  },
+  {
+   "seed": 14,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 800.7333333329337,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 157
+   },
+   "leaves": {
+    "spend": 195,
+    "mine": 31521,
+    "attack": 86055,
+    "retreat": 10575,
+    "dead": 86705,
+    "defend": 28188,
+    "cornered-fight": 3372,
+    "haul": 17826,
+    "last-stand": 117182,
+    "fix-base": 330,
+    "scavenge-opportunist": 210,
+    "turn-and-fight": 981,
+    "hunt": 1212
+   },
+   "decisions": 384352
+  },
+  {
+   "seed": 15,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 820.7833333329155,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 136
+   },
+   "leaves": {
+    "spend": 198,
+    "mine": 34920,
+    "defend": 25746,
+    "attack": 77289,
+    "retreat": 6849,
+    "cornered-fight": 2724,
+    "dead": 82022,
+    "fix-base": 462,
+    "haul": 17553,
+    "last-stand": 143981,
+    "scavenge-opportunist": 69,
+    "turn-and-fight": 234,
+    "hunt": 1929
+   },
+   "decisions": 393976
+  },
+  {
+   "seed": 16,
+   "lineup": "class:rot3",
+   "ok": true,
+   "failure": null,
+   "seconds": 809.9166666662587,
+   "winner": "sable",
+   "winnerClass": "excavator",
+   "winnerTier": "hard",
+   "seats": {
+    "sable": 8
+   },
+   "deaths": {
+    "sable": 142
+   },
+   "leaves": {
+    "spend": 171,
+    "mine": 37761,
+    "attack": 77002,
+    "retreat": 6396,
+    "turn-and-fight": 384,
+    "dead": 84710,
+    "defend": 23745,
+    "fix-base": 378,
+    "cornered-fight": 2343,
+    "last-stand": 134836,
+    "haul": 18417,
+    "scavenge-opportunist": 6,
+    "hunt": 2611
+   },
+   "decisions": 388760
+  }
+ ],
+ "leavesBy": {
+  "sable": {
+   "spend": 12465,
+   "mine": 2214213,
+   "attack": 5082630,
+   "haul": 990916,
+   "retreat": 538728,
+   "turn-and-fight": 43614,
+   "dead": 5371818,
+   "defend": 2087947,
+   "cornered-fight": 189213,
+   "fix-base": 44082,
+   "scavenge-opportunist": 3309,
+   "last-stand": 7918097,
+   "hunt": 119653,
+   "roam": 579
+  }
+ },
+ "decisionsBy": {
+  "sable": 24617264
+ },
+ "deathsBy": {
+  "sable": 8976
+ },
+ "seatMatchesBy": {
+  "sable": 512
+ }
+}

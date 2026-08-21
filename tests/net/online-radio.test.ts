@@ -126,8 +126,25 @@ const CONTROL_SECONDS = 60;
  * seats still read `radio === null` at t0 and a minute in, and `send` on a null
  * channel still draws no random number. New value measured twice, stable. Same
  * rule as above: any *other* red still means revert.
+ *
+ * **`a83554a1` → `9b587b0c`, 2026-08-21, a0-121 (Gameplay lane — flagged for the
+ * Netcode Engineer).** The Excavator's `turnMul` moves 0.8 → 0.25: GDD §2.11's
+ * stated penalty on the hull, retuned to the value that actually charges it
+ * (`src/sim/constants.ts` `SHIP_STATS`, measured in
+ * `tests/reports/a0-121-excavator.md`). Two of the control match's seats fly that
+ * hull, so their noses reach a target later, their shots land on different ticks,
+ * and the served field diverges from the first exchange onward — in Teams and FFA
+ * alike, for reasons with nothing to do with a radio.
+ *
+ * **Why this is not the thing rule 3 forbids.** Rule 3 catches a *team-aware path
+ * reachable in FFA*. A class-table cell is not team-aware: `shipTurnRate` reads
+ * `SHIP_STATS[shipClass].turnMul` and nothing about sides, radios or ally lists,
+ * and it moves Teams and FFA by the identical mechanism. The three seats still
+ * read `radio === null` at t0 and a minute in, and `send` on a null channel still
+ * draws no random number. New value measured twice, stable. Same rule as above:
+ * any *other* red still means revert.
  */
-const FFA_GOLDEN = 'a83554a1';
+const FFA_GOLDEN = '9b587b0c';
 
 /** A socket the room can write to. This file asserts on the room's own state and
  *  on its bots, never on what a client was told, so nothing is kept. */

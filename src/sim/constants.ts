@@ -1239,14 +1239,54 @@ export interface ShipStats {
   readonly cargo: number;
 }
 
-/** Per-class stats (GDD §2.11 table). All TUNABLE. */
+/**
+ * Per-class stats (GDD §2.11 table). All TUNABLE.
+ *
+ * ### The Excavator's `turnMul`: 0.8 → **0.25** (a0-121, retune of one TUNABLE cell)
+ *
+ * §2.11 prints **80%** here. It also prints, three paragraphs later, the target
+ * that number is supposed to satisfy — *"no class exceeds a 55% win rate"* — and
+ * calls the whole table *"opening hypotheses (TUNABLE), relative to the
+ * Vanguard."* At 80% the hypothesis fails its own acceptance test by 22 points
+ * (198/256 = 77.3%), and it fails it **for free**: deleting the penalty outright,
+ * `turnMul` 0.8 → 1.0, moves the ship-class contest by −6.3 ± 7.4 points — the
+ * wrong way, and inside the noise. The simulation is not ignoring the design's
+ * number for this penalty; the number is simply too small to be one.
+ *
+ * Why 80% costs nothing, and it is not a wiring bug: `turnMul` scales
+ * `BASE_TURN_RATE`, which §2.11 never states. At 6.5 rad/s the entire penalty is
+ * the 0.12 s by which the Excavator's nose loses a half-turn race to the
+ * Vanguard's — a third of one `fireInterval`. And the stat is **nose-only**:
+ * `integrate` in `./step` adds thrust in world space and never reads
+ * `ship.angle`, so facing does not gate travel and no turn rate can implement
+ * §2.11's *"can't run"* (pinned by `./step.test.ts`, "facing does not gate
+ * travel"). What a turn rate *can* implement is *slow to bring the gun to bear*,
+ * which is the half of that sentence this cell now actually charges.
+ *
+ * **0.25 is measured, not chosen.** The ladder is in
+ * `tests/reports/a0-121-excavator.md` §6 — 0.40 → 67.2%, 0.35 → 62.5%, 0.30 →
+ * 60.9%, 0.25 → 54.7%, 0.20 → 23.4% — and at full resolution on a0-112's own 64
+ * seeds it lands the hull at **124/255 = 48.6% ± 3.1**, still the best hull on the
+ * board, with the median match unmoved at 13:34 and 100% of matches inside 10–15
+ * minutes. **The other three hulls' rows are untouched**, which is the point of
+ * spending the change here rather than on `BASE_TURN_RATE`: §5 of that report
+ * measures the cast-wide dial and it cannot reach the band without slowing every
+ * hull by 4×, at which point the response is a cliff rather than a slope.
+ *
+ * **This diverges from the figure printed in GDD §2.11 and needs the Director to
+ * fold it back.** The lobby's ship-select tiles read this table (§2.11: "derived
+ * from the same value, read out of the simulation's class table"), so the game is
+ * self-consistent either way; the document is what is now behind. The divergence
+ * is asserted rather than hidden — `./upgrades.test.ts` still transcribes §2.11 by
+ * hand and names this one cell as pending.
+ */
 export const SHIP_STATS: Readonly<Record<ShipClass, ShipStats>> = {
   // Quadfin — scout, miner-hunter · 130/120/140 · hull 35 · power 8 · cargo 2
   [ShipClass.Interceptor]: { speedMul: 1.3, accelMul: 1.2, turnMul: 1.4, hull: 35, power: 8, cargo: 2 },
   // Anvil — all-rounder, onboarding default · 100/100/100 · hull 50 · power 10 · cargo 2
   [ShipClass.Vanguard]: { speedMul: 1.0, accelMul: 1.0, turnMul: 1.0, hull: 50, power: 10, cargo: 2 },
-  // Pincer — mining engine, close bruiser · 90/100/80 · hull 55 · power 13 · cargo 2
-  [ShipClass.Excavator]: { speedMul: 0.9, accelMul: 1.0, turnMul: 0.8, hull: 55, power: 13, cargo: 2 },
+  // Pincer — mining engine, close bruiser · 90/100/[80 → 25, a0-121] · hull 55 · power 13 · cargo 2
+  [ShipClass.Excavator]: { speedMul: 0.9, accelMul: 1.0, turnMul: 0.25, hull: 55, power: 13, cargo: 2 },
   // Hammerhead — logistics, siege tank · 85/80/85 · hull 70 · power 9 · cargo 3
   [ShipClass.Hauler]: { speedMul: 0.85, accelMul: 0.8, turnMul: 0.85, hull: 70, power: 9, cargo: 3 },
 };
