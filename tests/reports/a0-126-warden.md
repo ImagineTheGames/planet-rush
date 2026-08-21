@@ -1,6 +1,6 @@
 # a0-126 — 57.0% is not distinguishable from 55%, and the run that could tell says 51.7%
 
-> **_(deep run not yet filed)_**
+> **Inside the band? excavator ship-class: YES** (47.1%, exact 95% 44.0% – 50.2%). **Warden cast: YES** (51.7%, 50.0% – 53.3%). **Bolt Easy pool: NO** (67.4%, 57.0% – 76.6%). Warden's 2.0-point overage was sample noise and no constant moved to remove it: the same tree, measured on 3584 matches instead of 224, puts Warden 3.3 points **under** the ceiling. Bolt is the one target that is genuinely over, it is over by 2.0 points at the conservative bound, and its dial is in Bots' lane, not mine — §4.5 and §5.
 
 **the cast, ship-class and equal-skill contests re-run on a0-112's own seeds and
 then far past them, branch `agent/qa/a0-126-the-last-two-points`**
@@ -28,7 +28,11 @@ Only the readings are hand-written, and they are marked.
 
 ## Targets at a glance
 
-_(deep run not yet filed)_
+| target | contestant | wins / decided | rate | Wilson 95% | exact 95% — the verdict | P(≥ this \| p = 55%) | verdict |
+|---|---|---|---|---|---|---|---|
+| `excavator` — ship-class contest (GDD §2.11) | excavator | 481 / 1021 | **47.1%** | 44.1% – 50.2% | 44.0% – 50.2% | 1.000 | **INSIDE** |
+| Warden — cast contest (GDD §3.8) | warden | 1844 / 3569 | **51.7%** | 50.0% – 53.3% | 50.0% – 53.3% | 1.000 | **INSIDE** |
+| Bolt — Easy pool, one hull (a0-121 §7.5) | bolt | 64 / 95 | **67.4%** | 57.4% – 76.0% | 57.0% – 76.6% | 0.010 | **OVER** |
 
 **And the same three targets as a0-121 filed them, re-read through an interval
 instead of a point estimate:**
@@ -50,6 +54,7 @@ instead of a point estimate:**
 | `roster` — a0-121 | the shipped cast, 7 rotations (every character holds every seat once) | 1…32 | 7 | 224 | 223 | 1 | 0 | 0 |
 | `roster` — **a0-126** | the shipped cast, 7 rotations (every character holds every seat once) | 1…512 | 7 | 3584 | 3569 | 15 | 0 | 0 |
 | `tier` — a0-121 | equal-skill contests — one hull, one tier’s pool, rotated | 1…32 | 7 | 224 | 158 | 66 | 0 | 0 |
+| `tier` — **a0-126** | equal-skill contests — one hull, one tier’s pool, rotated | 1…256 | 7 | 1792 | 1286 | 506 | 0 | 0 |
 
 Reproduce any row:
 
@@ -290,6 +295,12 @@ p = 0.303 came out of the same 223 matches.
   rows compared: 256
   rows differing: 0
   IDENTICAL — the tree is unchanged since a0-121, and the deep run contains its run exactly.
+
+--- tier: a0-121's 224 matches, lifted back out of a0-126's 1792 ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 224
+  rows differing: 0
+  IDENTICAL — the tree is unchanged since a0-121, and the deep run contains its run exactly.
 ```
 
 *Hand-written reading.* Three things are proved at once and each is load-bearing.
@@ -371,11 +382,24 @@ In the six rotations where Warden gets the same number of chairs as everyone els
 
 ### 4.5 · Bolt, and the Easy pool that mostly draws
 
-_(pending)_
+| contestant | a0-121 · 32 seeds | a0-126 · 512 seeds | move | exact 95% (deep) | width before | width after | verdict (deep) |
+|---|---|---|---|---|---|---|---|
+| Bolt | 10 / 12 (**83.3%**) | 64 / 95 (**67.4%**) | -16.0 pts | 57.0% – 76.6% | 46.3 pts | 19.7 pts | **OVER** |
+| Rusty | 2 / 12 (**16.7%**) | 31 / 95 (**32.6%**) | +16.0 pts | 23.4% – 43.0% | 46.3 pts | 19.7 pts | INSIDE |
 
-Easy-pool draws: _(pending)_.
+Easy-pool draws: 417 of 512 (**81.4%**), against a0-121's 52 of 64 (81.3%).
 
-_(pending)_
+*Hand-written reading.* **Bolt: NO.** 64 of 95 decided, **67.4%**, exact 95% **57.0% – 76.6%** — OVER.
+
+a0-121 §7.5 called this pool OVER on **ten coin flips**: 10 of 12 decided matches, a Wilson lower bound that cleared 55% by two tenths of a point. §2.6 re-read the same twelve matches through the conservative interval and got UNRESOLVED. This section is the third reading, on 95 decided matches instead of 12, and it is the one that settles it.
+
+The Easy pool is the hardest of the three targets to measure and the draw rate is why: Easy bots stall out against each other, so a large fraction of Easy matches produce no winner at all and a match played is not a match that counts. That is the number quoted above the reading, and it is the reason this section needed a deep run more than either of the others — at a0-121's depth it had **twelve** usable observations to answer a ceiling question with.
+
+**a0-121's call was right, and it was still a coin flip.** Both of those are true and the report is worse if it prints only one. On twelve matches the verdict was not supportable — §2.6 shows the exact interval running from 51.6% to 97.9%, which is compatible with Bolt being fine and compatible with Bolt being unbeatable. It happened to point the right way. A method that is right when it guesses right is not a method, and this is the cleanest available demonstration that the interval is not a device for talking lanes out of findings: the same instrument that dissolved Warden's overage **confirms** Bolt's, on the same tree, in the same run, out of the same renderer.
+
+**What is actually wrong here is not only Bolt's rate.** 81.4% of Easy-pool matches reach the ceiling with no winner. The pool is not really a contest that Bolt wins 67.4% of — it is a pool that decides 18.6% of the time, and Bolt wins most of the few that decide. A read of "Bolt is 12.4 points over" hides that. My recommendation to the Director is that the Easy-pool ceiling target be **re-specified before anything is tuned against it**, because a win-rate ceiling applied to a pool that draws four times out of five is measuring the wrong quantity, and whatever gets changed to bring 67.4% down will be judged on 95 matches out of 512 played.
+
+Bolt's dial, like Warden's, is a personality in `src/bots/personalities.ts` — Bots' lane. I am filing the number and the interval, not a change. It is a genuine finding and it is the one thing in this report that needs somebody to do something.
 
 ### 4.6 · Match length — the target a nerf trades away
 
@@ -383,6 +407,7 @@ _(pending)_
 |---|---|---|---|---|---|---|---|---|
 | ship-class contest | 1024 | 1024 | 13:34 | **13:35** | 6:39 | 14:10 | 100.0% | **99.6%** |
 | cast contest | 3584 | 3584 | 13:52 | **13:51** | 12:57 | 14:08 | 100.0% | **100.0%** |
+| equal-skill contests | 1792 | 1792 | 13:54 | **13:54** | 11:24 | 14:10 | 100.0% | **100.0%** |
 
 *Hand-written reading.* Match length is not a thing this branch could have broken,
 because this branch moves no constant — it is reported because the brief asks for
@@ -394,11 +419,94 @@ The cast contest is **100.0% inside the band** across all 3584 matches, median 1
 
 I am filing this as a **watch item, not a failure**. The target is that match length lands in 10–15 minutes; the median (13:35) is unmoved from a0-121's 13:34, the p10–p90 band is 13:08–13:48, and 4 fast finishes in 1024 matches is a tail rather than a shift. It is also worth being precise about what the ship-class contest *is*: one behaviour flying every hull against itself, which is a measurement fixture rather than a matchup a player will ever see. But the honest statement is that "100% of matches inside 10–15 minutes" was a claim about sample size, and at 1024 matches the true figure for this section is 99.6%.
 
+### 4.7 · The behaviour a Warden nerf would have had to touch
+
+The brief's second instruction is not to tune Warden by dulling the thing it is
+for. That answer is owed whether or not this branch tunes, and the artifacts
+already carry it: `leavesBy` is character → behaviour leaf → ticks, and a0-105's
+own turn-of-retreat reading is a `harness/mirrors` export, so this is the same
+number that lane is working against rather than a new one invented here.
+
+**Where Warden's decisions go, at a0-121's depth:**
+
+| character | `retreat` | `cornered-fight` | `turn-and-fight` | `last-stand` | `defend` | **home family** | `attack` | `mine` | turn-of-retreat |
+|---|---|---|---|---|---|---|---|---|---|
+| **Warden** | 4.9% | 2.1% | 1.1% | 7.3% | 8.9% | **24.3%** | 39.6% | 11.2% | 17.8% |
+| foreman | 12.9% | 3.3% | 2.8% | 0.0% | 14.0% | **32.9%** | 26.7% | 10.4% | 17.7% |
+| sable | 4.1% | 1.3% | 0.7% | 8.1% | 8.2% | **22.4%** | 39.2% | 7.7% | 14.4% |
+| vulture | 1.9% | 1.0% | 0.2% | 33.4% | 6.6% | **43.2%** | 11.9% | 2.3% | 8.4% |
+| patch | 12.5% | 2.9% | 2.1% | 4.2% | 14.4% | **36.1%** | 25.8% | 9.8% | 14.5% |
+| rusty | 15.9% | 1.0% | 3.2% | 25.8% | 14.2% | **60.0%** | 0.0% | 17.6% | 16.8% |
+| bolt | 8.8% | 0.1% | 2.2% | 7.3% | 16.9% | **35.3%** | 0.0% | 6.7% | 20.1% |
+
+**And the same census over this branch's 512-seed run:**
+
+| character | `retreat` | `cornered-fight` | `turn-and-fight` | `last-stand` | `defend` | **home family** | `attack` | `mine` | turn-of-retreat |
+|---|---|---|---|---|---|---|---|---|---|
+| **Warden** | 4.7% | 2.1% | 1.0% | 7.4% | 9.0% | **24.3%** | 38.9% | 11.2% | 18.0% |
+| foreman | 13.1% | 3.2% | 2.8% | 0.1% | 14.3% | **33.4%** | 26.5% | 10.4% | 17.5% |
+| sable | 4.1% | 1.3% | 0.6% | 8.8% | 8.4% | **23.2%** | 38.8% | 7.8% | 13.7% |
+| vulture | 2.3% | 1.0% | 0.2% | 31.9% | 6.8% | **42.2%** | 11.8% | 2.2% | 8.0% |
+| patch | 12.5% | 3.1% | 2.1% | 4.3% | 14.0% | **36.0%** | 26.0% | 10.1% | 14.5% |
+| rusty | 14.6% | 1.0% | 2.9% | 29.1% | 13.4% | **61.0%** | 0.0% | 17.1% | 16.7% |
+| bolt | 9.0% | 0.1% | 2.3% | 5.3% | 17.4% | **34.0%** | 0.0% | 6.8% | 20.2% |
+
+*Hand-written reading.* Warden's home family — retreat, cornered-fight,
+turn-and-fight, last-stand, defend — is **24.3%** of its decisions, and the
+comparison that isolates it is **Foreman, which flies the same hull at 32.9%**.
+So the retreat path is not what separates Warden from its hull-mate; Warden is
+the character that spends *less* of its time there and more of it attacking. A
+nerf routed through `homebody` would push a character that is already less of a
+homebody than the one it shares an excavator with.
+
+**a0-121's hull retune already moved this path**, which is the part worth putting
+in front of the Bots lane:
+
+| leaf | before a0-121 | after a0-121 (shipped) | move |
+|---|---|---|---|
+| `retreat` | 5.0% | 4.9% | -0.11 pts |
+| `cornered-fight` | 1.9% | 2.1% | +0.25 pts |
+| `turn-and-fight` | 1.0% | 1.1% | +0.02 pts |
+| `last-stand` | 3.2% | 7.3% | +4.11 pts |
+| `defend` | 8.3% | 8.9% | +0.67 pts |
+| `attack` | 39.5% | 39.6% | +0.17 pts |
+| `mine` | 13.1% | 11.2% | -1.92 pts |
+| `haul` | 9.0% | 6.7% | -2.30 pts |
+| `dead` | 17.3% | 16.5% | -0.79 pts |
+| **home family** | **19.4%** | **24.3%** | **+4.94 pts** |
+| turn-of-retreat (a0-105) | 17.3% | 17.8% | +0.55 pts |
+
+The home family went **19.4% → 24.3%**, and almost all of it is `last-stand`
+(+4.1 pts) — a hull that is worse at disengaging spends more of its time making
+final stands. Meanwhile **turn-of-retreat moved +0.55 points and is intact**,
+which is the a0-105/a0-107 dead-band number specifically. So the shipped tree
+already contains a change to Warden's home behaviour that nobody aimed at it, and
+a second, deliberate one aimed at 2.0 points of win rate would land on top of it
+without either lane having measured the first. That is the concrete version of
+"do not undo this month's bot work", and it is an argument against tuning that
+survives independently of §2's finding that there was nothing to tune.
+
+---
+
 ---
 
 ## 5 · The decision
 
-_(pending)_
+**No constant moves. `src/sim/constants.ts` is untouched on this branch — `git diff` it against main and it is empty.**
+
+The brief asked for one thing before any tuning: say whether 57.0% is distinguishable from 55% at 224 matches. It is not — one-sided p = 0.303, an overage of 4.3 matches, and a sample ~11× short of the one that could tell (§2). The brief's own instruction for that case is that the honest finding is *"run more matches"*. §4 ran them: **51.7%**, exact 95% 50.0% – 53.3%, INSIDE.
+
+So there is no longer a case to tune, and this section would end here except that the brief asked a second question worth answering on the record — *what behaviour would a Warden nerf have had to touch* — and the answer is the reason I would have declined even on a significant result.
+
+**1 · The dial is not in my lane.** Warden's character is `homebody: 0.55` in `src/bots/personalities.ts` — Bots' file, not mine. I own `src/sim/constants.ts` values. There is no value in my lane that moves Warden alone: the constants Warden leans on are hull and combat values it **shares with Foreman**, which flies the same excavator, and with the rest of the cast. A "Warden nerf" written from this lane is a cast-wide or hull-wide change wearing one character's name, and §4.4 has just shown the hull sitting at 47.1% where the brief wants it.
+
+**2 · It is the behaviour the brief says not to dull.** `homebody` *is* the retreat-into-turret-cover path (GDD §2.6) that a0-105 and a0-107 have just reworked. §4.7 measures it: Warden's home family — retreat, cornered-fight, turn-and-fight, last-stand, defend — is 24.3% of its decisions, and a0-121's hull retune already moved that path (19.4% → 24.3%, almost all of it last-stand) while turn-of-retreat, the a0-105/a0-107 dead-band number, moved +0.55 and is intact. A nerf aimed at the win rate lands on the part of Warden that this month's bot work is about.
+
+**3 · The residual was never big enough to spend that on.** Two points on 224 matches is four matches. Undoing a month of another lane's work to move four matches — matches that §4 has now shown were not there — is the change I would not have been able to defend next week, which is exactly the failure mode the brief names.
+
+**The one target that does need somebody:** not Warden — Bolt. §4.5 resolves the Easy pool at 64 of 95 decided, 67.4%, exact 95% 57.0% – 76.6%, entirely over the ceiling. That is a real finding on real evidence and I am not softening it. It is also not mine to fix twice over: Bolt is a personality, and the pool it is measured in draws 81.4% of the time, which makes the ceiling target itself the wrong instrument for that pool. Both halves of that go to the Director in §7 rather than becoming an edit here.
+
+**What I would hand the Bots lane instead, if a future deep run does find Warden over:** not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is **50.0%** — fair share. The pooled number is inflated by a rotation that gives it two chairs out of eight, and the cheapest honest fix for a cast contest that does not divide evenly is in the **seating**, which costs no behaviour at all. That is a harness change in my own lane and I will make it the day it is needed. It is not needed today.
 
 ---
 
@@ -444,7 +552,19 @@ finding which stops being true fails a test before it misleads a reader.
 
 ## 7 · Reading
 
-_(pending)_
+**Two of the three targets are inside the band. The third is genuinely over, and it is not the one this brief was opened about.**
+
+- **excavator, ship-class contest — YES.** 47.1% on 1021 decided, exact 95% 44.0% – 50.2%. a0-121 met this target on evidence that cleared the line by a tenth of a point; it now clears it by 4.8.
+- **Warden, cast contest — YES.** 51.7% on 3569 decided, exact 95% 50.0% – 53.3%. The 2.0-point overage a0-121 reported was sampling noise and this branch moved no constant to remove it.
+- **Bolt, Easy pool — NO.** 67.4% on 95 decided, exact 95% 57.0% – 76.6% — the whole interval above the ceiling, one-sided p = 0.010. a0-121 called this OVER on twelve matches and was right; §4.5 is the evidence that makes it a finding rather than a guess, and it also shows why the target needs re-specifying before it is tuned against — 81.4% of the pool draws.
+
+**Match length holds**, with one honest amendment: the cast contest is 100% inside 10–15 minutes over 3584 matches, and the ship-class fixture is 99.6% — a short tail that only a deep run could see. Filed as a watch item in §4.6.
+
+**The thing this report actually asks the Director to take away** is not any of the three verdicts. It is that all three of them were previously decided by comparing a point estimate to a line, at a sample size that cannot support the comparison, and that this is a property of the *reporting convention* rather than of any one lane's care. a0-121 measured exactly as carefully as a0-112 and a0-117 did. The convention is what produced one target called met and one called missed on evidence of identical quality — and then, at depth, reversed the first and confirmed the second. That is the signature of a coin-flip method: it is not that it is always wrong, it is that being right carries no information.
+
+The fix is cheap and it is already built: `targets.ts` prints **INSIDE / OVER / UNRESOLVED**, and `sampleForExact` turns UNRESOLVED into a number of matches to run rather than a constant to change. I would like the next balance report in this series to use it, and I would like **UNRESOLVED to be an acceptable thing for a lane to file** — because the alternative, which this series has been doing, is that every marginal number gets rounded to a verdict and roughly half of those verdicts are wrong.
+
+Cost, for calibration: the deep run is 6400 matches, about an hour of wall clock on 8 cores because the harness now shards by seed range (§6.1). Resolving all three targets properly was affordable. It was only ever the *convention* that made it look like the choice was tune-or-shrug.
 
 ---
 

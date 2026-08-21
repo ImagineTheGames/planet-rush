@@ -37,6 +37,7 @@ import { readTarget, topOf, verdictOf, verdictTable } from './targets';
 import type { TargetReading } from './targets';
 import { restrict } from './reproduce';
 import { pairedTable } from './paired';
+import { behaviourTables } from './behaviour';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const read = (p: string): SectionRun => JSON.parse(readFileSync(resolve(ROOT, p), 'utf8')) as SectionRun;
@@ -278,12 +279,16 @@ const twoChair = deepRoster ? seatCut(deepRoster, 'warden', (n) => n > 1) : null
 const outsideBand = (run: SectionRun) => run.matches.filter((m) => m.ok && (m.seconds < 600 || m.seconds > 900));
 
 const HEADLINE = deepRoster && deepClass && deepTier
-  ? `Inside the band? excavator ship-class: **${yesNo(tExc)}** (${pct(tExc!.rate)}). ` +
-    `Warden cast: **${yesNo(tWar)}** (${pct(tWar!.rate)}). ` +
-    `Bolt Easy pool: **${yesNo(tBolt)}** (${pct(tBolt!.rate)}). ` +
-    `No constant moved: a0-121's residual +2.0 on Warden was sample noise, and the ` +
-    `${deepRoster.matches.length}-match run that could resolve it puts Warden at ` +
-    `${pct(tWar!.rate)} (exact 95% ${pct(tWar!.exactLo)} – ${pct(tWar!.exactHi)}), provably under the ceiling.`
+  ? `**Inside the band? excavator ship-class: ${yesNo(tExc)}** (${pct(tExc!.rate)}, exact 95% ` +
+    `${pct(tExc!.exactLo)} – ${pct(tExc!.exactHi)}). **Warden cast: ${yesNo(tWar)}** (${pct(tWar!.rate)}, ` +
+    `${pct(tWar!.exactLo)} – ${pct(tWar!.exactHi)}). **Bolt Easy pool: ${yesNo(tBolt)}** ` +
+    `(${pct(tBolt!.rate)}, ${pct(tBolt!.exactLo)} – ${pct(tBolt!.exactHi)}). ` +
+    `Warden's 2.0-point overage was sample noise and no constant moved to remove it: the same tree, ` +
+    `measured on ${deepRoster.matches.length} matches instead of ${priorRoster.matches.length}, ` +
+    `puts Warden ${f(100 * (WIN_RATE_CEILING - tWar!.rate))} points **under** the ceiling. ` +
+    `Bolt is the one target that is genuinely over, it is over by ` +
+    `${f(100 * (tBolt!.exactLo - WIN_RATE_CEILING))} points at the conservative bound, and its dial ` +
+    `is in Bots' lane, not mine — §4.5 and §5.`
   : '_(deep run not yet filed)_';
 
 
@@ -358,6 +363,10 @@ const fields: Record<string, string> = {
     : '_(pending)_',
 
   HEADLINE,
+
+  BEHAVIOUR_CENSUS: behaviourTables(null).census,
+  BEHAVIOUR_MOVE: behaviourTables(null).move,
+  BEHAVIOUR_DEEP: deepRoster ? behaviourTables(`${DEEP}/roster.json`).deepCensus : '_(pending)_',
 
   WARDEN_READING: !tWar || !oneChair || !twoChair || !deepRoster
     ? '_(pending)_'
@@ -435,6 +444,29 @@ const fields: Record<string, string> = {
           `all and a match played is not a match that counts. That is the number quoted above the ` +
           `reading, and it is the reason this section needed a deep run more than either of the others ` +
           `— at a0-121's depth it had **twelve** usable observations to answer a ceiling question with.`,
+        ``,
+        `**a0-121's call was right, and it was still a coin flip.** Both of those are true and the ` +
+          `report is worse if it prints only one. On twelve matches the verdict was not supportable ` +
+          `— §2.6 shows the exact interval running from 51.6% to 97.9%, which is compatible with Bolt ` +
+          `being fine and compatible with Bolt being unbeatable. It happened to point the right way. ` +
+          `A method that is right when it guesses right is not a method, and this is the cleanest ` +
+          `available demonstration that the interval is not a device for talking lanes out of ` +
+          `findings: the same instrument that dissolved Warden's overage **confirms** Bolt's, on the ` +
+          `same tree, in the same run, out of the same renderer.`,
+        ``,
+        `**What is actually wrong here is not only Bolt's rate.** ${pct(easyDraws(deepTier) / easyRows(deepTier))} ` +
+          `of Easy-pool matches reach the ceiling with no winner. The pool is not really a contest ` +
+          `that Bolt wins ${pct(tBolt.rate)} of — it is a pool that decides ` +
+          `${pct(1 - easyDraws(deepTier) / easyRows(deepTier))} of the time, and Bolt wins most of ` +
+          `the few that decide. A read of "Bolt is ${f(100 * (tBolt.rate - WIN_RATE_CEILING))} points ` +
+          `over" hides that. My recommendation to the Director is that the Easy-pool ceiling target ` +
+          `be **re-specified before anything is tuned against it**, because a win-rate ceiling ` +
+          `applied to a pool that draws four times out of five is measuring the wrong quantity, and ` +
+          `whatever gets changed to bring 67.4% down will be judged on 95 matches out of 512 played.`,
+        ``,
+        `Bolt's dial, like Warden's, is a personality in \`src/bots/personalities.ts\` — Bots' lane. ` +
+          `I am filing the number and the interval, not a change. It is a genuine finding and it is ` +
+          `the one thing in this report that needs somebody to do something.`,
       ].join('\n'),
 
   LENGTH_READING: !deepClass || !deepRoster
@@ -511,6 +543,15 @@ const fields: Record<string, string> = {
           `§4 has now shown were not there — is the change I would not have been able to defend next ` +
           `week, which is exactly the failure mode the brief names.`,
         ``,
+        `**The one target that does need somebody:** not Warden — Bolt. §4.5 resolves the Easy pool ` +
+          `at ${tBolt.wins} of ${tBolt.decided} decided, ${pct(tBolt.rate)}, exact 95% ` +
+          `${pct(tBolt.exactLo)} – ${pct(tBolt.exactHi)}, entirely over the ceiling. That is a real ` +
+          `finding on real evidence and I am not softening it. It is also not mine to fix twice ` +
+          `over: Bolt is a personality, and the pool it is measured in draws ` +
+          `${pct(deepTier ? easyDraws(deepTier) / easyRows(deepTier) : 0)} of the time, which makes ` +
+          `the ceiling target itself the wrong instrument for that pool. Both halves of that go to ` +
+          `the Director in §7 rather than becoming an edit here.`,
+        ``,
         `**What I would hand the Bots lane instead, if a future deep run does find Warden over:** ` +
           `not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is ` +
           `**${pct(oneChair.rate)}** — fair share. The pooled number is inflated by a rotation that ` +
@@ -523,7 +564,8 @@ const fields: Record<string, string> = {
   READING: !tWar || !tExc || !tBolt
     ? '_(pending)_'
     : [
-        `**All three targets are inside the band, and the third of them was never outside it.**`,
+        `**Two of the three targets are inside the band. The third is genuinely over, and it is not ` +
+          `the one this brief was opened about.**`,
         ``,
         `- **excavator, ship-class contest — ${yesNo(tExc)}.** ${pct(tExc.rate)} on ${tExc.decided} ` +
           `decided, exact 95% ${pct(tExc.exactLo)} – ${pct(tExc.exactHi)}. a0-121 met this target on ` +
@@ -533,8 +575,11 @@ const fields: Record<string, string> = {
           `exact 95% ${pct(tWar.exactLo)} – ${pct(tWar.exactHi)}. The 2.0-point overage a0-121 ` +
           `reported was sampling noise and this branch moved no constant to remove it.`,
         `- **Bolt, Easy pool — ${yesNo(tBolt)}.** ${pct(tBolt.rate)} on ${tBolt.decided} decided, ` +
-          `exact 95% ${pct(tBolt.exactLo)} – ${pct(tBolt.exactHi)}, against the twelve matches a0-121 ` +
-          `called it OVER on.`,
+          `exact 95% ${pct(tBolt.exactLo)} – ${pct(tBolt.exactHi)} — the whole interval above the ` +
+          `ceiling, one-sided p = ${tBolt.p1.toFixed(3)}. a0-121 called this OVER on twelve matches ` +
+          `and was right; §4.5 is the evidence that makes it a finding rather than a guess, and it ` +
+          `also shows why the target needs re-specifying before it is tuned against — ` +
+          `${pct(deepTier ? easyDraws(deepTier) / easyRows(deepTier) : 0)} of the pool draws.`,
         ``,
         `**Match length holds**, with one honest amendment: the cast contest is 100% inside 10–15 ` +
           `minutes over ${deepRoster ? deepRoster.matches.length : 0} matches, and the ship-class ` +
@@ -546,7 +591,10 @@ const fields: Record<string, string> = {
           `estimate to a line, at a sample size that cannot support the comparison, and that this is ` +
           `a property of the *reporting convention* rather than of any one lane's care. a0-121 ` +
           `measured exactly as carefully as a0-112 and a0-117 did. The convention is what produced ` +
-          `one target called met and one called missed on evidence of identical quality.`,
+          `one target called met and one called missed on evidence of identical quality — and then, ` +
+          `at depth, reversed the first and confirmed the second. That is the signature of a ` +
+          `coin-flip method: it is not that it is always wrong, it is that being right carries no ` +
+          `information.`,
         ``,
         `The fix is cheap and it is already built: `+'`targets.ts`'+` prints **INSIDE / OVER / ` +
           `UNRESOLVED**, and `+'`sampleForExact`'+` turns UNRESOLVED into a number of matches to run ` +
@@ -556,9 +604,9 @@ const fields: Record<string, string> = {
           `gets rounded to a verdict and roughly half of those verdicts are wrong.`,
         ``,
         `Cost, for calibration: the deep run is ${(deepRoster && deepClass && deepTier ? deepRoster.matches.length + deepClass.matches.length + deepTier.matches.length : 0)} ` +
-          `matches, about 40 minutes of wall clock on 8 cores because the harness now shards by seed ` +
-          `range (§6.1). Resolving Warden properly was affordable. It was only ever the *convention* ` +
-          `that made it look like the choice was tune-or-shrug.`,
+          `matches, about an hour of wall clock on 8 cores because the harness now shards by seed ` +
+          `range (§6.1). Resolving all three targets properly was affordable. It was only ever the ` +
+          `*convention* that made it look like the choice was tune-or-shrug.`,
       ].join('\n'),
 };
 

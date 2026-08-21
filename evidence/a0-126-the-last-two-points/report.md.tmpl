@@ -1,6 +1,6 @@
 # a0-126 — 57.0% is not distinguishable from 55%, and the run that could tell says {{WARDEN_RATE}}
 
-> **{{HEADLINE}}**
+> {{HEADLINE}}
 
 **the cast, ship-class and equal-skill contests re-run on a0-112's own seeds and
 then far past them, branch `agent/qa/a0-126-the-last-two-points`**
@@ -263,6 +263,47 @@ Easy-pool draws: {{EASY_DRAWS}}.
 because this branch moves no constant — it is reported because the brief asks for
 it and because a 16× sample is a better measurement of it than a 1× sample was.
 {{LENGTH_READING}}
+
+### 4.7 · The behaviour a Warden nerf would have had to touch
+
+The brief's second instruction is not to tune Warden by dulling the thing it is
+for. That answer is owed whether or not this branch tunes, and the artifacts
+already carry it: `leavesBy` is character → behaviour leaf → ticks, and a0-105's
+own turn-of-retreat reading is a `harness/mirrors` export, so this is the same
+number that lane is working against rather than a new one invented here.
+
+**Where Warden's decisions go, at a0-121's depth:**
+
+{{BEHAVIOUR_CENSUS}}
+
+**And the same census over this branch's 512-seed run:**
+
+{{BEHAVIOUR_DEEP}}
+
+*Hand-written reading.* Warden's home family — retreat, cornered-fight,
+turn-and-fight, last-stand, defend — is **24.3%** of its decisions, and the
+comparison that isolates it is **Foreman, which flies the same hull at 32.9%**.
+So the retreat path is not what separates Warden from its hull-mate; Warden is
+the character that spends *less* of its time there and more of it attacking. A
+nerf routed through `homebody` would push a character that is already less of a
+homebody than the one it shares an excavator with.
+
+**a0-121's hull retune already moved this path**, which is the part worth putting
+in front of the Bots lane:
+
+{{BEHAVIOUR_MOVE}}
+
+The home family went **19.4% → 24.3%**, and almost all of it is `last-stand`
+(+4.1 pts) — a hull that is worse at disengaging spends more of its time making
+final stands. Meanwhile **turn-of-retreat moved +0.55 points and is intact**,
+which is the a0-105/a0-107 dead-band number specifically. So the shipped tree
+already contains a change to Warden's home behaviour that nobody aimed at it, and
+a second, deliberate one aimed at 2.0 points of win rate would land on top of it
+without either lane having measured the first. That is the concrete version of
+"do not undo this month's bot work", and it is an argument against tuning that
+survives independently of §2's finding that there was nothing to tune.
+
+---
 
 ---
 
