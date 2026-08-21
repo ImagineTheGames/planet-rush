@@ -935,6 +935,63 @@ the minimap and nothing else, 24 violations
 
 ---
 
+### 4.13a SURFACE — an anchor that cannot say whose box it means (a0-125, 2026-08-21)
+
+| Export | Verdict |
+|---|---|
+| `src/ui/anchor-reach.ts#surfaceOf` | SURFACE — which of the two boxes an id was laid out in |
+| `src/ui/anchor-reach.ts#anchorFrame` | SURFACE — the reader that hands an id its own box |
+| `src/ui/anchor-reach.ts#cornerRivals` | SURFACE — the check itself: two elements, one region, two boxes |
+| `src/ui/anchor-reach.ts#describeCornerRival` | SURFACE — one rival pair, in a sentence |
+
+Same file and the same shape as [§4.13](#413-surface--a-placement-contract-that-must-not-be-the-placement-a0-103-2026-08-20),
+one question over — and a0-125 is the second time this contract was green on a
+screen that was wrong.
+
+An `AnchorSpec` says `top-right`. It does not say *the top-right of what*, and
+since a0-74 this game has had two answers on one screen: the HUD's corner chrome
+is bound to a centred **content box** (so a 32:9 display does not put the
+instruments a head-turn apart), while `main.ts` lays the build stamp, the ping
+stamp and the re-enter-fullscreen affordance out against the **glass**. On a
+798×384 phone the two boxes are the same rect, so `station-hp` at `HUD_PAD` 16 and
+`fullscreen-reenter` at margin 12 reached the same corner, and a 48×48 button sat
+on **31% of own-station HP for 462 swept frames** — with *both* halves of the
+placement contract green. Containment passed: each was inside its own zone. Reach
+passed: each was at its own margin. QA's sentence is the finding:
+
+> a0-103 asserted that each one reaches its own corner; nobody asked whether they
+> reach the same one.
+
+`LayoutSurface` is the missing word and `cornerRivals` is the missing question —
+*every pair declaring one region from two different boxes whose rects really
+meet*. Like §4.13, it is deliberately a second statement rather than a call inside
+the code that places things:
+
+- **A production caller would be the placement asserted against itself.** The code
+  that steps the HOME column aside (`hud-geometry.ts` `glassCornerReserve`)
+  computes the clearance, so a `cornerRivals` call beside it returns nothing by
+  construction, and it returns nothing *by the same arithmetic* on the frame where
+  that arithmetic is wrong. That is §4.13's failure mode exactly.
+- **The honest caller is upstairs.** `@platform/layout-registry` already holds
+  every frame's entries and already answers `placement()`; this is the third
+  question to ask of the same list. That file is Platform's and its anchor
+  vocabulary is ratified, so — as with `layout-exclusions.ts` and the rest of
+  `anchor-reach.ts` — the facility is written in the registry's own vocabulary
+  (`LayoutEntry` in, findings out, ids and `Rect`s throughout) to lift there
+  verbatim on the day its owner wants it.
+- **`surfaceOf` and `anchorFrame` are the same seam, not helpers.**
+  `CONTENT_BOUND_IDS` was already the data; before a0-125 it was consulted only by
+  an inline `includes` in `src/ui/minimap.test.ts`'s `frameFor`. Naming the concept
+  is what let the question be asked at all.
+
+What holds it is `src/ui/anchor-reach.test.ts`, which stages the **pre-fix**
+registry for that phone frame, asserts that `withinAnchor` and `reachViolations`
+both pass on it, and then shows `cornerRivals` naming the pair with a
+`{44×30}` overlap — a0-122's own measurement. The photographs are in
+`evidence/a0-125-the-corner-two-boxes-share/`.
+
+---
+
 ### 4.14 SURFACE — an overlap the placement cannot honestly ask itself (a0-114, 2026-08-20)
 
 | Export | Verdict |
