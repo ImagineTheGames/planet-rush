@@ -389,25 +389,32 @@ const fields: Record<string, string> = {
         ``,
         `**And the seat cut survives depth, which the win rate did not.** §2.4 found Warden holding ` +
           `two chairs in one rotation of seven and suggested some of the pooled rate was the seating. ` +
-          `At ${deepRoster.matches.length} matches that is no longer a suggestion:`,
+          `At ${deepRoster.matches.length} matches that is no longer a suggestion — it is the third ` +
+          `table above. In the six rotations where Warden gets one chair like everyone else it wins ` +
+          `**${pct(oneChair.rate)}**, ${f(100 * (WIN_RATE_CEILING - oneChair.rate))} points under the ` +
+          `ceiling and INSIDE. In the rotation where it gets two it wins **${pct(twoChair.rate)}**, ` +
+          `and *that* interval (${pct(twoChair.lo)} – ${pct(twoChair.hi)}) is entirely above the ` +
+          `ceiling. Doubling a contestant's seats raises its win rate; that is arithmetic, not ` +
+          `character.`,
         ``,
-        table(
-          ['cut', 'wins / decided', 'rate', 'exact 95%', 'vs 55%'],
-          [
-            ['one chair (6 rotations of 7)', `${oneChair.wins} / ${oneChair.decided}`, `**${pct(oneChair.rate)}**`, `${pct(oneChair.lo)} – ${pct(oneChair.hi)}`, verdictOf(oneChair.lo, oneChair.hi)],
-            ['two chairs (1 rotation of 7)', `${twoChair.wins} / ${twoChair.decided}`, `**${pct(twoChair.rate)}**`, `${pct(twoChair.lo)} – ${pct(twoChair.hi)}`, verdictOf(twoChair.lo, twoChair.hi) === 'OVER' ? '**OVER**' : verdictOf(twoChair.lo, twoChair.hi)],
-          ],
-        ),
+        `The pooled ${pct(tWar.rate)} mixes the two and is still INSIDE, so nothing here needs fixing. ` +
+          `What it means is that the cast contest's **headline number carries a seating artifact ` +
+          `worth about ${f(100 * (tWar.rate - oneChair.rate))} points**, and any future report that ` +
+          `finds Warden a point or two over should cut by chairs before it reaches for a constant — ` +
+          `because a rotation that hands one character two chairs out of eight will manufacture ` +
+          `roughly that much overage on its own. Filed as a measurement note for whoever runs this ` +
+          `next; it is not a request for a change.`,
         ``,
-        `In the six rotations where Warden gets the same number of chairs as everyone else it wins ` +
-          `**${pct(oneChair.rate)}** — fair share, to within the width of a rounding. In the rotation ` +
-          `where it gets two it wins ${pct(twoChair.rate)}, and *that* interval is entirely above the ` +
-          `ceiling. Two seats out of eight win more often than one seat out of eight; that is ` +
-          `arithmetic, not character. The pooled ${pct(tWar.rate)} is the average of those two things ` +
-          `and it is still INSIDE, so nothing here needs fixing — but it does mean the cast contest's ` +
-          `**headline number carries a seating artifact**, and any future report that finds Warden a ` +
-          `point or two high should cut by chairs before it reaches for a constant. Filed as a ` +
-          `measurement note for whoever runs this next; it is not a request for a change.`,
+        `**One thing the ceiling does not measure, stated plainly because this report is the place ` +
+          `for it.** Warden wins ${pct(tWar.rate)} of the cast contest holding, on average, ` +
+          `${pct(1 / 7)} of the cast's identities and ${pct(2 / 8 / 7 + 6 / 7 / 8)} of the chairs. ` +
+          `Foreman is next at ${pct(castCharacterWins(deepRoster).find((w) => w.key === 'foreman')!.rate)} ` +
+          `and no other character clears ${pct(Math.max(...castCharacterWins(deepRoster).filter((w) => w.key !== 'warden' && w.key !== 'foreman').map((w) => w.rate)))}. ` +
+          `The cast is extremely top-heavy and Warden is comfortably inside the 55% ceiling at the ` +
+          `same time — both are true, and they are true because a win-rate ceiling asks "is anyone ` +
+          `dominant" and a seven-character cast can be badly lopsided well under 55%. That is a ` +
+          `design observation for the Director and explicitly **not** one of this brief's three ` +
+          `targets; I raise it once and do not act on it.`,
       ].join('\n'),
 
   CLASS_READING: !tExc
@@ -554,11 +561,12 @@ const fields: Record<string, string> = {
         ``,
         `**What I would hand the Bots lane instead, if a future deep run does find Warden over:** ` +
           `not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is ` +
-          `**${pct(oneChair.rate)}** — fair share. The pooled number is inflated by a rotation that ` +
-          `gives it two chairs out of eight, and the cheapest honest fix for a cast contest that does ` +
-          `not divide evenly is in the **seating**, which costs no behaviour at all. That is a ` +
-          `harness change in my own lane and I will make it the day it is needed. It is not needed ` +
-          `today.`,
+          `**${pct(oneChair.rate)}** and INSIDE; the pooled number is pushed up about ` +
+          `${f(100 * (tWar.rate - oneChair.rate))} points by the one rotation in seven that gives it ` +
+          `two chairs out of eight. The cheapest honest fix for a cast contest whose seven characters ` +
+          `do not divide into eight chairs is in the **seating**, and it costs no behaviour at all. ` +
+          `That is a harness change in my own lane and I will make it the day it is needed. It is not ` +
+          `needed today.`,
       ].join('\n'),
 
   READING: !tWar || !tExc || !tBolt

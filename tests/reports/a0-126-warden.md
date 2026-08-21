@@ -346,14 +346,11 @@ Warden wins **51.7%** of 3569 decided matches, exact 95% **50.0% – 53.3%** —
 
 This is what §2.5 predicted and it is worth being blunt about the size of it. a0-121's 127 of 223 was 2.0 points over the line with a one-sided p of 0.303 — one draw in three from a fair coin looks at least that bad. The deep run draws 3569 decided matches from the same generator and lands 3.3 points **under** it. Both numbers are correct measurements of the same tree; only one of them was measured at a size that could tell.
 
-**And the seat cut survives depth, which the win rate did not.** §2.4 found Warden holding two chairs in one rotation of seven and suggested some of the pooled rate was the seating. At 3584 matches that is no longer a suggestion:
+**And the seat cut survives depth, which the win rate did not.** §2.4 found Warden holding two chairs in one rotation of seven and suggested some of the pooled rate was the seating. At 3584 matches that is no longer a suggestion — it is the third table above. In the six rotations where Warden gets one chair like everyone else it wins **50.0%**, 5.0 points under the ceiling and INSIDE. In the rotation where it gets two it wins **61.5%**, and *that* interval (57.1% – 65.7%) is entirely above the ceiling. Doubling a contestant's seats raises its win rate; that is arithmetic, not character.
 
-| cut | wins / decided | rate | exact 95% | vs 55% |
-|---|---|---|---|---|
-| one chair (6 rotations of 7) | 1531 / 3060 | **50.0%** | 48.2% – 51.8% | INSIDE |
-| two chairs (1 rotation of 7) | 313 / 509 | **61.5%** | 57.1% – 65.7% | **OVER** |
+The pooled 51.7% mixes the two and is still INSIDE, so nothing here needs fixing. What it means is that the cast contest's **headline number carries a seating artifact worth about 1.6 points**, and any future report that finds Warden a point or two over should cut by chairs before it reaches for a constant — because a rotation that hands one character two chairs out of eight will manufacture roughly that much overage on its own. Filed as a measurement note for whoever runs this next; it is not a request for a change.
 
-In the six rotations where Warden gets the same number of chairs as everyone else it wins **50.0%** — fair share, to within the width of a rounding. In the rotation where it gets two it wins 61.5%, and *that* interval is entirely above the ceiling. Two seats out of eight win more often than one seat out of eight; that is arithmetic, not character. The pooled 51.7% is the average of those two things and it is still INSIDE, so nothing here needs fixing — but it does mean the cast contest's **headline number carries a seating artifact**, and any future report that finds Warden a point or two high should cut by chairs before it reaches for a constant. Filed as a measurement note for whoever runs this next; it is not a request for a change.
+**One thing the ceiling does not measure, stated plainly because this report is the place for it.** Warden wins 51.7% of the cast contest holding, on average, 14.3% of the cast's identities and 14.3% of the chairs. Foreman is next at 25.6% and no other character clears 7.6%. The cast is extremely top-heavy and Warden is comfortably inside the 55% ceiling at the same time — both are true, and they are true because a win-rate ceiling asks "is anyone dominant" and a seven-character cast can be badly lopsided well under 55%. That is a design observation for the Director and explicitly **not** one of this brief's three targets; I raise it once and do not act on it.
 
 ### 4.3 · The rotations, at depth
 
@@ -506,7 +503,7 @@ So there is no longer a case to tune, and this section would end here except tha
 
 **The one target that does need somebody:** not Warden — Bolt. §4.5 resolves the Easy pool at 64 of 95 decided, 67.4%, exact 95% 57.0% – 76.6%, entirely over the ceiling. That is a real finding on real evidence and I am not softening it. It is also not mine to fix twice over: Bolt is a personality, and the pool it is measured in draws 81.4% of the time, which makes the ceiling target itself the wrong instrument for that pool. Both halves of that go to the Director in §7 rather than becoming an edit here.
 
-**What I would hand the Bots lane instead, if a future deep run does find Warden over:** not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is **50.0%** — fair share. The pooled number is inflated by a rotation that gives it two chairs out of eight, and the cheapest honest fix for a cast contest that does not divide evenly is in the **seating**, which costs no behaviour at all. That is a harness change in my own lane and I will make it the day it is needed. It is not needed today.
+**What I would hand the Bots lane instead, if a future deep run does find Warden over:** not a nerf to the retreat, but the seat cut in §4.2. At one chair Warden is **50.0%** and INSIDE; the pooled number is pushed up about 1.6 points by the one rotation in seven that gives it two chairs out of eight. The cheapest honest fix for a cast contest whose seven characters do not divide into eight chairs is in the **seating**, and it costs no behaviour at all. That is a harness change in my own lane and I will make it the day it is needed. It is not needed today.
 
 ---
 
