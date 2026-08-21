@@ -506,6 +506,9 @@ export function spikePeakAlphaOf(intensity: number): number {
  *   bloom.rule            CONFIRMED   `magnitude > threshold`, a0-40's ruling
  *   bloom.threshold       CONFIRMED   0.86 — 6.2% of the field blooms, and the
  *                                     field's p99 lands in the design's band
+ *                                     (**overruled by a0-123: 0.92, 3.5%** — the
+ *                                     measurement stands, the developer does not
+ *                                     want the field it produces)
  *   count 560             CONFIRMED   unchanged, and now p99 47.9 ∈ 46–53
  *   magnitudeExponent     CONFIRMED   the fit still holds AFTER the halo moved
  *   radius, alpha         CONFIRMED   likewise — see below, this is the point
@@ -650,8 +653,40 @@ export const MOCKUP_STARS = {
    */
   bloom: {
     rule: 'brightest' as const,
-    /** Magnitude above which a star blooms — and gets its spikes. */
-    threshold: 0.86,
+    /**
+     * **Magnitude above which a star blooms** — and above which it is *eligible*
+     * for its spikes ({@link spike}`.chance`; the two used to be one thing).
+     *
+     * ## a0-123 raised it, and the number is no longer the design's
+     *
+     * 0.86 was **measured off the design** and it is the value the design draws;
+     * everything in this entry above the line was fitted with it. The developer,
+     * off the menu backdrop: *"we have too many stars with bloom, can we reduce
+     * the number"*. So this is a **ruling**, in the same class as a0-40's on the
+     * bloom rule itself, and it is recorded as one rather than relabelled a
+     * measurement — the file's whole value is that *Measured* means measured.
+     *
+     * The rate follows from the curve rather than being typed anywhere: magnitude
+     * is `u^`{@link magnitudeExponent} for a uniform `u`, so the blooming
+     * population is `1 − threshold^(1/exponent)`.
+     *
+     * ```
+     *   threshold   bloomed share of the field
+     *   0.86        6.22%   the design's, and what shipped until a0-123
+     *   0.92        3.49%   this
+     * ```
+     *
+     * **Why 0.92 and not further.** Not taste alone — {@link peakP99} is the
+     * binding constraint and it is measured on the halos. The design's own panel
+     * reads p99 44.78 at 0.86 and drops as the halos leave the frame: 42.04 at
+     * 0.92, **41.28 at 0.93 — under the band's own floor of 42**. So 0.92 is
+     * very nearly the largest reduction available that leaves the design's luma
+     * gate standing, and this brief therefore does not touch `peakP99` at all
+     * (`evidence/a0-123-fewer-blooms-loose-crosses/p99.txt`). Anything dimmer is
+     * a second ruling — on how bright the sky is, not on how many orbs are in it
+     * — and it is the Director's, not Art's.
+     */
+    threshold: 0.92,
     /**
      * The design's `state.intensity` — the one knob its bloom is stated in, and
      * the multiplier every number below is derived through. Against the shipped
@@ -680,9 +715,25 @@ export const MOCKUP_STARS = {
     knee: { at: 0.35, alpha: 0.0624 },
   },
   /**
-   * **Measured.** The diffraction cross on a bloomed star — the same
-   * `magnitude > threshold` population, because a spike and a halo are the same
-   * physical event and the design draws them together.
+   * **Measured.** The diffraction cross on a bloomed star.
+   *
+   * ## a0-123: the cross is its own draw, and it was the halo's shadow
+   *
+   * This entry used to open *"the same `magnitude > threshold` population,
+   * because a spike and a halo are the same physical event and the design draws
+   * them together"* — which is true of the design and is no longer true of the
+   * game. The developer: *"make it so not all of them have that cross, that
+   * should also be a random thing so some of them with bloom have that others
+   * don't"*. So a cross is now an **independent per-star chance among the stars
+   * that bloom** ({@link chance}), and the sentence that justified the old rule
+   * is deleted rather than left standing beside the rule that replaced it
+   * (LESSONS §14) — a comment that outlives its rule is how the next reader gets
+   * it wrong.
+   *
+   * The physics that sentence appealed to is not being denied; it is being
+   * outranked. A diffraction cross is an artefact of the *instrument*, not of the
+   * star, so "which bright stars flare" is a property the design was free to make
+   * uniform and the developer is free to make sparse.
    *
    * The design draws the cross from the **halo**, not from the star:
    * `moveTo(x − halo × 0.62, y)`. So the arm is {@link spikeLengthOf} of the halo
@@ -723,6 +774,33 @@ export const MOCKUP_STARS = {
      * is the faint part of a bloom, not the bright part.
      */
     peakAlpha: 0.1056,
+    /**
+     * **The chance a bloomed star wears its cross** (a0-123) — a **ruling**, not
+     * a measurement: the design crosses every bloomed star, i.e. this was
+     * implicitly `1`.
+     *
+     * It is a chance *among the bloomed*, so it multiplies rather than replaces
+     * {@link bloom}`.threshold`. Over a screenful of 560:
+     *
+     * ```
+     *                       bloomed   crossed
+     *   before a0-123        6.22%     6.22%   every bloom, by construction
+     *   threshold alone      3.49%     3.49%
+     *   and this             3.49%     1.75%   the cross is the rarer mark again
+     * ```
+     *
+     * **Why a half.** The developer asked for *"some … have that others don't"*,
+     * which is a statement about the *mix* and is loudest at 0.5 — any other
+     * value makes one of the two populations the exception rather than making
+     * both ordinary. Picked by eye on the menu backdrop against 0.35 and 0.65
+     * (`evidence/a0-123-fewer-blooms-loose-crosses/`), and 0.5 is also the only
+     * value on that sweep that cannot be read as a *third* tier of star.
+     *
+     * It costs nothing on the field: the draw comes from its own stream, so no
+     * star's position, magnitude or colour moves — see `../art/backdrop`
+     * `starFieldSprite`.
+     */
+    chance: 0.5,
   },
   /**
    * **Measured, and it is the whole of a0-45.** A star's **temperature**, drawn
@@ -1049,11 +1127,42 @@ export function starAlpha(mag: number): number {
 
 /**
  * **Does this star bloom?** The design's rule is the *brightest*, not a seeded
- * scatter — see {@link MOCKUP_STARS}`.bloom`. A bloomed star also gets its
- * diffraction cross; they are one event.
+ * scatter — see {@link MOCKUP_STARS}`.bloom`.
+ *
+ * It used to end *"A bloomed star also gets its diffraction cross; they are one
+ * event."* **That is no longer the rule** (a0-123): blooming makes a star
+ * *eligible* for a cross and {@link starWearsCross} decides. The two functions
+ * are deliberately separate rather than one returning a pair, because they take
+ * different arguments from different places — this one a magnitude off the
+ * field's own stream, that one a uniform off a stream that exists so this
+ * decision cannot move the field.
  */
 export function starBlooms(mag: number): boolean {
   return mag > MOCKUP_STARS.bloom.threshold;
+}
+
+/**
+ * **Does this bloomed star wear its diffraction cross?** — one uniform in, at
+ * {@link MOCKUP_STARS}`.spike.chance` (a0-123).
+ *
+ * The developer: *"make it so not all of them have that cross, that should also
+ * be a random thing so some of them with bloom have that others don't"*.
+ *
+ * **It takes a uniform rather than a random source, and that is the whole point
+ * of its signature.** {@link starTemperature} takes the *stream* because it needs
+ * two draws from it; this needs exactly one, and by not holding the stream it
+ * cannot be the thing that decides *which* stream. Its caller decides that, and
+ * `../art/backdrop` `starFieldSprite` deliberately does not hand it the field's
+ * own — see there for why a fourth draw on the field's stream would have re-rolled
+ * every star in the sky.
+ *
+ * The answer is meaningless for a star that does not bloom; callers gate on
+ * {@link starBlooms} first. It is not folded in here because the two live on
+ * different streams, and a function that consumed the cross draw only when the
+ * magnitude cleared the threshold is precisely the shape that couples them again.
+ */
+export function starWearsCross(u: number): boolean {
+  return u < MOCKUP_STARS.spike.chance;
 }
 
 /**

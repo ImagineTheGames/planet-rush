@@ -171,6 +171,7 @@ import {
   starRadius,
   starSpikeAlpha,
   starTemperature,
+  starWearsCross,
   type MockupSkyId,
   type SkyReference,
 } from './mockup-reference';
@@ -1011,10 +1012,52 @@ function keySalt(key: string): number {
  *  2. **A magnitude curve, not three tiers.** A star draws one magnitude and its
  *     radius and its alpha follow from it. Its COLOUR does not: that is a second,
  *     independent draw — the star's temperature (a0-45).
- *  3. **Bloom on the brightest, with its spikes.** One soft-falloff halo instead
- *     of two flat rings, at 0.48 of the star's alpha instead of 0.16, on the
- *     `magnitude > 0.86` population — and the same population gets the
- *     diffraction cross, because a spike and a halo are one event.
+ *  3. **Bloom on the brightest, and a cross on some of those.** One soft-falloff
+ *     halo instead of two flat rings, at 0.48 of the star's alpha instead of
+ *     0.16, on the `magnitude > `{@link BLOOM}`.threshold` population.
+ *
+ *     This clause used to end *"— and the same population gets the diffraction
+ *     cross, because a spike and a halo are one event."* **a0-123 overturned
+ *     it**, on the developer's ruling: *"not all of them have that cross, that
+ *     should also be a random thing so some of them with bloom have that others
+ *     don't"*. A cross is now an independent per-star chance among the bloomed
+ *     ({@link SPIKE}`.chance`), and the sentence that justified the old rule is
+ *     gone rather than left to outlive it.
+ *
+ * ## The fourth draw, and why it is not on this stream (a0-123)
+ *
+ * Every star draws from the layer's seeded stream **in order** — x, y, magnitude,
+ * then two for temperature — so the stream's alignment is the field's identity.
+ * Taking the cross's draw from it, at any position in that order, shifts every
+ * subsequent star: the naive one-line insertion re-rolls the whole sky's
+ * positions, magnitudes and colours to loosen a cross. That is not a theoretical
+ * cost here. The developer has twice reported the field drifting from the
+ * mockups (a0-44, a0-45), and a re-roll would have arrived as exactly that drift,
+ * for free, inside a brief about something else.
+ *
+ * So the cross draws from **its own stream**, salted off the layer's key, and it
+ * is advanced **once per star** rather than once per bloom. Two consequences,
+ * both wanted:
+ *
+ *  - The field is **byte-identical** to what it was before this brief. Not
+ *    "close" — the same numbers in the same order. The only shapes that move are
+ *    halos and arms, which is the whole of what was asked for.
+ *  - A star's cross bit is a property of **that star at that index**, so it does
+ *    not depend on how many stars before it happened to bloom. Moving
+ *    `bloom.threshold` therefore does not re-roll which of the survivors are
+ *    crossed — which is what makes the two halves of this brief independent
+ *    rather than entangled.
+ *
+ * The rejected alternative was deriving the bit from values already drawn
+ * (magnitude's low bits, or the temperature). It costs no draw at all, but it
+ * correlates the cross with brightness or with colour — a field where the amber
+ * stars are the crossed ones is a *third* tier of star, drawn by accident. The
+ * evidence directory measures the correlation this arrangement actually has
+ * against magnitude and against temperature, rather than asserting there is none.
+ *
+ * Determinism is unaffected: a second `mulberry32` from the same `seed` is as
+ * deterministic as the first, and the sprite stays deep-equal in
+ * (`spec`, `seed`, `width`, `height`) (GDD §4.1).
  */
 export function starFieldSprite(
   spec: StarLayerSpec,
@@ -1023,6 +1066,11 @@ export function starFieldSprite(
   height: number,
 ): SpriteDef {
   const rng = mulberry32((seed ^ keySalt(spec.key)) >>> 0);
+  // **The cross's own stream** (a0-123) — see the header. Salted off the same
+  // layer key through the same hash, so it is a different stream from `rng` for
+  // every layer and every seed, and it is advanced once per star below whether
+  // that star blooms or not.
+  const crossRng = mulberry32((seed ^ keySalt(`${spec.key}/cross`)) >>> 0);
   const count = Math.max(1, Math.round(((width * height) / 1e6) * spec.density));
   const hw = width / 2;
   const hh = height / 2;
@@ -1037,6 +1085,11 @@ export function starFieldSprite(
     // from the same seeded stream, so the field stays byte-deterministic
     // (GDD §4.1) and the design's 78/22 split falls out of the stream itself.
     const color = starColorFor(starTemperature(rng));
+    // Advanced HERE, unconditionally, and outside the `starBlooms` branch below:
+    // one draw per star, in star order, off a stream `rng` never touches. That is
+    // what keeps the field byte-identical to the one before this brief and keeps
+    // the cross bit stable when `BLOOM.threshold` moves (a0-123, header).
+    const wearsCross = starWearsCross(crossRng.next());
     const r = round(starRadius(mag));
     const alpha = round(starAlpha(mag));
     // Bloom first, so the star's own point sits on top of its halo — and the
@@ -1071,17 +1124,22 @@ export function starFieldSprite(
         );
       }
       // The diffraction cross — the point's own light, in the point's own
-      // colour, which is now the same sentence as the halo's.
+      // colour, which is now the same sentence as the halo's. **On about half of
+      // the bloomed stars** since a0-123 (`SPIKE.chance`): blooming is what makes
+      // a star eligible for a cross, and its own draw is what decides. A halo
+      // with no cross is a finished star, not a partial one.
       //
       // And at the design's own ABSOLUTE alpha (a0-45; `starSpikeAlpha`), which
       // is the other end of the correction a0-44 started one line up. This was a
       // fraction of the star's own alpha until a0-45 — measuring 0.2427–0.2728
       // where the halo around it peaks at a flat 0.2016 — so every bloom was
       // drawn correctly and then buried under its own spikes.
-      const len = round(r * SPIKE.length);
-      const a = round(starSpikeAlpha());
-      shapes.push(polyline([x - len, y, x + len, y], stroke(color, SPIKE.width, 'material', a)));
-      shapes.push(polyline([x, y - len, x, y + len], stroke(color, SPIKE.width, 'material', a)));
+      if (wearsCross) {
+        const len = round(r * SPIKE.length);
+        const a = round(starSpikeAlpha());
+        shapes.push(polyline([x - len, y, x + len, y], stroke(color, SPIKE.width, 'material', a)));
+        shapes.push(polyline([x, y - len, x, y + len], stroke(color, SPIKE.width, 'material', a)));
+      }
     }
     shapes.push(circle(x, y, r, fill(color, 'material', alpha)));
   }

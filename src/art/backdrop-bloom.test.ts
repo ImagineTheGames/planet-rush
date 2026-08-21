@@ -71,7 +71,7 @@ import {
   starFieldSprite,
   type MapId,
 } from './backdrop';
-import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS, haloRadiusOf } from './mockup-reference';
+import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS, haloRadiusOf, starRadius } from './mockup-reference';
 import {
   falloffRamp,
   premultiplied,
@@ -156,6 +156,43 @@ function submittedStars(layer: Graphics): SubmittedStar[] {
   return [...byCentre.values()];
 }
 
+/**
+ * **Every diffraction cross on a layer, by the centre it is drawn on** (a0-123),
+ * with how many arms arrived there.
+ *
+ * A cross arrives as two stroked polylines, each a `moveTo`/`lineTo` pair through
+ * the star — so the arm's MIDPOINT is the star's centre, and it is the key
+ * {@link submittedStars} groups fills under. Reading the centre back off the
+ * geometry rather than off the sprite definition is what lets "which stars wear a
+ * cross" be answered at the frame, which is the only place the developer can see
+ * it.
+ *
+ * The midpoint is rounded to 4 decimals to match `./shapes` `round`, which is the
+ * quantisation the fills' own keys already carry; without it an exact-string join
+ * against a fill centre would miss on float noise and the test would read zero
+ * crosses and pass everything.
+ */
+function crossArmsByCentre(layer: Graphics): Map<string, number> {
+  const ctx = (layer as unknown as { context?: { instructions?: unknown[] } }).context;
+  const out = new Map<string, number>();
+  const q = (v: number): number => Math.round(v * 10000) / 10000;
+  for (const raw of (ctx?.instructions ?? []) as { action?: string; data?: unknown }[]) {
+    if (raw.action !== 'stroke') continue;
+    const data = raw.data as { path?: { instructions?: { action?: string; data?: number[] }[] } };
+    const pts = (data.path?.instructions ?? []).filter(
+      (p) => p.action === 'moveTo' || p.action === 'lineTo',
+    );
+    expect(pts.length, 'a spike arm is a moveTo and a lineTo').toBe(2);
+    const [a, b] = pts.map((p) => p.data as [number, number]) as [
+      [number, number],
+      [number, number],
+    ];
+    const key = `${q((a[0] + b[0]) / 2)},${q((a[1] + b[1]) / 2)}`;
+    out.set(key, (out.get(key) ?? 0) + 1);
+  }
+  return out;
+}
+
 /** The star layers on the stage, in draw order, keyed by their layer key. */
 function starLayers(b: VoidBackdrop): Map<string, Graphics> {
   const out = new Map<string, Graphics>();
@@ -222,6 +259,27 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
     }
   });
 
+  /**
+   * **a0-123 changed how MANY stars bloom and which of them flare. It did not
+   * touch how hard a bloom blooms** — and that is asserted here rather than
+   * claimed in a PR body, because it is the thing that has gone wrong twice.
+   *
+   * The developer, on a0-44: *"on the designs their bloom radius was larger… why
+   * does this keep getting messed up"*. Both numbers below are the design's own,
+   * settled by a0-44/a0-45, and both are one careless edit from a brief about
+   * star COUNTS. The two assertions immediately after this one measure the same
+   * two numbers **at the frame**; this pair pins the constants those are measured
+   * against, so a build cannot satisfy them by moving the target.
+   */
+  it('leaves the halo’s radius and its alpha exactly where a0-44 put them', () => {
+    expect(BLOOM.radius, 'halo radius, star-radii — 5 + 13 × 0.48').toBe(11.24);
+    expect(BLOOM.peakAlpha, 'halo peak alpha, ABSOLUTE — 0.42 × 0.48').toBe(0.2016);
+    // And the two the cross is drawn from, which a0-123 also leaves alone: only
+    // WHETHER an arm is drawn changed, never how long or how bright it is.
+    expect(SPIKE.length, 'arm length, star-radii — halo × 0.62').toBe(6.9688);
+    expect(SPIKE.peakAlpha, 'arm alpha, ABSOLUTE — 0.22 × 0.48').toBe(0.1056);
+  });
+
   it('submits each halo at the design’s radius and the design’s alpha', () => {
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
@@ -266,17 +324,96 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
     }
   });
 
-  it('gives every bloomed star its diffraction cross, and nothing else one (a0-40)', () => {
-    // The design draws the halo and the spikes on one population, because a halo
-    // and a spike are one physical event. This is that, at the frame: two stroked
-    // polylines per bloomed star, and the arms are the star's own colour.
+  /**
+   * **A cross is its own draw** (a0-123), at the frame.
+   *
+   * This replaces `expect(strokes).toBe(blooms * 2)` — *"two arms per bloomed
+   * star"* — which pinned the rule the developer has now overturned: *"make it so
+   * not all of them have that cross, that should also be a random thing so some
+   * of them with bloom have that others don't"*.
+   *
+   * The old assertion is not merely relaxed into a range. It is **inverted**: the
+   * thing that must now be true at the frame is that the two populations *both
+   * exist*, which `blooms * 2` forbade and which a loosened `toBeLessThanOrEqual`
+   * would also pass on a build that had simply stopped drawing crosses at all.
+   * So all three are asserted — some do, some do not, and nothing that failed to
+   * bloom wears one.
+   *
+   * Every number here is read off `Graphics`'s own instruction list, the same far
+   * end of the pipeline the rest of this file measures; the sprite definition is
+   * not consulted and cannot vouch for itself.
+   */
+  it('a cross is its own draw, not a property of blooming', () => {
     for (const [key, gfx] of starLayers(boot())) {
-      const blooms = bloomedOf(submittedStars(gfx)).length;
-      const ctx = (gfx as unknown as { context?: { instructions?: unknown[] } }).context;
-      const strokes = ((ctx?.instructions ?? []) as { action?: string }[]).filter(
-        (i) => i.action === 'stroke',
-      ).length;
-      expect(strokes, `${key}: two arms per bloomed star`).toBe(blooms * 2);
+      const stars = submittedStars(gfx);
+      const bloomed = bloomedOf(stars);
+      const armsAt = crossArmsByCentre(gfx);
+
+      // 1. **Nothing that did not bloom wears a cross.** Blooming is still what
+      //    makes a star ELIGIBLE — a0-123 loosened which of the eligible flare,
+      //    not which are allowed to. This is the half of the old assertion that
+      //    survives intact, and it is the half a0-44 was reported on.
+      const bloomedAt = new Set(bloomed.map((s) => `${s.x},${s.y}`));
+      for (const centre of armsAt.keys()) {
+        expect(bloomedAt.has(centre), `${key}: a cross at ${centre} on a star with no halo`).toBe(
+          true,
+        );
+      }
+
+      // 2. **Some bloomed stars carry a cross and some do not** — the developer's
+      //    sentence, at a fixed seed, as two counts that must both be non-zero.
+      const crossed = bloomed.filter((s) => armsAt.has(`${s.x},${s.y}`));
+      const bare = bloomed.filter((s) => !armsAt.has(`${s.x},${s.y}`));
+      expect(bloomed.length, `${key} submitted bloomed stars`).toBeGreaterThan(20);
+      expect(crossed.length, `${key}: no bloomed star wears a cross`).toBeGreaterThan(0);
+      expect(bare.length, `${key}: EVERY bloomed star wears a cross — a0-123 undone`).toBeGreaterThan(
+        0,
+      );
+      // …and stated once more as the negation of exactly what this replaced, so a
+      // build that reverts the rule fails on the sentence that named it.
+      const strokes = [...armsAt.values()].reduce((n, arms) => n + arms, 0);
+      expect(strokes, `${key}: ${strokes} arms — the old rule's ${bloomed.length * 2}`).not.toBe(
+        bloomed.length * 2,
+      );
+
+      // 3. **A crossed star wears a WHOLE cross.** Two arms or none: one arm is a
+      //    star that lost half its flare, which no rule in the art produces and
+      //    which the count assertions above would happily accept.
+      for (const [centre, arms] of armsAt) {
+        expect(arms, `${key}: ${arms} arm(s) at ${centre} — a cross is two`).toBe(2);
+      }
+
+      // 4. **At the design's chance**, which is what makes it a draw rather than
+      //    a pattern. ±30% is the sampling noise on a count this size, matching
+      //    the bloom-ratio bound above; the assertion is "the arms arrive at the
+      //    ruled rate", not a golden number.
+      const rate = crossed.length / bloomed.length;
+      const want = SPIKE.chance;
+      expect(rate, `${key} cross rate ${rate.toFixed(3)} vs the ruled ${want.toFixed(2)}`)
+        .toBeGreaterThan(want * 0.7);
+      expect(rate, `${key} cross rate ${rate.toFixed(3)} vs the ruled ${want.toFixed(2)}`)
+        .toBeLessThan(Math.min(1, want * 1.3));
+
+      // 5. **And the draw is not the star's brightness wearing a disguise.** The
+      //    cross comes off its own stream (`../art/backdrop` `starFieldSprite`),
+      //    so the crossed and the bare halves of the bloomed population must be
+      //    the same population — if the bit had been derived from magnitude, the
+      //    crossed stars would be systematically the big ones. Compared on the
+      //    star's own point radius, which is monotone in magnitude.
+      const meanR = (xs: SubmittedStar[]): number =>
+        xs.reduce((t, s) => t + Math.min(...s.radii), 0) / xs.length;
+      const spread = Math.abs(meanR(crossed) - meanR(bare)) / meanR(bloomed);
+      expect(
+        spread,
+        `${key}: crossed stars mean r ${meanR(crossed).toFixed(3)} vs bare ${meanR(bare).toFixed(3)}` +
+          ' — the cross is tracking magnitude',
+      ).toBeLessThan(0.1);
+    }
+  });
+
+  it('keeps the cross inside the halo, and the halo the design’s size (a0-40, a0-44)', () => {
+    for (const [key, gfx] of starLayers(boot())) {
+      expect(bloomedOf(submittedStars(gfx)).length, `${key} bloomed at all`).toBeGreaterThan(0);
       // **This assertion used to be the other way round** — `SPIKE.length >
       // BLOOM.radius`, "the arms reach past the halo's own radius" — and it
       // passed for as long as the defect lived, because it was written from the
@@ -617,27 +754,59 @@ describe('measured off the shipped frame', () => {
     readonly layer: string;
   }
 
-  /** Every bloomed star in the frame, registered: the same `starFieldSprite`
-   *  call the client made, placed by the camera offset it drew at. */
+  /**
+   * **The bloom threshold the two frames in this block were DRAWN at** (a0-123).
+   *
+   * Both PNGs are historical captures — a0-53's frozen desktop shot and a0-62's
+   * shipped bundle — and a capture is a record of the build that made it. a0-123
+   * raised {@link BLOOM}`.threshold` from this to 0.92, so enumerating "the
+   * blooms in this frame" from today's constant asks the wrong question of a file
+   * that cannot answer a new one: it returns a *subset*, and the samples it drops
+   * are real halos sitting in those pixels.
+   *
+   * It is not a tolerance and it is not a copy of a live number — it is the value
+   * of a variable at a moment in the past, so it is written down rather than
+   * derived, and it is pinned to these two files and nothing else. If either
+   * frame is ever re-captured, this moves with it.
+   *
+   * (The count is what breaks, not the measurement: on today's constant this
+   * block still finds 2 clean blooms and both still measure correct. But 2 is
+   * under the 4 the assertions require to call a median a median, and a bar
+   * lowered to fit is a bar that stops catching a0-53's defect.)
+   */
+  const FRAME_BLOOM_THRESHOLD = 0.86;
+
+  /**
+   * Every bloomed star **in the frame**, registered: the same `starFieldSprite`
+   * call the client made, placed by the camera offset it drew at.
+   *
+   * The blooms are taken from the star POINTS, by the radius the frame's own
+   * threshold implies, rather than from the halos in today's sprite — see
+   * {@link FRAME_BLOOM_THRESHOLD}. `starRadius` is monotone in magnitude, so
+   * "radius at or above the threshold star's" is exactly "magnitude above the
+   * threshold", which is `starBlooms` written in the one unit the frame records.
+   */
   const registered = (): { blooms: Bloom[]; points: { x: number; y: number; r: number }[] } => {
     const blooms: Bloom[] = [];
     const points: { x: number; y: number; r: number }[] = [];
+    const cut = starRadius(FRAME_BLOOM_THRESHOLD);
     for (const spec of STAR_LAYERS) {
       const w = coverSpan(spec.parallax, SHOT.w, ARENA.w);
       const h = coverSpan(spec.parallax, SHOT.h, ARENA.h);
       const px = SHOT.w / 2 + OFFSET.x * spec.parallax;
       const py = SHOT.h / 2 + OFFSET.y * spec.parallax;
-      const halos: { cx: number; cy: number }[] = [];
+      const mine: { x: number; y: number; r: number }[] = [];
       for (const s of starFieldSprite(spec, VOID_SEED, w, h).shapes) {
-        if (s.path.kind !== 'circle') continue;
-        if (s.fill?.falloff) halos.push({ cx: s.path.cx, cy: s.path.cy });
-        else points.push({ x: px + s.path.cx, y: py + s.path.cy, r: s.path.r });
+        // Today's halos are skipped outright: which stars carry one is the very
+        // thing that moved, and the point beneath each is in the list regardless.
+        if (s.path.kind !== 'circle' || s.fill?.falloff) continue;
+        mine.push({ x: px + s.path.cx, y: py + s.path.cy, r: s.path.r });
       }
-      // A halo and its star point share a centre, so the point is what says how
-      // big the star that owns this halo is.
-      for (const halo of halos) {
-        const pt = points.find((p) => p.x === px + halo.cx && p.y === py + halo.cy);
-        if (pt) blooms.push({ sx: pt.x, sy: pt.y, starR: pt.r, layer: spec.key });
+      points.push(...mine);
+      // The star's own radius is what the design's rule scales, and here it is
+      // also what identifies the star as one this frame drew a halo around.
+      for (const p of mine) {
+        if (p.r >= cut - 1e-9) blooms.push({ sx: p.x, sy: p.y, starR: p.r, layer: spec.key });
       }
     }
     return { blooms, points };
