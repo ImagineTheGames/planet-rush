@@ -316,13 +316,24 @@ const SECONDS = 180;
  * **The brief's rule for a re-baseline is that a golden you re-bake without
  * proving it still bites is a deleted test**, so it was proved first, on this
  * tree, against the *new* hashes:
- * `evidence/a0-121-excavator-penalty/bite.txt`. Five blocks, each one
- * perturbation applied to the branch tree and then restored — `WORLD_SIZE` +1
- * unit, this brief's own cell moved by 0.01 (0.25 → 0.26), `BASE_TURN_RATE`
- * 6.5 → 6.4, and the **Interceptor's** `turnMul` 1.4 → 1.41, a hull a0-121 does
- * not touch. All three hashes fail on all four, and the two control blocks are
- * green. The last case — the guard on the guard that a0-120 repaired — reads the
- * FFA side live and re-baselines itself, so it needed no edit here.
+ * `evidence/a0-121-excavator-penalty/bite.txt`. Each block is one perturbation
+ * applied to the branch tree and then restored — `WORLD_SIZE` +1 unit, this
+ * brief's own cell moved by 0.01 (0.25 → 0.26), `BASE_TURN_RATE` 6.5 → 6.4, and
+ * the **Interceptor's** `turnMul`, a hull a0-121 does not touch. All three hashes
+ * fail on the first three, and both control blocks are green. The guard on the
+ * guard that a0-120 repaired reads the FFA side live and re-baselines itself, so
+ * it needed no edit here.
+ *
+ * **One block passes, and it is worth reading rather than patching around.** The
+ * Interceptor at `turnMul` 1.4 → **1.41** does not move a single hash; the same
+ * hull at 1.4 → **1.0** fails all three. `turnToward` clamps to the target angle
+ * as soon as the gap is under one tick's step, so a turn rate is observable only
+ * while it is the *binding* constraint. At 9.1 rad/s an Interceptor is on target
+ * in two or three ticks and lands on the identical angle on the identical tick at
+ * 9.165 — the stat has been tuned past the point of mattering, so neither the
+ * simulation nor a hash of it can tell. That is the whole of a0-121 falling out
+ * of a golden: it is exactly what §2.11's 80% was doing on the Excavator, and
+ * exactly why deleting that penalty outright cost the hull nothing measurable.
  *
  * Same rule as every entry above: re-baselined for this reason only. Any *other*
  * red still means revert.
