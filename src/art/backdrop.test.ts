@@ -954,12 +954,36 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
     expect(Math.max(...plainR), 'the brightest unbloomed star does not').toBeLessThan(cut);
   });
 
-  it('gives every bloomed star its cross, and no other star one', () => {
-    // The halo and the spikes are one event in the design, so they are one
-    // population here: two strokes per halo, and a spike on nothing else.
+  it('gives SOME bloomed stars a cross, and no other star one (a0-123)', () => {
+    // This asserted `spikes.length === halos.length * 2` — *"two arms per bloomed
+    // star"* — until a0-123, which is the rule the developer overturned: *"not
+    // all of them have that cross … some of them with bloom have that others
+    // don't"*. What survives is the eligibility: a cross still requires a halo.
+    //
+    // The population claim is asserted at the FRAME in `./backdrop-bloom.test.ts`
+    // (`a cross is its own draw, not a property of blooming`), which can match an
+    // arm to the star it belongs to. Here, in the sprite, the arms arrive
+    // immediately after the halo they belong to, so counting is enough — and
+    // both bounds are asserted, because "fewer than two per halo" alone is
+    // satisfied by a build that draws no crosses at all.
     const { halos, spikes } = parts();
     expect(halos.length, 'the mid layer bloomed at all').toBeGreaterThan(50);
-    expect(spikes.length, 'two arms per bloomed star').toBe(halos.length * 2);
+    expect(spikes.length, 'a cross is still two arms').toBe(spikes.length - (spikes.length % 2));
+    expect(spikes.length / 2, 'crosses cannot outnumber the halos that earn them')
+      .toBeLessThanOrEqual(halos.length);
+    expect(spikes.length, 'and the field draws crosses at all').toBeGreaterThan(0);
+    // The one that would go red on a revert: strictly FEWER than every halo.
+    expect(spikes.length / 2, `${spikes.length / 2} crosses on ${halos.length} halos`).toBeLessThan(
+      halos.length,
+    );
+    // At the ruled chance, ±30% for the sampling noise on this count.
+    const rate = spikes.length / 2 / halos.length;
+    expect(rate, `cross rate ${rate.toFixed(3)} vs the ruled ${SPIKE.chance}`).toBeGreaterThan(
+      SPIKE.chance * 0.7,
+    );
+    expect(rate, `cross rate ${rate.toFixed(3)} vs the ruled ${SPIKE.chance}`).toBeLessThan(
+      SPIKE.chance * 1.3,
+    );
   });
 
   it('is the DESIGN’s intensity, and it is not Art’s to move', () => {
@@ -971,8 +995,22 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
     expect(BLOOM).toBe(MOCKUP_STARS.bloom);
     expect(BLOOM.rule).toBe('brightest');
     expect(BLOOM.intensity).toBe(0.48);
-    expect(BLOOM.threshold).toBe(0.86);
     expect(SPIKE).toBe(MOCKUP_STARS.spike);
+    // **The threshold is the one number here that IS Art's to move, now** — and
+    // only because the developer moved it. This said `.toBe(0.86)`: the design's
+    // own measured value, and the value every fit in `mockup-reference` was made
+    // with. a0-123: *"we have too many stars with bloom, can we reduce the
+    // number"*. So it is pinned to the ruling rather than to the design, and the
+    // rate it implies is pinned beside it — the rate is what was actually asked
+    // for, and a threshold is only the knob that produces one.
+    expect(BLOOM.threshold, 'a0-123’s ruling, not the design’s 0.86').toBe(0.92);
+    const rate = 1 - Math.pow(BLOOM.threshold, 1 / MOCKUP_STARS.magnitudeExponent);
+    expect(rate, `${(rate * 100).toFixed(2)}% of the field blooms`).toBeCloseTo(0.0349, 4);
+    // …and this is the number that must NOT come back, in either direction: the
+    // design's rate, which is what "too many" named.
+    expect(rate, 'the design’s 6.22% is what the developer rejected').toBeLessThan(0.05);
+    // The cross's own chance, likewise a ruling. `1` is the rule it replaced.
+    expect(SPIKE.chance, 'a cross is its own draw (a0-123)').toBe(0.5);
   });
 
   // -------------------------------------------------------------------------
@@ -1424,11 +1462,16 @@ describe('star colour — it comes from temperature, and the whole star wears it
     // The design's gradient is `starColor(s.temp, …)` — the halo is the star's
     // own light, so it is the star's own colour. Until a0-45 the halo was a
     // second colour source (`BLOOM_TINTS`); this is the assertion that there is
-    // now exactly one, and it walks the sprite in draw order: halo, two arms,
-    // then the point.
+    // now exactly one, and it walks the sprite in draw order: halo, **its arms if
+    // it has any** (a0-123), then the point. The walk needed no change for that —
+    // `pending` is cleared by the point, not by the arms — but the count beneath
+    // it did: it read `spikes.length === halos.length * 2`, which was the third
+    // copy of the rule a0-123 overturned and the one that would have quietly
+    // made this test about cross COUNTS rather than about colour.
     const { halos, spikes, points } = parts(near.shapes);
     expect(halos.length, 'the near layer bloomed at all').toBeGreaterThan(100);
-    expect(spikes.length, 'two arms per bloomed star').toBe(halos.length * 2);
+    expect(spikes.length, 'the near layer drew crosses at all').toBeGreaterThan(100);
+    expect(spikes.length / 2, 'and fewer than one per halo, since a0-123').toBeLessThan(halos.length);
     let pending: number | null = null;
     let checked = 0;
     for (const s of near.shapes) {

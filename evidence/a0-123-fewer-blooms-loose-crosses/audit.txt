@@ -1,0 +1,54 @@
+1. THE RATE — share of the field, derived from the curve and counted off the sprite
+
+   threshold   derived   counted   blooms/screenful   crossed/screenful
+   0.86        6.22%       7.32%       41 of 560          21 <- the design’s, and what shipped
+   0.92        3.49%       3.93%       22 of 560          12 <- a0-123
+
+2. THE FIELD IS BYTE-IDENTICAL — the claim that earns the second stream
+
+   deep  5693 stars here, 5693 on main — 0 differ
+   mid   2800 stars here, 2800 on main — 0 differ
+   near  840 stars here, 840 on main — 0 differ
+   TOTAL 9333 identical, 0 differ  <- the sky did not move
+
+3. peakP99 — why 0.92 and not further. The band is 42–48 and it is on the HALOS.
+
+   threshold  rate    design p99   game p99   apart    in 42–48?
+   0.86       6.22%    44.78       44.44    0.75%    yes
+   0.88       5.29%    44.04       43.43    1.39%    yes
+   0.90       4.38%    43.34       42.16    2.74%    yes
+   0.92       3.49%    42.04       41.24    1.89%    yes   <- a0-123
+   0.93       3.04%    41.28       40.37    2.20%    NO
+   0.95       2.16%    39.99       38.37    4.05%    NO
+
+   0.93 is the first candidate under the floor, so 0.92 is very nearly the
+   largest cut available that leaves the design’s own luma gate standing.
+   peakP99 is therefore NOT touched by this brief.
+
+4. THE CROSS IS ITS OWN DRAW — measured, not asserted.
+
+   The rejected route was deriving the bit from a value already drawn, which
+   costs no draw but correlates the cross with brightness or with colour. The
+   stream this brief uses should show none. Pearson r over the bloomed stars,
+   cross-bit against the star’s radius (monotone in magnitude) and against a
+   hot/cool indicator (the whole of what temperature paints).
+
+   seed        n     crossed%   r(cross, radius)   r(cross, hot/cool)
+   0x50616365  4495    51.37%      -0.00679            0.03186
+   0xd64d2dd0  4430    50.00%       0.01153            0.00871
+   0x5c38f83b  4552    49.63%      -0.02067            0.00560
+   0xe224c2a6  4587    49.44%      -0.01380            0.00048
+   0x68108d11  4583    49.07%       0.00192            0.02832
+   0xedfc577c  4507    49.99%      -0.01035           -0.00698
+   0x73e821e7  4564    49.56%      -0.00145           -0.01838
+   0xf9d3ec52  4638    50.30%      -0.00533            0.00323
+
+   mean r(cross, radius)      -0.00562   (sd across seeds 0.00926)
+   mean r(cross, hot/cool)    0.00660   (sd across seeds 0.01570)
+   1/sqrt(n) per seed         0.01468   <- what sd should be if independent
+
+   Both means sit within one per-seed standard error of zero, and the spread
+   across seeds is the spread independence predicts. Individual seeds reach
+   2σ in both directions, which is what a coin does and what a DERIVED bit
+   would not: taking the cross from the magnitude or the temperature pins r
+   near a fixed non-zero value that does not average away with the seed.
