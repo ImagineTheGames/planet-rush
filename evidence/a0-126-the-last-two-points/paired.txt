@@ -1,0 +1,11 @@
+## a0-121, read as the paired experiment it was
+
+| what | before | after | move | both won | before only | after only | neither | discordant | McNemar exact p |
+|---|---|---|---|---|---|---|---|---|---|
+| Warden — cast contest | 72.8% | 56.7% | -16.1 pts | 91 | 72 | 36 | 25 | 108 | 0.000684 |
+| Foreman — cast contest | 15.2% | 25.4% | +10.3 pts | 5 | 29 | 52 | 138 | 81 | 0.013999 |
+| `excavator` — cast contest, by silhouette | 87.9% | 82.1% | -5.8 pts | 163 | 34 | 21 | 6 | 55 | 0.104789 |
+| `excavator` — ship-class contest | 77.3% | 48.4% | -28.9 pts | 95 | 103 | 29 | 29 | 132 | < 0.000001 |
+| `vanguard` — ship-class contest | 10.9% | 27.3% | +16.4 pts | 6 | 22 | 64 | 164 | 86 | 0.000007 |
+
+*Rates here are over **all** matches of the section, not over the decided ones, because a paired test needs the same denominator in both columns; a0-121's published rates are over decided matches and differ in the third digit.*

@@ -279,6 +279,70 @@ export function sampleForExact(p: number, ceiling: number, conf = 0.95, deff = 1
   return Infinity;
 }
 
+/**
+ * McNemar's exact test on a **paired** before/after run.
+ *
+ * Every table in this series compares two columns measured on the same seeds,
+ * and then reads the difference through two independent standard errors. That
+ * throws away the pairing, which is the whole reason the same seeds were used:
+ * a match that both trees won and a match that both trees lost carry no
+ * information about the change at all, and only the **discordant** matches do.
+ *
+ * So the right test on "did this constant move the win rate" is not two
+ * intervals that happen to overlap or not — it is the exact binomial test on
+ * `b` against `b + c`, where `b` is the matches won before and lost after and
+ * `c` the reverse. That is strictly more sensitive than the unpaired reading,
+ * and a0-126 needs it in both directions: it is what lets the report say that
+ * a0-121's −16 points is real beyond argument while its residual +2 is not.
+ */
+export interface Paired {
+  /** Both columns won it. */
+  readonly both: number;
+  /** Won before, lost after. */
+  readonly lostIt: number;
+  /** Lost before, won after. */
+  readonly gained: number;
+  /** Neither column won it. */
+  readonly neither: number;
+  readonly discordant: number;
+  /** Two-sided exact p-value on the discordant pairs. */
+  readonly p: number;
+  readonly beforeRate: number;
+  readonly afterRate: number;
+}
+
+export function mcnemar(
+  before: readonly boolean[],
+  after: readonly boolean[],
+): Paired {
+  if (before.length !== after.length) throw new Error('mcnemar: unpaired inputs');
+  let both = 0;
+  let lostIt = 0;
+  let gained = 0;
+  let neither = 0;
+  for (let i = 0; i < before.length; i++) {
+    if (before[i] && after[i]) both++;
+    else if (before[i]) lostIt++;
+    else if (after[i]) gained++;
+    else neither++;
+  }
+  const n = lostIt + gained;
+  // Exact two-sided binomial test at p = 1/2 on the discordant pairs.
+  const k = Math.min(lostIt, gained);
+  const p = n === 0 ? 1 : Math.min(1, 2 * binomTailLE(k, n, 0.5));
+  const total = before.length;
+  return {
+    both,
+    lostIt,
+    gained,
+    neither,
+    discordant: n,
+    p,
+    beforeRate: total ? (both + lostIt) / total : 0,
+    afterRate: total ? (both + gained) / total : 0,
+  };
+}
+
 /** Points, for a report that talks in points. */
 export const pts = (x: number, d = 1): string => `${(x * 100).toFixed(d)}`;
 export const pctOf = (x: number, d = 1): string => `${(x * 100).toFixed(d)}%`;
