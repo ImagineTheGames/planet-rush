@@ -14,18 +14,42 @@
  * (`./map-picker.test.ts`) — and {@link ./map-picker-view} is the thin PixiJS
  * view that draws exactly what this returns. Nothing here imports PixiJS.
  *
- * The one rule this file keeps: **the preview cannot lie.** Every card's dots are
- * `map.stations(...)` normalised into the card box, so the picture a player reads
- * is the board the sim will build — a new map is a registry entry and its preview
- * follows for free (`../sim/maps` MapDef). The chosen id is fed to
- * `bootOfflineMatch(seed, mapId)` and persisted like the fire-mode key, so a
- * returning player finds their last arena preselected.
+ * The one rule this file keeps: **the preview cannot lie.**
+ *
+ * ---------------------------------------------------------------------------
+ * a0-124 — WHAT "CANNOT LIE" HAD TO MEAN
+ * ---------------------------------------------------------------------------
+ * It meant the *stations*, and only the stations, until a0-124: the card drew
+ * `map.stations(...)` normalised into the box and nothing else, and the developer
+ * looked at the picker and said the previews should show *"the ores, empty
+ * stations locations, the nebulas and stars in the back… just more accurate
+ * overall"*. A player choosing a board could not see the board — and the missing
+ * half is the half that decides how a map plays. The Line and The Ring differ in
+ * where the ore lies far more than in where eight berths sit.
+ *
+ * So {@link mapPreview} **builds the world**. `createWorld`, on the map's own
+ * bounds, at the full ring, and then it reads the stations and the asteroids off
+ * the result — because a `MapDef` declares the arena and the berths and says
+ * nothing at all about ore: the field is stamped at world build by
+ * `../sim/waves` `spawnHomeFields` and the opening `spawnWave`. Re-deriving that
+ * here would be a second implementation of the field, which is the same defect as
+ * a hand-kept dot list one level down. The sky is the same discipline in the view:
+ * the map's own `MAP_NEBULA` entry through the backdrop's own generators, never a
+ * second starfield (`./map-picker-view`).
+ *
+ * A new map is still a registry entry and its preview still follows for free. The
+ * chosen id is fed to `bootOfflineMatch(seed, mapId)` and persisted like the
+ * fire-mode key, so a returning player finds their last arena preselected.
  */
 
+import { ShipClass } from '@shared/types';
 import type { Vec2 } from '@shared/types';
 import type { Rect } from '@platform/layout-registry';
+import { DEFAULT_ABUNDANCE } from '../sim/constants';
 import { DEFAULT_MAP_ID, MAPS, getMap } from '../sim/maps';
 import type { MapDef } from '../sim/maps';
+import { createWorld } from '../sim/state';
+import type { PlayerSpec } from '../sim/state';
 import { clamp, hitRect } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -69,16 +93,38 @@ export const MAP_PREVIEW_SEED = 0;
 // ---------------------------------------------------------------------------
 
 /**
- * A map's layout, reduced to what a preview needs: the arena's aspect ratio and
- * each home station's centre **normalised into `[0,1]×[0,1]`** within the arena
- * box. The view letterboxes this into a card so a wide arena (oval/diamond) reads
- * as wide and a square one (octagon/compass) reads as square.
+ * One rock of the opening ore field, normalised into the arena box: centre in
+ * `[0,1]×[0,1]`, radius as a fraction of the arena's WIDTH (one axis, so a rock
+ * stays a circle when the view letterboxes a non-square arena).
+ */
+export interface MapPreviewRock {
+  readonly x: number;
+  readonly y: number;
+  /** Body radius ÷ arena width. */
+  readonly r: number;
+}
+
+/**
+ * A map's board, reduced to what a preview needs: the arena's aspect ratio, every
+ * berth's centre and every opening rock, all **normalised into `[0,1]×[0,1]`**
+ * within the arena box. The view letterboxes this into a card so a wide arena
+ * (oval/diamond) reads as wide and a square one (octagon/compass) reads as square.
+ *
+ * All of it comes off a world {@link mapPreview} actually builds — see there.
  */
 export interface MapPreview {
   /** Arena width ÷ height — the box the dots are placed in. */
   readonly aspect: number;
   /** Home station centres, normalised to the arena box. In slot order. */
   readonly stations: readonly Vec2[];
+  /**
+   * The **ore field the match opens on** — every asteroid `createWorld` places,
+   * which is each station's home neighbourhood plus wave 1 of the commons. This is
+   * the half of a map that decides how it plays (p1-09: the home fields are
+   * congruent by construction, the commons is `N`-fold symmetric), and it is the
+   * half the picker showed nothing of until a0-124.
+   */
+  readonly ore: readonly MapPreviewRock[];
 }
 
 /** One card, as the view draws it: words and a preview, and whether it is chosen.
@@ -91,7 +137,7 @@ export interface MapCardModel {
   readonly veteran: boolean;
   /** Drawn as the selected card (plasma border). Exactly one is true. */
   readonly selected: boolean;
-  /** The mini layout, from the registry's real station positions. */
+  /** The board, off a world the match's own constructor built ({@link mapPreview}). */
   readonly preview: MapPreview;
 }
 
@@ -139,16 +185,93 @@ export function registryStations(id: string, count = MAP_PREVIEW_SLOTS): Vec2[] 
   return map.stations(MAP_PREVIEW_SEED, count, map.bounds).map((p) => ({ x: p.station.x, y: p.station.y }));
 }
 
-/** The mini layout for a card — normalised station dots + arena aspect, from the
- *  registry itself so the picture can never drift from the board. */
+/**
+ * The roster a preview's world is built with: {@link MAP_PREVIEW_SLOTS} seats, no
+ * sides (FFA teams-of-one, so `teamHomeSlots` is the identity and station `i` sits
+ * on placement `i`). The hull is the onboarding default and is **irrelevant to the
+ * board** — a ship class sets speed and hull, never where a rock lands — but a
+ * `PlayerSpec` needs one, so the choice is stated rather than arbitrary.
+ */
+const PREVIEW_ROSTER: readonly PlayerSpec[] = Array.from(
+  { length: MAP_PREVIEW_SLOTS },
+  (_, id): PlayerSpec => ({ id, shipClass: ShipClass.Vanguard }),
+);
+
+/** Memo for {@link mapPreview}, keyed by map id — see there for why it must exist. */
+const PREVIEW_CACHE = new Map<string, MapPreview>();
+
+/**
+ * The board for a card: arena aspect, berth centres and the opening ore field,
+ * normalised into the arena box.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS BUILT BY THE THING THAT BUILDS THE MATCH
+ * ---------------------------------------------------------------------------
+ * **This calls `createWorld`.** Not `map.stations(...)` and a hand-rolled field —
+ * the actual world constructor, on the map's own bounds, and then it reads the
+ * stations and asteroids off the result.
+ *
+ * That is not thoroughness for its own sake; it is the only way the picture can be
+ * the board. A `MapDef` declares the arena and where the berths go and *nothing
+ * about the ore*: the field is stamped at world build (`../sim/state` `createWorld`
+ * → `../sim/waves` `spawnHomeFields`, then the opening `spawnWave`), out of the
+ * seeded RNG, against the abundance-resolved economy. A preview that re-derived
+ * that here from `RESOURCE_FIELD` would be a second implementation of the field —
+ * which is the same defect as a hand-kept dot list, one level down, and it would
+ * drift the first time the generator was retuned.
+ *
+ * Three things are fixed here because the picker cannot know them yet, and each is
+ * chosen to be the one the player is about to get:
+ *
+ *  - **Seat count** — {@link MAP_PREVIEW_SLOTS}, the full ring (GDD §2.1). At eight
+ *    every board is all-live, so every berth on the card is a berth, and none of
+ *    the derelict-fill maps shows a wreck it would not have at a full table.
+ *  - **Seed** — {@link MAP_PREVIEW_SEED}. Station geometry ignores the seed
+ *    entirely (`../sim/maps`), so the berths are exact. The field does not: a real
+ *    match rolls its own scatter. What is *invariant* under the seed is the
+ *    structure — every home neighbourhood congruent, the commons `N`-fold symmetric
+ *    about the centre — and the structure is what tells The Line from The Ring.
+ *  - **Abundance** — {@link DEFAULT_ABUNDANCE}, the level the lobby opens on
+ *    (`../sim/match-config` `matchAbundance`). It scales rock count and size
+ *    uniformly for every map, so it moves the texture of all six cards together and
+ *    never their relative read.
+ *
+ * The board is the one at **t = 0**: the home fields plus wave 1 of the commons,
+ * which is exactly what `createWorld` places. Waves 2..5 arrive on the metronome
+ * and are not part of the world a match is handed.
+ *
+ * **Memoised, and it has to be.** `mapPickerModel` is a per-frame constructor
+ * ({@link ./map-select} `mapSelectModel` calls it every frame), and six world
+ * builds a frame on a screen a player is waiting on is exactly the shape of
+ * regression this codebase has paid for three times this month. The result is a
+ * pure function of the map id — fixed seats, fixed seed, fixed abundance — so the
+ * cache can never go stale.
+ */
 export function mapPreview(map: MapDef): MapPreview {
-  const bounds = map.bounds;
-  const placements = map.stations(MAP_PREVIEW_SEED, MAP_PREVIEW_SLOTS, bounds);
-  const stations = placements.map((p) => ({
-    x: bounds.width > 0 ? p.station.x / bounds.width : 0.5,
-    y: bounds.height > 0 ? p.station.y / bounds.height : 0.5,
-  }));
-  return { aspect: bounds.height > 0 ? bounds.width / bounds.height : 1, stations };
+  const cached = PREVIEW_CACHE.get(map.id);
+  if (cached) return cached;
+
+  const world = createWorld({
+    seed: MAP_PREVIEW_SEED,
+    players: PREVIEW_ROSTER,
+    mapId: map.id,
+    abundance: DEFAULT_ABUNDANCE,
+  });
+  const { width, height } = world.bounds;
+  const nx = (x: number): number => (width > 0 ? x / width : 0.5);
+  const ny = (y: number): number => (height > 0 ? y / height : 0.5);
+
+  const preview: MapPreview = {
+    aspect: height > 0 ? width / height : 1,
+    stations: world.stations.map((s) => ({ x: nx(s.pos.x), y: ny(s.pos.y) })),
+    ore: world.asteroids.map((a) => ({
+      x: nx(a.pos.x),
+      y: ny(a.pos.y),
+      r: width > 0 ? a.radius / width : 0,
+    })),
+  };
+  PREVIEW_CACHE.set(map.id, preview);
+  return preview;
 }
 
 /** Build the frame model for a given selection. Pure: the view draws exactly this
