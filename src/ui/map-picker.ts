@@ -93,11 +93,15 @@ export const MAP_PREVIEW_SEED = 0;
 // ---------------------------------------------------------------------------
 
 /**
- * One rock of the opening ore field, normalised into the arena box: centre in
- * `[0,1]×[0,1]`, radius as a fraction of the arena's WIDTH (one axis, so a rock
- * stays a circle when the view letterboxes a non-square arena).
+ * A round body on the board, normalised into the arena box: centre in
+ * `[0,1]×[0,1]`, radius as a fraction of the arena's WIDTH — one axis, so a body
+ * stays a circle when the view letterboxes a non-square arena.
+ *
+ * Both a berth and a rock are this, and both carry their **real** radius off the
+ * world, so the view never has to invent how big a station is next to an asteroid
+ * (it is a little over 2×, and that is the sim's number, not a drawing decision).
  */
-export interface MapPreviewRock {
+export interface MapPreviewBody {
   readonly x: number;
   readonly y: number;
   /** Body radius ÷ arena width. */
@@ -115,8 +119,9 @@ export interface MapPreviewRock {
 export interface MapPreview {
   /** Arena width ÷ height — the box the dots are placed in. */
   readonly aspect: number;
-  /** Home station centres, normalised to the arena box. In slot order. */
-  readonly stations: readonly Vec2[];
+  /** Home station berths, normalised to the arena box. In slot order. Nobody owns
+   *  one at pick time, which is why the view draws them unclaimed. */
+  readonly stations: readonly MapPreviewBody[];
   /**
    * The **ore field the match opens on** — every asteroid `createWorld` places,
    * which is each station's home neighbourhood plus wave 1 of the commons. This is
@@ -124,7 +129,7 @@ export interface MapPreview {
    * congruent by construction, the commons is `N`-fold symmetric), and it is the
    * half the picker showed nothing of until a0-124.
    */
-  readonly ore: readonly MapPreviewRock[];
+  readonly ore: readonly MapPreviewBody[];
 }
 
 /** One card, as the view draws it: words and a preview, and whether it is chosen.
@@ -260,15 +265,12 @@ export function mapPreview(map: MapDef): MapPreview {
   const { width, height } = world.bounds;
   const nx = (x: number): number => (width > 0 ? x / width : 0.5);
   const ny = (y: number): number => (height > 0 ? y / height : 0.5);
+  const nr = (r: number): number => (width > 0 ? r / width : 0);
 
   const preview: MapPreview = {
     aspect: height > 0 ? width / height : 1,
-    stations: world.stations.map((s) => ({ x: nx(s.pos.x), y: ny(s.pos.y) })),
-    ore: world.asteroids.map((a) => ({
-      x: nx(a.pos.x),
-      y: ny(a.pos.y),
-      r: width > 0 ? a.radius / width : 0,
-    })),
+    stations: world.stations.map((s) => ({ x: nx(s.pos.x), y: ny(s.pos.y), r: nr(s.radius) })),
+    ore: world.asteroids.map((a) => ({ x: nx(a.pos.x), y: ny(a.pos.y), r: nr(a.radius) })),
   };
   PREVIEW_CACHE.set(map.id, preview);
   return preview;
@@ -344,8 +346,20 @@ export const MAP_CARD_MIN_HEIGHT = 84;
  * has and reads as a board rather than as a banner; the view still drops an
  * overrunning blurb whole rather than clipping it, which is the guard that found
  * this.
+ *
+ * **240 since a0-124, up from 190 — and the number is now about the picture.** The
+ * card carries a rendering of the board rather than eight dots, and on the desktop
+ * baseline the six 190-tall cards sat in a 451-tall band with ~130px of empty
+ * screen above and below them: the ceiling, not the band, was what held the arena
+ * to an 86px square on the largest screen the game runs on. 240 spends that empty
+ * band on the thing the screen is for.
+ *
+ * It changes **nothing on the constraint that decides this screen**. A landscape
+ * phone's cards are band-limited at 240×114 and come out byte-identical at either
+ * ceiling; every viewport that moves does so because it had spare band height and
+ * was being capped out of using it (portrait 190→238, iPad 190→240).
  */
-export const MAP_CARD_MAX_HEIGHT = 190;
+export const MAP_CARD_MAX_HEIGHT = 240;
 
 /** How the four cards are arranged in the band. */
 export type MapCardShape = 'row' | 'grid';
