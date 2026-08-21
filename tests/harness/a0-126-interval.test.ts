@@ -30,6 +30,7 @@ import {
   binomTailLE,
   clopper,
   designEffect,
+  exactLoAbove,
   lnBinomPmf,
   normalCdf,
   sampleFor,
@@ -267,6 +268,38 @@ describe('sampleFor answers "run more matches" with a number', () => {
 
   it('scales by the design effect, in matches actually played', () => {
     expect(sampleForExact(0.6, 0.55, 0.95, 2)).toBeGreaterThan(sampleForExact(0.6, 0.55, 0.95, 1));
+  });
+
+  // `exactLoAbove` is the shortcut `sampleForExact` searches with, and it is only
+  // allowed to be a shortcut if it agrees with the thing it replaces everywhere.
+  // The first deep render of this brief wedged for 26 minutes of CPU inside the
+  // long form; the identity below is what makes the short form safe to trust.
+  it('exactLoAbove agrees with the Clopper-Pearson bound it stands in for', () => {
+    for (const n of [8, 12, 40, 223, 255, 1024, 3584]) {
+      for (let w = 0; w <= n; w += Math.max(1, Math.floor(n / 37))) {
+        expect(exactLoAbove(w, n, WIN_RATE_CEILING)).toBe(clopper(w, n).lo > WIN_RATE_CEILING);
+      }
+    }
+  });
+
+  it('exactLoAbove holds the identity at other ceilings and confidences', () => {
+    for (const ceiling of [0.3, 0.5, 0.55, 0.8]) {
+      for (const conf of [0.9, 0.95, 0.99]) {
+        for (const w of [0, 1, 7, 19, 33, 40]) {
+          expect(exactLoAbove(w, 40, ceiling, conf)).toBe(clopper(w, 40, conf).lo > ceiling);
+        }
+      }
+    }
+  });
+
+  // The regression itself: a rate a hair over the ceiling is the shape that used
+  // to walk most of SAMPLE_SEARCH_CAP at 200 bisections per step. Wall-clock in a
+  // unit test is a blunt instrument, so the bound is loose on purpose - it is
+  // there to catch a return of the hang, not to police milliseconds.
+  it('answers the near-the-line rates that used to wedge it', () => {
+    const started = Date.now();
+    for (const p of [0.5502, 0.5525, 0.5605, 0.57]) expect(sampleForExact(p, 0.55)).toBeGreaterThan(0);
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 });
 

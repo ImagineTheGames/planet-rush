@@ -274,9 +274,30 @@ export function sampleForExact(p: number, ceiling: number, conf = 0.95, deff = 1
   const start = sampleFor(p, ceiling, conf);
   if (!Number.isFinite(start)) return Infinity;
   for (let n = Math.max(8, start); n <= SAMPLE_SEARCH_CAP; n += Math.max(1, Math.floor(n * 0.01))) {
-    if (clopper(Math.round(p * n), n, conf).lo > ceiling) return Math.ceil(n * Math.max(deff, 1));
+    if (exactLoAbove(Math.round(p * n), n, ceiling, conf)) return Math.ceil(n * Math.max(deff, 1));
   }
   return Infinity;
+}
+
+/**
+ * `clopper(wins, n, conf).lo > ceiling`, decided without finding `lo`.
+ *
+ * The Clopper–Pearson lower bound is the q solving `P(X >= wins | q) = alpha/2`,
+ * and that tail is increasing in q, so the bound clears the ceiling exactly when
+ * the tail *at* the ceiling is already below alpha/2. One tail sum answers what
+ * {@link clopper} spends a 200-step bisection over tail sums to answer.
+ *
+ * This is an identity, not an approximation — but it is the difference between a
+ * report that renders and one that does not. {@link sampleForExact} walks up to
+ * {@link SAMPLE_SEARCH_CAP} in 1% steps, ~1050 of them, and a contestant sitting
+ * a hair over the ceiling walks most of that range: 200 bisection steps × O(n)
+ * per step × 1050 is tens of minutes of CPU per target, which is how the first
+ * deep render of this brief was found wedged rather than slow. The same call
+ * against the tail directly is ~1050 × O(n), and returns in seconds.
+ */
+export function exactLoAbove(wins: number, n: number, ceiling: number, conf = 0.95): boolean {
+  if (wins <= 0) return false; // lo is pinned at 0; 0 > ceiling is false for any ceiling >= 0.
+  return binomTailGE(wins, n, ceiling) < (1 - conf) / 2;
 }
 
 /**
