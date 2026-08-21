@@ -407,7 +407,8 @@ const fields: Record<string, string> = {
         ``,
         `**One thing the ceiling does not measure, stated plainly because this report is the place ` +
           `for it.** Warden wins ${pct(tWar.rate)} of the cast contest holding, on average, ` +
-          `${pct(1 / 7)} of the cast's identities and ${pct(2 / 8 / 7 + 6 / 7 / 8)} of the chairs. ` +
+          `${pct(2 / 8 / 7 + 6 / 7 / 8)} of the chairs — one seventh, its even share of a ` +
+          `seven-character cast. ` +
           `Foreman is next at ${pct(castCharacterWins(deepRoster).find((w) => w.key === 'foreman')!.rate)} ` +
           `and no other character clears ${pct(Math.max(...castCharacterWins(deepRoster).filter((w) => w.key !== 'warden' && w.key !== 'foreman').map((w) => w.rate)))}. ` +
           `The cast is extremely top-heavy and Warden is comfortably inside the 55% ceiling at the ` +
