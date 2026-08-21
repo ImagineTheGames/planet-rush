@@ -610,17 +610,21 @@ const fields: Record<string, string> = {
           `estimate to a line, at a sample size that cannot support the comparison, and that this is ` +
           `a property of the *reporting convention* rather than of any one lane's care. a0-121 ` +
           `measured exactly as carefully as a0-112 and a0-117 did. The convention is what produced ` +
-          `one target called met and one called missed on evidence of identical quality — and then, ` +
-          `at depth, reversed the first and confirmed the second. That is the signature of a ` +
-          `coin-flip method: it is not that it is always wrong, it is that being right carries no ` +
-          `information.`,
+          `one target called met and two called missed on evidence of identical quality, and ` +
+          `then, at depth, held the first, **reversed** Warden and **confirmed** Bolt. Three ` +
+          `marginal calls, two of them right, and no way to have known which. That is the ` +
+          `signature of a coin-flip method: not that it is always wrong, but that being right ` +
+          `carries no information.`,
         ``,
         `The fix is cheap and it is already built: `+'`targets.ts`'+` prints **INSIDE / OVER / ` +
           `UNRESOLVED**, and `+'`sampleForExact`'+` turns UNRESOLVED into a number of matches to run ` +
           `rather than a constant to change. I would like the next balance report in this series to ` +
           `use it, and I would like **UNRESOLVED to be an acceptable thing for a lane to file** — ` +
           `because the alternative, which this series has been doing, is that every marginal number ` +
-          `gets rounded to a verdict and roughly half of those verdicts are wrong.`,
+          `gets rounded to a verdict, and this brief is the first time three of them were checked ` +
+          `at a size that could check them. One turned over. The cost of the convention is not that ` +
+          `it is usually wrong; it is that a lane cannot tell a real finding from a coin flip, and ` +
+          `so cannot tell when it is being sent to change the game for nothing.`,
         ``,
         `Cost, for calibration: the deep run is ${(deepRoster && deepClass && deepTier ? deepRoster.matches.length + deepClass.matches.length + deepTier.matches.length : 0)} ` +
           `matches, about an hour of wall clock on 8 cores because the harness now shards by seed ` +
