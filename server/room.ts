@@ -233,13 +233,15 @@ export const INTENT_HOLD_TICKS = 15;
  *
  * **Why input silence is the right signal.** A live match is a continuous
  * conversation: the client files an input tick every tick and probes twice a second
- * (`src/net/ping`). Silence from a *seated, live* connection is therefore as strong
- * a signal here as it is on the client (`src/net/link-loss` — "silence is a
- * signal"), and it arrives on the application's own clock rather than on a
- * middlebox timer. Note the two conditions in that sentence: **seated** and
- * **live**. A lobby is legitimately quiet — nothing is being simulated and nothing
- * is being sent — so this sweep never runs outside `'live'`, for exactly the reason
- * `src/net/link-loss-attach` refuses to watch a lobby.
+ * (`src/net/ping`). Silence from a *seated, live, already-talking* connection is
+ * therefore as strong a signal here as it is on the client (`src/net/link-loss` —
+ * "silence is a signal"), and it arrives on the application's own clock rather than
+ * on a middlebox timer. Note all three conditions in that sentence. A lobby is
+ * legitimately quiet — nothing is being simulated and nothing is being sent — so
+ * this sweep never runs outside `'live'`, for exactly the reason
+ * `src/net/link-loss-attach` refuses to watch a lobby. And a connection that has
+ * not spoken yet has not gone quiet: the watchdog is armed by the seat's own first
+ * frame ({@link Slot.lastHeardMs}), never by the seat merely existing.
  *
  * **Five seconds, and why not less.** It has to be longer than any stall this build
  * has measured, because a false substitution puts a bot on a living player's ship:
@@ -343,10 +345,11 @@ interface Slot {
    * input, a ping probe, a lobby choice. The liveness signal a half-open socket
    * cannot fake ({@link SEAT_SILENCE_MS}).
    *
-   * `-1` means "not armed": no connection, or a live match this seat has not yet
-   * spoken in. {@link MatchRoom.sweepSilentSeats} arms it rather than any of the
-   * seating paths, so there is one place that decides when the clock starts and no
-   * way to add a seventh way to fill a seat and forget to wind it.
+   * `-1` means **not armed**: no connection, or a connection that has not sent
+   * anything yet. Armed by {@link MatchRoom.receive} — the seat's own first frame —
+   * and by no other path, which is what keeps {@link MatchRoom.sweepSilentSeats}
+   * answering "this client stopped talking" rather than "this client has not
+   * started". Cleared back to -1 whenever the seat changes hands.
    */
   lastHeardMs: number;
   /** The secret issued to the human who holds this seat (GDD §4.2 reclaim). */
@@ -1836,13 +1839,16 @@ export class MatchRoom {
     for (const slot of this.slots) {
       const socket = slot.socket;
       if (socket === null) continue;
-      // Arm on first sight. Doing it here rather than in the seating paths means a
-      // seat filled by a join, a reclaim, or RUSH!'s renumbering all start their
-      // clock the same way, and none of them can forget to.
-      if (slot.lastHeardMs < 0) {
-        slot.lastHeardMs = nowMs;
-        continue;
-      }
+      // **Silence is only a signal from a connection that was talking.** The
+      // watchdog is armed by the seat's own first frame ({@link receive}) and by
+      // nothing else — not by being seated, not by RUSH!, not by this sweep noticing
+      // the seat exists. The rule this file is enforcing is *stopped*, and a seat
+      // that has never started cannot have stopped: reading "has not spoken yet" as
+      // "has gone away" would substitute a bot for a player during the handful of
+      // ticks between their `matchStart` and their first input, and would make every
+      // driver that seats a socket without flying it — the server's own tests among
+      // them — look like a room full of departures.
+      if (slot.lastHeardMs < 0) continue;
       if (nowMs - slot.lastHeardMs < SEAT_SILENCE_MS) continue;
       // The seat goes exactly the way a hang-up sends it: a bot on the controls, the
       // seat held for the life of the match, and `playerSubstituted` to everyone
