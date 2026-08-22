@@ -2,7 +2,11 @@
  * evidence/a0-130-bolt-inside-the-band/arms.ts — every arm, read through
  * a0-126's interval. OWNER: Bot Engineer (brief a0-130).
  *
- *   npx vite-node evidence/.../arms.ts <label>[=dir] …
+ *   npx vite-node evidence/.../arms-run.ts <label>[=dir] …
+ *
+ * Library plus a `main` the CLI calls; the CLI is `./arms-run.ts`, because
+ * `./render.ts` imports this module and a module that prints a table at import
+ * time prints it into the middle of the report.
  *
  * The brief's standing instruction is *"do not tune anything whose interval you
  * have not computed"*, so no arm in this report is ever printed as a point
@@ -177,8 +181,8 @@ export function clusteringOf(r: ArmReading): string {
 
 // ---------------------------------------------------------------------------
 
-function main(): void {
-  const args = process.argv.slice(2);
+export function main(argv: readonly string[]): void {
+  const args = [...argv];
   const rows: ArmReading[] = [];
   for (const a of args) {
     const [label, dir] = a.includes('=') ? a.split('=') : [a, `tests/reports/a0-130-data/${a}`];
@@ -191,5 +195,3 @@ function main(): void {
   }
   console.log(armTable(rows));
 }
-
-main();

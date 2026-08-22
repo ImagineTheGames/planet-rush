@@ -73,6 +73,9 @@ let skipped = 0;
  * Easy-only artifact is not missing rows, it is a different question asked of
  * the same generator.
  */
+const span = (r: SectionRun | null): string =>
+  r ? `${r.seeds[0]}…${r.seeds[r.seeds.length - 1]}` : '?';
+
 function compare(name: string, a: SectionRun | null, b: SectionRun | null, lineupPrefix = ''): void {
   if (!a || !b) {
     // A skipped check must never read as a passed one: the whole point of this
@@ -112,24 +115,29 @@ const DEEP = 'tests/reports/a0-130-data';
 const A0126 = 'tests/reports/a0-126-data/deep-shipped';
 
 // 1 — the Easy-pool runner reproduces a0-126's tier section, on a0-126's seeds.
+const shippedDeep = read(`${DEEP}/deep-shipped/tier.json`);
 compare(
-  "the Easy pool: a0-126's 512 matches, re-run by this brief's own runner",
-  read(`${DEEP}/deep-shipped/tier.json`),
+  `the Easy pool: a0-126's 512 matches (seeds ${span(read(`${A0126}/tier.json`))}), lifted back out of this brief's own ${span(shippedDeep)} run`,
+  shippedDeep,
   read(`${A0126}/tier.json`),
   'easy:',
 );
 
 // 2 — every screening arm is a strict restriction of its deep arm.
+const cautionDeep = read(`${DEEP}/deep-bolt-caution/tier.json`);
+const cautionScreen = read(`${DEEP}/d-bolt-caution/tier.json`);
 compare(
-  'the caution arm: its screen (1…256) lifted back out of its deep run (1…4096)',
-  read(`${DEEP}/deep-bolt-caution/tier.json`),
-  read(`${DEEP}/d-bolt-caution/tier.json`),
+  `the caution arm: its screen (${span(cautionScreen)}) lifted back out of its deep run (${span(cautionDeep)})`,
+  cautionDeep,
+  cautionScreen,
   'easy:',
 );
+const endgameDeep = read(`${DEEP}/deep-endgame/tier.json`);
+const endgameScreen = read(`${DEEP}/c-endgame/tier.json`);
 compare(
-  'the endgame arm: its screen (1…256) lifted back out of its deep run (1…2048)',
-  read(`${DEEP}/deep-endgame/tier.json`),
-  read(`${DEEP}/c-endgame/tier.json`),
+  `the endgame arm: its screen (${span(endgameScreen)}) lifted back out of its deep run (${span(endgameDeep)})`,
+  endgameDeep,
+  endgameScreen,
   'easy:',
 );
 
