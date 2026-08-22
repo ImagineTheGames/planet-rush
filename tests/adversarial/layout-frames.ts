@@ -642,11 +642,12 @@ function arrowKeepOutFor(p: Profile, wheelOpen: boolean): Rect[] {
  */
 function alarmArrow(p: Profile, sit: MatchSituation, readouts: readonly Rect[]): Rect | null {
   const { vp } = p;
-  // `./layout-reachable` `arrowHome` is `Hud.drawHomeArrow`'s own first two
-  // lines: the alarm is up, and home is not already on screen. It returns `null`
-  // for a situation the game draws no arrow in, which is what makes the wheel
-  // and the arrow unable to appear together — both read the one home offset.
-  const arrow = arrowHome(sit, vp);
+  // `./layout-reachable` `arrowHome` is `Hud.drawHomeArrow`, both rectangles:
+  // visibility against the WHOLE viewport (which is what makes the wheel and the
+  // arrow unable to appear together — both read the one home offset) and the edge
+  // clamp against the CONTENT BOX, which is where the view actually stands it and
+  // is 960 px from the screen edge on the 32:9.
+  const arrow = arrowHome(sit, vp, contentBox(vp));
   if (!arrow) return null;
   const centre = { x: vp.width / 2, y: vp.height / 2 };
   const cleared = arrowClearOfReadouts(arrow, centre, readouts);

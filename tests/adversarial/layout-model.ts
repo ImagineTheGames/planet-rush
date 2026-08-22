@@ -219,8 +219,13 @@ export const LAYOUT_ALLOWANCES: readonly Allowance[] = [
     // the minimap out ON PURPOSE and says why: *"a map of the world is a world
     // surface, and a name over it is a name over the thing it names."* The arrow
     // is a world mark by the same argument — it says where the world is. Measured
-    // across all 360 bearings the sweep runs: it reaches at most 3% of the map's
-    // rect and never its centre, so the tap that expands the map is untouched.
+    // across all 360 bearings the sweep runs: it reaches at most **7.7%** of the
+    // map's rect and never its centre, so the tap that expands the map is
+    // untouched. (Re-taken 2026-08-22, a0-128, once the arrow was clamped to the
+    // content box the view clamps it to: 58 frames, worst on the phone at bearing
+    // 17°, which is a viewport the correction does not move. The 3% this line
+    // used to claim was a0-122's number and had not been re-taken since a0-125
+    // changed what the arrow yields to.)
     why: 'the minimap is deliberately not a keep-out (a0-115’s list, reused by a0-116) — a world mark over a world surface',
   },
   {

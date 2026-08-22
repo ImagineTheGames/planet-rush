@@ -196,26 +196,55 @@ export function wheelIsOpen(sit: MatchSituation): boolean {
 }
 
 /**
- * The arrow home for this situation on this viewport, or `null` when the game
+ * The arrow home for this situation, in screen space, or `null` when the game
  * would not draw one.
  *
- * `Hud.drawHomeArrow`'s own first question, verbatim: *"Is home already on
- * screen? Asked of the WHOLE viewport, because the world is full-bleed"* — so
- * this asks `homeArrow` against `{screenWidth, screenHeight}` and returns `null`
- * on `onScreen`, which is that method's `if (visible.onScreen) return;`.
+ * **`Hud.drawHomeArrow`'s two rectangles, both of them** — and they are
+ * *"genuinely different on an ultrawide (a0-74)"*, which is that method's own
+ * comment and the reason this takes two arguments:
  *
- * The ship sits at the viewport centre because the follow camera puts it there,
- * so the returned arrow is in screen space already.
+ *  - **Is home already on screen?** Asked of the WHOLE viewport, *"because the
+ *    world is full-bleed: a station drawn out in the gutter is a station the
+ *    player can see."* `null` here is `drawHomeArrow`'s
+ *    `if (visible.onScreen) return;` — and it is the half that makes the wheel
+ *    and the arrow mutually exclusive.
+ *  - **Where does the arrow go?** Clamped to the CONTENT BOX, *"because an arrow
+ *    is only a tell if it is read, and the far edge of a 32:9 display is where
+ *    the whole second report says the player is not looking"* — then shifted into
+ *    screen space by the box's `x`, exactly as the view does.
+ *
+ * The `box` argument is a0-128's second correction to the census. Before it, the
+ * model rode the arrow along the SCREEN edge on every viewport, which is the
+ * game's answer on the two where the box is the screen and 440 px / 960 px wrong
+ * on the two where it is not: on the 32:9 at a due-east bearing the sweep drew
+ * the arrow at x 3812 and the game draws it at x 2844.5. That is the same defect
+ * class as D5 one level down — a rect nobody could photograph — and it cut the
+ * expensive way, because the readouts the a0-116/a0-125 yield must clear are
+ * content-box furniture the screen-edge arrow mostly missed. Corrected, the
+ * arrow reaches the minimap on 58 frames rather than 43, and the shipped yield
+ * still holds on every one of them.
+ *
+ * Omit `box` and this is the visibility question alone, which is all the
+ * reachability oracle needs.
+ *
+ * The ship sits at the centre of each rect because the follow camera puts it
+ * there and the box is centred (`@platform/camera`, `@ui/viewport` `contentBox`).
  */
 export function arrowHome(
   sit: MatchSituation,
   vp: { readonly width: number; readonly height: number },
+  box?: { readonly x: number; readonly width: number; readonly height: number },
 ): HomeArrow | null {
   if (!sit.alarmFiring) return null;
   const centre = { x: vp.width / 2, y: vp.height / 2 };
   const home = { x: centre.x + sit.home.dx, y: centre.y + sit.home.dy };
   const visible = homeArrow(centre, home, vp, ARROW_EDGE_INSET);
-  return visible.onScreen ? null : visible;
+  if (visible.onScreen) return null;
+  if (!box) return visible;
+  const boxCentre = { x: box.width / 2, y: box.height / 2 };
+  const boxHome = { x: boxCentre.x + sit.home.dx, y: boxCentre.y + sit.home.dy };
+  const inBox = homeArrow(boxCentre, boxHome, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
+  return { ...inBox, x: inBox.x + box.x };
 }
 
 /** Whether the screen-edge arrow is drawn at all this frame. */
