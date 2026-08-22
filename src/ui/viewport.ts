@@ -55,8 +55,50 @@
  * is a short cycle rather than a slider because the developer asked for a
  * *button*, and it is touch-only because they explicitly did **not** choose the
  * other option they named (confining the desktop view).
+ *
+ * ── 3. THE SIGHTLINE FLOOR (a0-134) ─────────────────────────────────────────
+ *
+ * a0-131 put two real clients in one match and came back with a disagreement:
+ *
+ * > *"at the shipped VIEW 1× the phone player is being shot by an attacker its
+ * > screen does not draw."*
+ *
+ * The desktop, same match, same instant, drew both ships. That is not the comfort
+ * report §2 answers — it is the same arithmetic turned into a **fairness** bug,
+ * because at the shipped default one player can see the fight and the other is
+ * being hit from off-screen. §2 gave the phone a way to *ask* for a fair view;
+ * this section makes it the only view it is offered.
+ *
+ * The property, once: **the disc of everything that can reach you fits inside the
+ * world your camera draws.** Its radius is {@link SIGHTLINE_RADIUS}, read off the
+ * sim rather than typed. Its consequence is {@link minViewZoom}, and the whole of
+ * the fix is that {@link viewZoomSteps} drops every rung that cannot keep it — so
+ * a device's ladder contains only fair views and the rung it boots at is simply
+ * the first of them.
+ *
+ * **Why the ladder and not a new continuous scale.** A continuous floor works
+ * arithmetically and lands the camera at 1.4375× on a 798×384 phone, which is a
+ * view the `VIEW` readout has no label for; the control would then either print a
+ * number nobody chose or grow a dialect. Dropping rungs keeps `1× / 1.5× / 2×`
+ * exactly as they read today and costs one filter.
+ *
+ * **Why the floor and not the default alone.** The smaller, more honest fix would
+ * be to boot a phone at 1.5× and leave 1× on the ladder — but the control cycles,
+ * so 1× stays one tap away, and a property a tap can break is not a property.
+ *
+ * **Why range was not touched instead.** Expressing weapon range as a fraction of
+ * the visible world is `src/sim/`'s to change and is the same bug from the other
+ * end: a 32:9 player would out-range a phone *by construction*. Range stays
+ * absolute at `WEAPON_RANGE` for every screen, so nothing here changes what an
+ * ultrawide can reach — only whether a phone can see what reaches it.
+ *
+ * **What this is not.** It is not a second family of screen-edge markers: the
+ * alarm arrow already owns that idiom for the off-screen station, and a second
+ * one is how the HUD gets crowded (a0-116, a0-122, a0-125). A marker would tell
+ * the player about the bug; this removes it.
  */
 
+import { SHIP_RADIUS, WEAPON_RANGE } from '../sim/constants';
 import { HUD_REFERENCE } from './instrument';
 import type { Rect, Viewport } from '@platform/layout-registry';
 
@@ -117,9 +159,122 @@ export function contentBox(viewport: Viewport): Rect {
  */
 export const VIEW_ZOOM_STEPS: readonly number[] = [1, 1.5, 2];
 
-/** The shipped view — the first rung, and what a player with nothing stored gets
- *  (desktop players never leave it: the control is touch-only). */
+/** The shipped view — the ladder's first rung, and what a screen with room to
+ *  spare gets. It is no longer what *every* screen gets: {@link viewZoomSteps}
+ *  withholds it from a screen too short to keep the sightline (a0-134), so the
+ *  rung a device boots at is {@link defaultViewZoom}, not this. Kept exported
+ *  because the HUD wants a rung to draw before the host has fed it one. */
 export const DEFAULT_VIEW_ZOOM = VIEW_ZOOM_STEPS[0] as number;
+
+// ---------------------------------------------------------------------------
+// 3. The sightline floor (a0-134)
+// ---------------------------------------------------------------------------
+
+/**
+ * How far from the player's ship the camera must draw world, in world units, for
+ * *"something that can shoot you is visible to you"* to hold — see the header §3.
+ *
+ * Both halves are read from the sim rather than typed here, so a balance pass
+ * that moves either one moves this with it:
+ *
+ *  - `WEAPON_RANGE` (260) is the acquisition radius auto-aim engages within
+ *    (`src/sim/step.ts` sizes its search at `WEAPON_RANGE²`), and it is the
+ *    governing reach of anything in the game that shoots a ship: every turret
+ *    tier is *strictly under* it by a stated design rail (`constants.ts` — Mk III
+ *    reaches 250, and "the range rail is a design invariant, not a tuning knob").
+ *  - `SHIP_RADIUS` (16) is added so what arrives on screen is the shooter's
+ *    **hull**. A ship whose centre lands exactly on the edge is drawn as half a
+ *    ship in the last pixel column, and half a ship at the edge of a phone is not
+ *    an answer to "who is shooting me".
+ */
+export const SIGHTLINE_RADIUS = WEAPON_RANGE + SHIP_RADIUS;
+
+/**
+ * The smallest view-width multiplier at which `viewport` keeps the sightline —
+ * `2 × SIGHTLINE_RADIUS / min(width, height)`.
+ *
+ * **The short axis is the whole of it.** The camera centres the ship, so the
+ * world it draws reaches half the glass in each direction and the nearest edge is
+ * always the short one. A landscape phone's *width* was never the problem — 798
+ * CSS px is ±399 world units, comfortably past 276 — and its height is ±192. That
+ * `min` is also why the answer does not change when a phone is turned: a rotation
+ * swaps the two and `min` cannot tell.
+ *
+ * Returned unrounded and un-clamped: it can be **below 1** on a screen that
+ * already has the room (a 1280×800 desktop needs 0.69), which is exactly what
+ * lets {@link viewZoomSteps} leave such a screen's ladder untouched.
+ */
+export function minViewZoom(viewport: Viewport): number {
+  const short = Math.min(viewport.width, viewport.height);
+  // A degenerate viewport (0, NaN — a canvas measured mid-teardown) gets the
+  // shipped ladder rather than a camera scale of 0 or Infinity.
+  if (!Number.isFinite(short) || short <= 0) return DEFAULT_VIEW_ZOOM;
+  return (2 * SIGHTLINE_RADIUS) / short;
+}
+
+/**
+ * The rungs `viewport` is allowed to be on: {@link VIEW_ZOOM_STEPS} with every
+ * view that cannot keep the sightline dropped. **This is the fix** — everything
+ * else in this section reads its answer off this one list.
+ *
+ * Called with no viewport it is the shipped ladder unchanged, so a caller that
+ * has no screen to reason about (a stored-value parse before boot) is exactly
+ * where it was.
+ *
+ * What it returns on the matrix, measured (`src/ui/hud-geometry.test.ts`):
+ *
+ * | viewport            | short axis | floor  | ladder      |
+ * |---------------------|-----------:|-------:|-------------|
+ * | desktop 1280×800    |        800 | 0.690  | 1, 1.5, 2   |
+ * | pixel 915×412       |        412 | 1.340  | 1.5, 2      |
+ * | iphone 844×390      |        390 | 1.415  | 1.5, 2      |
+ * | qa-phone 798×384    |        384 | 1.438  | 1.5, 2      |
+ * | iphone-se 375×667   |        375 | 1.472  | 1.5, 2      |
+ * | small 568×320       |        320 | 1.725  | 2           |
+ *
+ * Two things that table says out loud. **A desktop is untouched** — which is the
+ * point, since the desktop client in a0-131 could already see everything and the
+ * defect was only ever the phone's. And **the smallest screen the game claims to
+ * run on (GDD §4.3) has exactly one fair view, and it is the widest rung the
+ * ladder has**: fairness there consumes the whole of §2's cycle. That is a real
+ * cost, stated rather than discovered — the ladder stops at 2 because a
+ * `SHIP_RADIUS` ship drawn past it stops being readable, so a 320 px screen has
+ * no headroom left at all and the next screen down would have nowhere to go.
+ *
+ * The fallback branch is for exactly that screen: where no shipped rung is wide
+ * enough, the floor itself is the ladder, so the property holds on viewports
+ * nobody enumerated (a 240 px-tall browser window) rather than failing silently
+ * on them.
+ */
+export function viewZoomSteps(viewport?: Viewport): readonly number[] {
+  if (!viewport) return VIEW_ZOOM_STEPS;
+  const floor = minViewZoom(viewport);
+  const fair = VIEW_ZOOM_STEPS.filter((step) => step >= floor);
+  return fair.length > 0 ? fair : [floor];
+}
+
+/**
+ * The rung a screen boots at — the first fair one. On a desktop that is the
+ * shipped `1×` and nothing has changed; on a phone it is the smallest widening
+ * that answers a0-131, never more.
+ */
+export function defaultViewZoom(viewport?: Viewport): number {
+  return viewZoomSteps(viewport)[0] as number;
+}
+
+/**
+ * Seat an arbitrary rung on `viewport`'s ladder — the public form of the guard
+ * every function here runs, and what a host calls when the *screen* changed
+ * rather than the player's choice.
+ *
+ * A resize, a rotation or a fullscreen flip can withdraw the rung a player is on
+ * (a short desktop window crosses the floor at 552 px tall, and there is no zoom
+ * control on desktop to put them back). Clamping is upward: the widening a screen
+ * needs is never taken away by a later one that needs less.
+ */
+export function seatViewZoom(step: number, viewport?: Viewport): number {
+  return normaliseZoom(step, viewport);
+}
 
 /**
  * The camera scale for a view-width multiplier: `1 / step`.
@@ -129,17 +284,27 @@ export const DEFAULT_VIEW_ZOOM = VIEW_ZOOM_STEPS[0] as number;
  * left at each call site because the two are easy to invert by accident, and an
  * inverted zoom is a zoom *in* on the device that already sees least.
  */
-export function cameraScale(step: number): number {
-  const s = normaliseZoom(step);
+export function cameraScale(step: number, viewport?: Viewport): number {
+  const s = normaliseZoom(step, viewport);
   return 1 / s;
 }
 
-/** The next rung of {@link VIEW_ZOOM_STEPS}, wrapping back to the first. The
- *  whole behaviour of the control: one button, cycled, no slider. */
-export function nextViewZoom(step: number): number {
-  const steps = VIEW_ZOOM_STEPS;
-  const i = steps.indexOf(normaliseZoom(step));
-  return steps[(i + 1) % steps.length] as number;
+/**
+ * The next rung of this screen's ladder, wrapping back to the first. The whole
+ * behaviour of the control: one button, cycled, no slider.
+ *
+ * `steps` is the ladder to cycle — {@link viewZoomSteps} for the live screen,
+ * defaulting to the shipped one. It is passed in rather than derived from a
+ * viewport here because the HUD lays out in the *logical* frame while the camera
+ * reads the *visual* one, and those differ by a URL bar: the host computes the
+ * ladder once, off the camera's own viewport, and the two cannot drift (a0-134).
+ * On a screen with a single fair rung this returns that rung, so the press
+ * changes nothing rather than seating a view the player cannot be given.
+ */
+export function nextViewZoom(step: number, steps: readonly number[] = VIEW_ZOOM_STEPS): number {
+  const ladder = steps.length > 0 ? steps : VIEW_ZOOM_STEPS;
+  const i = ladder.indexOf(snapTo(step, ladder));
+  return ladder[(i + 1) % ladder.length] as number;
 }
 
 /** The label a zoom step wears on the control — `1×`, `1.5×`, `2×`. Trailing
@@ -157,9 +322,10 @@ export function viewZoomLabel(step: number): string {
  */
 export const VIEW_ZOOM_STORAGE = 'planet-rush:viewZoom';
 
-/** The string to persist for a step. */
-export function storedViewZoom(step: number): string {
-  return String(normaliseZoom(step));
+/** The string to persist for a step, seated on `viewport`'s ladder first so a
+ *  rung the screen is not allowed to be on can never reach storage. */
+export function storedViewZoom(step: number, viewport?: Viewport): string {
+  return String(normaliseZoom(step, viewport));
 }
 
 /**
@@ -168,16 +334,35 @@ export function storedViewZoom(step: number): string {
  * {@link DEFAULT_VIEW_ZOOM}, so nothing a player ever saved can seat a zoom that
  * is not on the ladder.
  */
-export function parseViewZoom(stored: string | null | undefined): number {
-  if (typeof stored !== 'string') return DEFAULT_VIEW_ZOOM;
+export function parseViewZoom(stored: string | null | undefined, viewport?: Viewport): number {
+  const ladder = viewZoomSteps(viewport);
+  if (typeof stored !== 'string') return ladder[0] as number;
   const n = Number(stored);
-  return VIEW_ZOOM_STEPS.includes(n) ? n : DEFAULT_VIEW_ZOOM;
+  if (!Number.isFinite(n)) return ladder[0] as number;
+  return snapTo(n, ladder);
 }
 
-/** Snap an arbitrary number onto the ladder — the guard every function above
- *  runs first, so a caller that hand-rolls a step can never produce a camera
- *  scale of 0, NaN or Infinity. */
-function normaliseZoom(step: number): number {
-  if (!Number.isFinite(step)) return DEFAULT_VIEW_ZOOM;
-  return VIEW_ZOOM_STEPS.includes(step) ? step : DEFAULT_VIEW_ZOOM;
+/** Snap an arbitrary number onto this screen's ladder — the guard every function
+ *  above runs first, so a caller that hand-rolls a step can never produce a
+ *  camera scale of 0, NaN or Infinity, and (since a0-134) can never seat a rung
+ *  the screen it is on is not allowed to be on. */
+function normaliseZoom(step: number, viewport?: Viewport): number {
+  const ladder = viewZoomSteps(viewport);
+  if (!Number.isFinite(step)) return ladder[0] as number;
+  return snapTo(step, ladder);
+}
+
+/**
+ * The rung of `ladder` a raw number seats: the **narrowest view at least as wide
+ * as asked for**, or the widest rung when nothing on the ladder reaches it.
+ *
+ * Clamping *upward* rather than folding to a default is what a0-134 needs from a
+ * stored value. A player who saved `1` before this shipped, or hand-edited one
+ * in, is seated at their screen's first fair rung instead of the unfair view they
+ * asked for — where the old fold-to-default would have handed them exactly the
+ * rung the floor exists to withhold.
+ */
+function snapTo(step: number, ladder: readonly number[]): number {
+  const widest = ladder[ladder.length - 1] as number;
+  return ladder.find((rung) => rung >= step) ?? widest;
 }

@@ -138,14 +138,23 @@ describe('the view zoom ladder', () => {
     expect(viewZoomLabel(2)).toBe('2×');
   });
 
-  it('round-trips through storage, and folds anything else to the default', () => {
+  it('round-trips through storage, and seats anything else on the ladder', () => {
     expect(VIEW_ZOOM_STORAGE).toBe('planet-rush:viewZoom');
     for (const step of VIEW_ZOOM_STEPS) {
       expect(parseViewZoom(storedViewZoom(step))).toBe(step);
     }
-    for (const bad of [null, undefined, '', 'wide', '0', '-1', '3', 'NaN', 'Infinity']) {
+    // Nothing that was never a rung, and nothing that is not a number at all,
+    // reaches the camera: it seats on the first rung instead.
+    for (const bad of [null, undefined, '', 'wide', '0', '-1', 'NaN', 'Infinity']) {
       expect(parseViewZoom(bad)).toBe(DEFAULT_VIEW_ZOOM);
     }
+    // …with ONE deliberate exception, added by a0-134: a stored value that asks
+    // for MORE world than the ladder has is clamped to the widest rung rather
+    // than folded back to the first. The fold was safe while every rung was fair;
+    // it is not, now that the first rung is withheld from screens too short to
+    // keep the sightline, because folding is the one direction that can hand a
+    // player exactly the view the floor exists to take away.
+    expect(parseViewZoom('3')).toBe(VIEW_ZOOM_STEPS[VIEW_ZOOM_STEPS.length - 1]);
   });
 
   it('never hands the renderer a scale of 0, NaN or Infinity', () => {

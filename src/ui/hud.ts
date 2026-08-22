@@ -158,7 +158,7 @@ import {
 } from './hud-geometry';
 import type { ClockLayout, OreCounterLayout } from './hud-geometry';
 import { ARROW_KEEPOUT_IDS, exclusionViolations } from './layout-exclusions';
-import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
+import { contentBox, DEFAULT_VIEW_ZOOM, VIEW_ZOOM_STEPS, nextViewZoom } from './viewport';
 import {
   hitZoomControl,
   ZOOM_CONTROL_ANCHOR,
@@ -347,6 +347,18 @@ export interface HudFrame {
    * taught about the zoom draws the control reading `1×` rather than `undefined×`.
    */
   readonly viewZoom?: number;
+  /**
+   * The rungs THIS screen is allowed to be on (`./viewport` `viewZoomSteps`) —
+   * what the control cycles through when it is pressed.
+   *
+   * Fed rather than derived here, and that is the point of it (a0-134): the HUD
+   * lays out in the LOGICAL frame while the camera reads the VISUAL one, and the
+   * two differ by a URL bar. The host computes the ladder once, off the camera's
+   * own viewport, so the rung the control offers and the rung the camera can be
+   * seated at cannot disagree. Optional, defaulting to the shipped ladder, for a
+   * host that has not been taught about it.
+   */
+  readonly viewZoomSteps?: readonly number[];
   /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
@@ -778,6 +790,8 @@ export class Hud extends Container {
   /** The rung the control last drew, so a tap knows what to advance from without
    *  the caller having to hand it back in. */
   private zoomStep = DEFAULT_VIEW_ZOOM;
+  /** The ladder the control cycles — the live screen's, fed on `HudFrame`. */
+  private zoomLadder: readonly number[] = VIEW_ZOOM_STEPS;
   private zoomChromeKey = '';
 
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
@@ -1815,6 +1829,7 @@ export class Hud extends Container {
     const rect: Rect = { ...local, x: local.x + box.x - this.topRightReserve };
     this.zoomRect = rect;
     this.zoomStep = frame.viewZoom ?? DEFAULT_VIEW_ZOOM;
+    this.zoomLadder = frame.viewZoomSteps ?? VIEW_ZOOM_STEPS;
     this.zoomGroup.visible = true;
     this.zoomGroup.x = rect.x;
     this.zoomGroup.y = rect.y;
@@ -1855,7 +1870,10 @@ export class Hud extends Container {
   zoomTap(x: number, y: number): number | null {
     if (!this.zoomGroup.visible) return null;
     if (!hitZoomControl(x, y, this.zoomRect)) return null;
-    const next = nextViewZoom(this.zoomStep);
+    // This screen's ladder, not the shipped one: on a screen whose sightline floor
+    // withdraws every other rung (a0-134) the cycle is one rung long, so the press
+    // holds the view rather than seating one the player may not be given.
+    const next = nextViewZoom(this.zoomStep, this.zoomLadder);
     // Optimistic: draw the new value now rather than waiting a frame for the host
     // to feed it back, so the press reads as instant under the thumb.
     this.zoomStep = next;

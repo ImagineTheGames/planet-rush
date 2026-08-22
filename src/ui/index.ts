@@ -1502,7 +1502,12 @@ export {
 // pure: `contentBox` binds the HUD's chrome to a centred region of the HUD's own
 // reference aspect on an ultrawide (and to the whole viewport everywhere else),
 // and the zoom ladder is the touch zoom-out control's model. The wiring layer
-// reads the stored rung and hands the camera `cameraScale(step)`.
+// reads the stored rung and hands the camera `cameraScale(step, viewport)`.
+//
+// a0-134 added the third half of it: `viewZoomSteps` withholds every rung whose
+// view is too narrow to contain a shooter in firing range, so the ladder a screen
+// is offered contains only fair views. `seatViewZoom` is what a host calls when
+// the SCREEN changed rather than the player's choice.
 
 export {
   contentBox,
@@ -1511,8 +1516,13 @@ export {
   viewZoomLabel,
   parseViewZoom,
   storedViewZoom,
+  minViewZoom,
+  viewZoomSteps,
+  defaultViewZoom,
+  seatViewZoom,
   CONTENT_MAX_ASPECT,
   CONTENT_MIN_WIDTH,
+  SIGHTLINE_RADIUS,
   VIEW_ZOOM_STEPS,
   VIEW_ZOOM_STORAGE,
   DEFAULT_VIEW_ZOOM,
