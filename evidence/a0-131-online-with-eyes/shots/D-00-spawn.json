@@ -1,0 +1,177 @@
+{
+  "room": "X8V7",
+  "host": {
+    "menu": {
+      "screen": "online",
+      "matchStarted": true
+    },
+    "online": {
+      "visible": false,
+      "screen": "home",
+      "status": "connecting",
+      "title": "JOINED · SEAT 1",
+      "error": "",
+      "notice": "",
+      "code": "",
+      "resolvedCode": "X8V7",
+      "joinMode": "browse",
+      "browseRows": [],
+      "browseStamp": "",
+      "browseEmpty": [],
+      "regionLine": "IAD —",
+      "regionPickerVisible": false
+    },
+    "lobby": {
+      "visible": false,
+      "online": true,
+      "room": "X8V7",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 2,
+      "mode": "ffa",
+      "size": 2,
+      "abundance": "scarce",
+      "claim": "PUBLIC",
+      "selectedClass": "vanguard",
+      "seatStates": [
+        {
+          "index": 0,
+          "label": "TAKEN",
+          "live": false
+        },
+        {
+          "index": 1,
+          "label": "TAKEN",
+          "live": false
+        },
+        {
+          "index": 2,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 3,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 4,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 5,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 6,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 7,
+          "label": "OPEN",
+          "live": false
+        }
+      ],
+      "worldMapId": "octagon",
+      "worldCast": []
+    },
+    "badge": {
+      "text": "01a8353 · 0800d5b6 (iad) · 433ms",
+      "visible": true,
+      "server": {
+        "machine": "0800d5b6f1e208",
+        "region": "iad"
+      }
+    }
+  },
+  "joiner": {
+    "menu": {
+      "screen": "online",
+      "matchStarted": true
+    },
+    "online": {
+      "visible": false,
+      "screen": "join",
+      "status": "connecting",
+      "title": "JOINED · SEAT 2",
+      "error": "",
+      "notice": "",
+      "code": "X8V7",
+      "resolvedCode": "X8V7",
+      "joinMode": "code",
+      "browseRows": [],
+      "browseStamp": "",
+      "browseEmpty": [],
+      "regionLine": "IAD —",
+      "regionPickerVisible": false
+    },
+    "lobby": {
+      "visible": false,
+      "online": true,
+      "room": "X8V7",
+      "you": 1,
+      "isHost": false,
+      "humanCount": 2,
+      "mode": "ffa",
+      "size": 2,
+      "abundance": "scarce",
+      "claim": null,
+      "selectedClass": "vanguard",
+      "seatStates": [
+        {
+          "index": 0,
+          "label": "TAKEN",
+          "live": false
+        },
+        {
+          "index": 1,
+          "label": "TAKEN",
+          "live": false
+        },
+        {
+          "index": 2,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 3,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 4,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 5,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 6,
+          "label": "OPEN",
+          "live": false
+        },
+        {
+          "index": 7,
+          "label": "OPEN",
+          "live": false
+        }
+      ],
+      "worldMapId": "octagon",
+      "worldCast": []
+    },
+    "badge": {
+      "text": "01a8353 · 0800d5b6 (iad) · 505ms",
+      "visible": true,
+      "server": {
+        "machine": "0800d5b6f1e208",
+        "region": "iad"
+      }
+    }
+  }
+}

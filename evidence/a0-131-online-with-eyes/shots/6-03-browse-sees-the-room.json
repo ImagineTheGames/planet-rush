@@ -1,0 +1,37 @@
+{
+  "menu": {
+    "screen": "online",
+    "matchStarted": false
+  },
+  "online": {
+    "visible": true,
+    "screen": "join",
+    "status": "idle",
+    "title": "PICK A ROOM",
+    "error": "",
+    "notice": "",
+    "code": "",
+    "resolvedCode": null,
+    "joinMode": "browse",
+    "browseRows": [
+      {
+        "owner": "4CQCGF",
+        "meta": "1 PLAYER · 4 SEATS OPEN · FFA",
+        "where": "VIRGINIA —",
+        "action": "JOIN",
+        "state": "open",
+        "enabled": true
+      }
+    ],
+    "browseStamp": "UPDATED 0s AGO",
+    "browseEmpty": [],
+    "regionLine": "IAD —",
+    "regionPickerVisible": false
+  },
+  "lobby": null,
+  "badge": {
+    "text": "01a8353",
+    "visible": true,
+    "server": null
+  }
+}

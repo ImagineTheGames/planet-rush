@@ -1,0 +1,87 @@
+{
+  "menu": {
+    "screen": "online",
+    "matchStarted": false
+  },
+  "online": {
+    "visible": false,
+    "screen": "join",
+    "status": "connecting",
+    "title": "JOINED · SEAT 2",
+    "error": "",
+    "notice": "",
+    "code": "C7TV",
+    "resolvedCode": "C7TV",
+    "joinMode": "code",
+    "browseRows": [],
+    "browseStamp": "",
+    "browseEmpty": [],
+    "regionLine": "IAD —",
+    "regionPickerVisible": false
+  },
+  "lobby": {
+    "visible": true,
+    "online": true,
+    "room": "C7TV",
+    "you": 1,
+    "isHost": false,
+    "humanCount": 2,
+    "mode": "ffa",
+    "size": 2,
+    "abundance": "scarce",
+    "claim": null,
+    "selectedClass": "vanguard",
+    "seatStates": [
+      {
+        "index": 0,
+        "label": "TAKEN",
+        "live": false
+      },
+      {
+        "index": 1,
+        "label": "TAKEN",
+        "live": false
+      },
+      {
+        "index": 2,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 3,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 4,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 5,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 6,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 7,
+        "label": "OPEN",
+        "live": false
+      }
+    ],
+    "worldMapId": null,
+    "worldCast": null
+  },
+  "badge": {
+    "text": "01a8353 · 4d891e33 (iad)",
+    "visible": true,
+    "server": {
+      "machine": "4d891e33b27a95",
+      "region": "iad"
+    }
+  }
+}

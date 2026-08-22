@@ -1,0 +1,28 @@
+{
+  "menu": {
+    "screen": "online",
+    "matchStarted": false
+  },
+  "online": {
+    "visible": true,
+    "screen": "join",
+    "status": "idle",
+    "title": "ENTER THE ROOM CODE",
+    "error": "",
+    "notice": "",
+    "code": "",
+    "resolvedCode": null,
+    "joinMode": "code",
+    "browseRows": [],
+    "browseStamp": "",
+    "browseEmpty": [],
+    "regionLine": "IAD —",
+    "regionPickerVisible": false
+  },
+  "lobby": null,
+  "badge": {
+    "text": "01a8353",
+    "visible": true,
+    "server": null
+  }
+}
