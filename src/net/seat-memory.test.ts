@@ -15,9 +15,9 @@ import {
   SEAT_MEMORY_KEY,
   SEAT_MEMORY_TTL_MS,
   browserSeatMemory,
-  memorySeatStorage,
   seatMemory,
 } from './seat-memory';
+import { memorySeatStorage } from '../../tests/net/seat-storage';
 import type { StorageLike } from './playtest-log-store';
 
 const NOW = 1_700_000_000_000;

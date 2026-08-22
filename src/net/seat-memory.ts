@@ -240,17 +240,3 @@ export function browserSeatMemory(): SeatMemory | null {
     return null;
   }
 }
-
-/**
- * An in-memory {@link StorageLike}, for tests that need a page reload to be
- * simulable without a DOM: keep the object, throw the session away, build another
- * one on top of it — which is what a discarded tab does to the pair of them.
- */
-export function memorySeatStorage(): StorageLike {
-  const cells = new Map<string, string>();
-  return {
-    getItem: (key) => cells.get(key) ?? null,
-    setItem: (key, value) => void cells.set(key, value),
-    removeItem: (key) => void cells.delete(key),
-  };
-}

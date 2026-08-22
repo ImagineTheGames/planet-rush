@@ -13,8 +13,9 @@ import type { ClientMessage, ServerMessage } from './transport';
 import { WebSocketTransport } from './websocket-transport';
 import type { TimerHandle, WebSocketLike } from './websocket-transport';
 import { encodeServerMessage } from './wire';
-import { memorySeatStorage, seatMemory } from './seat-memory';
+import { seatMemory } from './seat-memory';
 import type { SeatMemory } from './seat-memory';
+import { memorySeatStorage } from '../../tests/net/seat-storage';
 
 /** A socket a test can open, drop and inspect. */
 class FakeSocket implements WebSocketLike {
