@@ -13,11 +13,6 @@
  * and a shield before it will spend an ore on its own ship, and it has no
  * seek-and-destroy branch at all — a timid character with a rival in plain sight
  * keeps working.
- *
- * And then the clause that is not in that sentence: the **endgame** (a0-130).
- * "Attacks rarely" is a claim about the match; the collapse is not the match
- * (GDD §2.3), and the pair of cases at the bottom is the whole difference —
- * same board, same character, the collapse flag the only thing that moved.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -182,75 +177,5 @@ describe('Easy — over-defends, and attacks rarely (GDD §2.9)', () => {
     // bar Rusty's does not (GDD §2.9 — "characters, not difficulty labels").
     const { bot } = standoff(1, 'bolt');
     expect(bot.brain.lastBehavior).toBe('potshot');
-  });
-});
-
-/**
- * **The endgame** (GDD §2.3; brief a0-130).
- *
- * Before a0-130 this tier had no collapse branch, and the price was measured
- * rather than argued: **four Easy matches in five ended with nobody having won**,
- * because a match nobody contests is decided by which reactor entropy reaches
- * last (`tests/reports/a0-130-bolt.md` §2). Medium and Hard have carried `hunt`
- * since day 4; these are the cases that say Easy carries it now, and that it
- * carries it *only* in the phase it is for.
- */
-describe('Easy — the endgame, once the field has closed (GDD §2.3)', () => {
-  /** The same open-space board, with the rival's home the only thing standing
-   *  in reach and the collapse flag as the single variable. */
-  function endgame(personality: PersonalityId, collapsed: boolean, out = 600) {
-    const world = arena();
-    const me = world.ships[0]!;
-    const rival = world.stations.find((s) => s.owner === 1)!;
-    me.hull = me.maxHull;
-    me.pos = { x: rival.pos.x, y: rival.pos.y + out };
-    me.vel = { x: 0, y: 0 };
-    // Already pointed at it. The trigger gate is on the *hull* bearing, not the
-    // requested one (`./steering` `canHitDir`), so a ship that has not finished
-    // turning yet is a ship that has not fired yet — which is true of any tier
-    // and is not what these cases are about.
-    me.angle = Math.atan2(rival.pos.y - me.pos.y, rival.pos.x - me.pos.x);
-    // The rival's ship is parked far away, so nothing above the endgame — no
-    // threat to flee, no intruder to meet — can answer instead.
-    world.ships[1]!.pos = { x: 100, y: 100 };
-    if (collapsed) {
-      world.match.collapseTime = world.time;
-      world.match.phase = 'collapse';
-    }
-    const bot = createBot({ id: 0, personality }, { seed: 11 });
-    const actions = bot.decide(perceive(world, 0));
-    return { world, bot, actions, rival };
-  }
-
-  it('closes on the nearest standing enemy reactor', () => {
-    for (const character of ['rusty', 'bolt'] as const) {
-      // 600 out: further than the weapon reaches, so the leaf has to fly there.
-      const { bot, actions } = endgame(character, true, 600);
-      expect(bot.brain.lastBehavior, character).toBe('hunt');
-      // The reactor is due south of the bot; a negative y is a flight at it.
-      expect(thrustOf(actions).y, character).toBeLessThan(0);
-    }
-  });
-
-  it('…and pulls the trigger once it is in reach', () => {
-    for (const character of ['rusty', 'bolt'] as const) {
-      // Inside weapon range. This is the whole difference from `./behaviors`
-      // `hunt`, which only ever closes: Medium and Hard have an `attack` branch
-      // above it to fire, and this tier has none, so the leaf does both.
-      const { bot, actions } = endgame(character, true, 220);
-      expect(bot.brain.lastBehavior, character).toBe('hunt');
-      expect(actions.some((a) => a.type === 'fire' && a.active), character).toBe(true);
-      // Aimed at the reactor — the same bearing the thrust took — rather than
-      // off into a field it can no longer mine.
-      const aim = actions.find((a) => a.type === 'aim');
-      expect(aim && aim.type === 'aim' ? aim.dir.y : 0, character).toBeLessThan(0);
-    }
-  });
-
-  it('does not touch it one tick before the field closes — the control', () => {
-    for (const character of ['rusty', 'bolt'] as const) {
-      const { bot } = endgame(character, false);
-      expect(bot.brain.lastBehavior, character).not.toBe('hunt');
-    }
   });
 });

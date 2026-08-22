@@ -62,20 +62,9 @@ const ALLY = 1;
 const NEAR_FOE = 2;
 const FAR_FOE = 3;
 
-/**
- * Every tier that hunts — **all three since a0-130**.
- *
- * This list used to read Medium and Hard, with the note "Easy has no collapse
- * branch — it has no endgame model to get wrong, which is a competence
- * difference and not a bug". a0-130 measured the price of not having one: four
- * Easy matches in five ended with nobody having won, because the collapse
- * crowns whichever reactor entropy reaches last and no Easy bot was doing
- * anything about it. Easy now carries the branch (`./easy` `endgameSiege`), so
- * it is in this list — and being in this list is the part that matters, because
- * the allegiance rule below is exactly the thing a new hunting tier could get
- * wrong on its first day.
- */
-const HUNTING_TIERS: readonly Difficulty[] = [Difficulty.Easy, Difficulty.Medium, Difficulty.Hard];
+/** Both tiers that hunt. Easy has no collapse branch — it has no endgame model
+ *  to get wrong, which is a competence difference and not a bug. */
+const HUNTING_TIERS: readonly Difficulty[] = [Difficulty.Medium, Difficulty.Hard];
 
 // ---------------------------------------------------------------------------
 // The board

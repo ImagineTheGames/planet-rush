@@ -21,25 +21,12 @@
  *
  * What this adds up to for a first-time player: an opponent that fills a slot,
  * defends its home convincingly, and loses.
- *
- * **And one clause that is not in GDD §2.9 but in §2.3** *(a0-130)*: once the
- * field has closed, an Easy bot goes and shoots the nearest enemy reactor. That
- * is not "attacks rarely" being walked back — it is the *collapse*, where there
- * is no ore to mine, no repair to buy and no regeneration to defend, and the
- * only score left is whose core outlasts whose. `./medium` and `./hard` have
- * carried that branch since day 4 (`hunt`); this tier did not, and the measured
- * price was that **four Easy matches in five ended with nobody having won**
- * (`tests/reports/a0-130-bolt.md` §2). A tier that never contests the endgame
- * does not read as a weaker opponent — it reads as a match that stops mattering
- * a minute and a half before it ends.
  */
 
 import { UpgradeTrack } from '@shared/types';
-import type { Action } from '@shared/types';
 import type { DefencePlan, Purchase } from './behaviors';
 import {
   RETREAT_CLEAR_RANGE,
-  SIEGE_STANDOFF,
   corneredBlockader,
   coreUnderFinalAssault,
   defendAlly,
@@ -70,7 +57,7 @@ import {
   wantsTurnAndFight,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
-import { bestRock, homeIntruder, isWounded, nearestEnemy, nearestLivingRival } from './targeting';
+import { bestRock, homeIntruder, isWounded, nearestEnemy } from './targeting';
 import type { BotCtx, Node } from './tree';
 import { selector, when } from './tree';
 
@@ -136,41 +123,6 @@ export const EASY_UPGRADE_FLOOR = 10;
 /** An Easy character only goes looking for a fight if the design gave it one —
  *  Bolt, "reckless rusher" — and even then only at what it can already see. */
 export const EASY_ATTACK_WEIGHT = 0.4;
-
-/**
- * **The endgame** (GDD §2.3 collapse, §2.6 "the economy is the siege engine of
- * last resort"; brief a0-130).
- *
- * The field has closed: no new ore, no repair, no shield regeneration, a lost
- * hull costs five free seconds and ore in the hold is worthless. The only score
- * left is whose core outlasts whose, so an Easy bot stops working and goes to
- * the nearest standing enemy reactor.
- *
- * **Why this fires the gun when `./behaviors` `hunt` does not.** At Medium and
- * Hard, `hunt` is only the *approach*: their `attack` branch outranks it and
- * pulls the trigger once there is something in reach. This tier has no attack
- * branch under it — "there is no seek-and-destroy branch at all" — so a bare
- * `hunt` here would fly an Easy bot to an enemy home and park it there, which
- * is theatre rather than an endgame. One `engage` at {@link SIEGE_STANDOFF} is
- * the approach and the shot in one leaf, and it is the same `engage` a Hard
- * siege uses, with this tier's own fat spread and slow re-aim on top.
- *
- * **It is still an Easy bot doing it.** The leaf sits below `last-stand`,
- * `cornered-fight`, `retreat`, `defend` and `defend-ally`, so a character that
- * is frightened, cornered or hearing an alarm still answers those first — which
- * is why a timid Rusty spends much of the collapse running home and a reckless
- * Bolt spends it on somebody's doorstep, out of the weights they already have
- * and with no new dial for it.
- *
- * Returns null with no enemy home standing, which cannot happen in a live match
- * — `resolveWinner` has already ended it — and the tree falls through to the
- * economy leaves below.
- */
-export function endgameSiege(ctx: BotCtx): readonly Action[] | null {
-  const rival = nearestLivingRival(ctx);
-  if (!rival) return null;
-  return engage(ctx, rival.pos, rival.radius, SIEGE_STANDOFF);
-}
 
 /** The Easy tree (GDD §2.9). Read top to bottom: that is the bot's priorities. */
 export const easyTree: Node = selector('easy', [
@@ -271,13 +223,6 @@ export const easyTree: Node = selector('easy', [
   // Easy never *opens* a raid, note: this tree has no station attack to announce
   // one from. It only ever answers a better bot's.
   when('join-assault', (ctx) => wantsJoinAssault(ctx), (ctx) => joinAssault(ctx)),
-
-  // **The endgame** ({@link endgameSiege}). Above `potshot`, because once the
-  // field has closed a rival *ship* is worth five seconds of respawn and a rival
-  // *core* is worth the match — so the core outranks the hull for both
-  // characters, on the same terms. Below everything defensive, so the ladder and
-  // the cast survive the phase change intact.
-  when('hunt', (ctx) => ctx.view.collapsed, (ctx) => endgameSiege(ctx)),
 
   // "attacks rarely": only a character with a real attack weight, and only at
   // something already in front of it.
