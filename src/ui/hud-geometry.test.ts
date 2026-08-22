@@ -199,6 +199,14 @@ import type { ControlScheme } from './settings';
 import { WAVE_NAMES } from './wave-clock';
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
+// a0-134's sightline invariant is a claim about the CAMERA, so it is asserted
+// through the camera's own arithmetic and the cull's own inverse — the two
+// modules that already own "how much world is on screen" — against the reach the
+// sim publishes. Nothing about "visible" is re-derived in this file.
+import { cameraOffset } from '@platform/camera';
+import { cullBox, writeVisibleWorld } from '@render/cull';
+import { SHIP_RADIUS, WEAPON_RANGE } from '../sim/constants';
+import { VIEW_ZOOM_STEPS, cameraScale } from './viewport';
 
 // ---------------------------------------------------------------------------
 // The device matrix — QA's playwright.config.ts profiles, both orientations,
@@ -3879,5 +3887,92 @@ describe('the build stamp on every screen it is drawn over (a0-129)', () => {
     // that stops this rule from re-laying out screens it has nothing to say about.
     const clear: Rect = { x: 10, y: 10, width: 100, height: 40 };
     expect(clearBuildStamp(clear, buildStampRow(desktop))).toBe(clear);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE SIGHTLINE (a0-134) — something that can shoot you must be drawn for you
+// ---------------------------------------------------------------------------
+//
+// a0-131 put two real clients in one match and failed on it: *"at the shipped
+// VIEW 1× the phone player is being shot by an attacker its screen does not
+// draw."* The desktop, on the same match at the same instant, drew both ships.
+//
+// This is not the comfort report a0-74 answered with the zoom control ("on pc we
+// have a larger screen, do we have any way on mobile to zoom out"). It is a
+// FAIRNESS defect: at the shipped default the two players are not playing the
+// same game, because one of them can see the fight and the other is being hit
+// from off-screen with nothing on the glass but a directionless vignette.
+//
+// THE PROPERTY, stated once: the disc of everything that can reach you must fit
+// inside the world your camera draws. Its radius is read from the sim rather
+// than typed here —
+//
+//   WEAPON_RANGE (260) : the acquisition radius auto-aim engages within
+//                        (`src/sim/step.ts`, `bestD2 = WEAPON_RANGE²`). Every
+//                        turret tier is strictly UNDER it by design rail
+//                        (Mk III = 250, `constants.ts` "the range rail is a
+//                        design invariant"), so 260 is the governing reach of
+//                        anything in the game that can shoot a ship.
+//   SHIP_RADIUS  (16)  : so what arrives on screen is the shooter's HULL and not
+//                        its last pixel column. A ship whose centre is exactly on
+//                        the edge is half-drawn, which is not "visible to you".
+//
+// so a fair view is one that shows at least 2 × 276 = 552 world units on its
+// SHORT axis. The short axis is the whole of it: a landscape phone's width was
+// never the problem (798 px is ±399 world units, comfortably past 276) and its
+// HEIGHT is (384 px is ±192).
+//
+// Measured against the shipped camera — one world unit is one CSS pixel, so the
+// half-extent is half the glass — every touch profile in the matrix fails and
+// only the desktop passes:
+//
+//   iphone/portrait   390×844  →  195     pixel/landscape   915×412  →  206
+//   iphone/landscape  844×390  →  195     desktop          1280×800  →  400  ✓
+//   qa-phone/landscape 798×384 →  192     iphone-se/portrait 375×667 →  187
+//   pixel/portrait    412×915  →  206     small/*           320×568  →  160
+//
+// It is asserted through the REAL camera path — `cameraOffset` writes the offset
+// the renderer writes, `writeVisibleWorld` inverts it exactly as the cull does —
+// rather than by re-deriving "the visible world" here, because a second notion of
+// on-screen is the bug this is about (see the header over `@render/cull`).
+describe('the sightline (a0-134)', () => {
+  /** How far from the camera target the world must be drawn, world units. */
+  const SIGHTLINE = WEAPON_RANGE + SHIP_RADIUS;
+
+  /** Somewhere unremarkable in the arena — the property is about the extent the
+   *  camera draws AROUND its target, so the target's own coordinates are free. */
+  const SHIP = { x: 1200, y: 1200 };
+
+  it('a shooter in range is never off the player screen', () => {
+    const failures: string[] = [];
+    for (const { name, vp } of PROFILES) {
+      const camera = { ...vp, originX: 0, originY: 0 };
+      // Every rung the device can actually be on, not only the one it boots at:
+      // a property a tap can put the player back outside is not a property.
+      for (const step of VIEW_ZOOM_STEPS) {
+        const scale = cameraScale(step);
+        const seen = writeVisibleWorld(cullBox(), cameraOffset(SHIP, camera, scale), camera, scale);
+        const reach = {
+          left: SHIP.x - seen.left,
+          right: seen.right - SHIP.x,
+          up: SHIP.y - seen.top,
+          down: seen.bottom - SHIP.y,
+        };
+        const worst = Math.min(reach.left, reach.right, reach.up, reach.down);
+        if (worst < SIGHTLINE) {
+          failures.push(
+            `${name} @ VIEW ${step}×: the camera draws only ${worst.toFixed(1)} world units ` +
+              `toward its nearest edge, so a shooter as much as ${(SIGHTLINE - worst).toFixed(1)} ` +
+              `units INSIDE its own firing range is off the glass (needs ${SIGHTLINE}; sees ` +
+              `${(seen.right - seen.left).toFixed(0)}×${(seen.bottom - seen.top).toFixed(0)} ` +
+              `world units)`,
+          );
+        }
+      }
+    }
+    expect(failures, `a shooter in range is off the screen on:\n  ${failures.join('\n  ')}`).toEqual(
+      [],
+    );
   });
 });
