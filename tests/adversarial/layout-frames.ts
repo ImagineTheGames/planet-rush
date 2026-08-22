@@ -22,6 +22,25 @@
  * and each view's own draw sequence elsewhere. It is transcribed here because
  * **the layout registry cannot express it** — see below.
  *
+ * ── AND WHAT THE CENSUS MUST NOT INVENT (a0-128) ────────────────────────────
+ *
+ * A cross-product composes; a game does not. This file used to take `wheelOpen`
+ * and `alarm` as independent booleans, and two independent booleans are four
+ * screens whether or not the game has four — it has three. The fourth,
+ * `match-alarm-wheel` with the arrow home up, is 288 of the 1,896 frames the
+ * sweep used to run and **none of them exist**: the wheel opens only inside
+ * `STATION.dockRange` and the arrow is drawn only once home is off the inset
+ * rect, which is further out on every viewport. a0-125 measured 3.3 px of overlap
+ * on one of them and a0-127 went to photograph it and could not.
+ *
+ * So a match frame is staged from a {@link MatchSituation} — the WORLD, not the
+ * screen — and `./layout-reachable` asks the shipped predicates what that world
+ * puts on the glass. There is no exclusion list and no pair of ids is named
+ * impossible anywhere: the wheel and the arrow read the same home offset, so the
+ * frame is not excluded, it is unspellable. Every {@link Variant} also carries
+ * the {@link Stage} it was staged from, and `./layout-overlap.test.ts` fails on a
+ * frame whose painted list disagrees with what that stage would draw.
+ *
  * ── WHAT THE REGISTRY CANNOT SAY, STATED PLAINLY ────────────────────────────
  *
  * The brief asks for this if it is true, and it is true. A `LayoutEntry`
@@ -101,7 +120,6 @@ import {
   waveClockLayout,
   wheelFootprint,
 } from '../../src/ui/hud-geometry';
-import { homeArrow } from '../../src/ui/alarm';
 import {
   ARROW_KEEPOUT_IDS,
   HUD_READOUT_IDS,
@@ -126,6 +144,8 @@ import { DOOR_ORDER, KEYPAD_KEYS } from '../../src/ui/lobby-entry';
 import { entryLayout } from '../../src/ui/lobby-geometry';
 import { layer } from './layout-model';
 import type { Frame, Unlayered } from './layout-model';
+import { arrowHome, homeAway, situation, wheelIsOpen } from './layout-reachable';
+import type { MatchSituation, Stage, StagedFrame } from './layout-reachable';
 
 // ---------------------------------------------------------------------------
 // The three mirrored constants
@@ -238,18 +258,24 @@ export type Bypass =
   /** a0-119 — do not drop an owner's second label. */
   | 'a0-119';
 
-/** What the HUD is doing this frame. */
-interface HudSignals {
-  /** A shipped rule switched off — negative controls only. */
-  readonly bypass?: Bypass;
+/**
+ * What the HUD is doing this frame — **derived, since a0-128.**
+ *
+ * This used to be a record of independent booleans: `wheelOpen`, `alarm`, a
+ * bearing. Two independent booleans are four screens whether or not the game has
+ * four, and one of the four did not exist — the wheel open with the arrow home
+ * up, which `./layout-reachable` shows cannot happen on any viewport. So the
+ * census now states the WORLD ({@link MatchSituation}) and asks the shipped
+ * predicates what is on the glass.
+ */
+interface HudDraws {
+  /** `canOpenWheel` on the sim's own `isDocked` — `./layout-reachable`. */
   readonly wheelOpen: boolean;
-  readonly alarm: boolean;
-  /** The prompt's sentence, or `null` for a frame with no prompt up. */
-  readonly prompt: string | null;
-  /** Bearing to home in radians, for the alarm arrow. */
-  readonly bearing?: number;
-  /** Screen-space camera stop for the two nameplates, or `null` for none. */
-  readonly plateAt?: { readonly x: number; readonly y: number } | null;
+}
+
+/** What the shipped conditions say this situation puts on the glass. */
+function hudDraws(sit: MatchSituation): HudDraws {
+  return { wheelOpen: wheelIsOpen(sit) };
 }
 
 /**
@@ -262,8 +288,9 @@ interface HudSignals {
  * fires while the wheel is open (GDD §2.10), so it has to sit on top of it"*,
  * which is precisely why a0-100 was a defect and not a curiosity.
  */
-function matchHud(p: Profile, s: HudSignals): Unlayered[] {
+function matchHud(p: Profile, sit: MatchSituation, bypass?: Bypass): Unlayered[] {
   const { vp, isTouch } = p;
+  const { wheelOpen } = hudDraws(sit);
   const box = contentBox(vp);
   const out: Unlayered[] = [];
   const scheme: ControlScheme = 'tap';
@@ -286,7 +313,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
   // and the order is the a0-119 ruling (the station's plate is placed first and
   // keeps its pixels). Both belong to the SAME owner, which is the frame the
   // developer photographed on 2026-08-19.
-  if (s.plateAt) out.push(...nameplates(p, s.plateAt, readoutsFor(p, s), s.bypass));
+  if (sit.plateAt) out.push(...nameplates(p, sit.plateAt, readoutsFor(p, wheelOpen), bypass));
 
   // --- corner chrome ---------------------------------------------------------
 
@@ -308,7 +335,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
     },
   );
 
-  const clock = waveClock(p, s.wheelOpen);
+  const clock = waveClock(p, wheelOpen);
   out.push({
     id: 'wave-clock',
     role: 'read',
@@ -322,7 +349,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
   // would let the frame and the keep-out disagree about where an element is —
   // which is the whole class a0-122 exists to find. `./hud` `keepOutCandidates`
   // is the same arrangement in the shipped view.
-  const chrome = fixedChrome(p, s);
+  const chrome = fixedChrome(p, wheelOpen);
   out.push({
     id: 'station-hp',
     role: 'read',
@@ -369,7 +396,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
 
   // --- the alarm -------------------------------------------------------------
 
-  if (s.alarm) {
+  if (sit.alarmFiring) {
     // The frame is a STROKE, not a fill: four bars around the glass. Modelled as
     // what it inks rather than as a filled rect, because a filled rect would
     // "cover" the whole HUD and need a blanket exception — and a blanket
@@ -389,7 +416,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
         note: 'the under-attack frame’s stroke',
       });
     }
-    const arrow = alarmArrow(p, s, s.bypass === 'a0-116' ? [] : arrowKeepOutFor(p, s));
+    const arrow = alarmArrow(p, sit, bypass === 'a0-116' ? [] : arrowKeepOutFor(p, wheelOpen));
     if (arrow) {
       out.push({
         id: 'alarm-arrow',
@@ -403,7 +430,7 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
 
   // --- the wheel, and the prompt on top of it --------------------------------
 
-  if (s.wheelOpen) {
+  if (wheelOpen) {
     out.push({
       id: 'build-wheel',
       role: 'press',
@@ -413,13 +440,13 @@ function matchHud(p: Profile, s: HudSignals): Unlayered[] {
     });
   }
 
-  if (s.prompt !== null) {
+  if (sit.prompt !== null) {
     const wrapAt = promptWrapWidth(vp.width, vp.height, isTouch);
-    const text = wrapped(s.prompt, p, wrapAt);
+    const text = wrapped(sit.prompt, p, wrapAt);
     // The a0-100 bypass is exactly what the prompt did before a0-100: it placed
     // itself without knowing a wheel was open, and never withdrew.
-    const knowsWheel = s.bypass === 'a0-100' ? false : s.wheelOpen;
-    if (s.bypass === 'a0-100' || !promptWithdraws(vp.width, vp.height, isTouch, {}, s.wheelOpen, text.h)) {
+    const knowsWheel = bypass === 'a0-100' ? false : wheelOpen;
+    if (bypass === 'a0-100' || !promptWithdraws(vp.width, vp.height, isTouch, {}, wheelOpen, text.h)) {
       out.push({
         id: 'onboarding',
         role: 'read',
@@ -539,7 +566,7 @@ function waveClock(p: Profile, wheelOpen: boolean): Rect {
  * "the button is up" and "the column stands off its corner" are one condition
  * here as they are in `./hud`.
  */
-function fixedChrome(p: Profile, s: HudSignals): Record<string, Rect | null> {
+function fixedChrome(p: Profile, wheelOpen: boolean): Record<string, Rect | null> {
   const { vp, isTouch } = p;
   const box = contentBox(vp);
   const ore = oreCluster(p);
@@ -551,7 +578,7 @@ function fixedChrome(p: Profile, s: HudSignals): Record<string, Rect | null> {
   return {
     'ore-hud': ore.cluster,
     'banked-total': ore.numeral,
-    'wave-clock': waveClock(p, s.wheelOpen),
+    'wave-clock': waveClock(p, wheelOpen),
     'station-hp': { ...hp, x: box.x + hp.x - reserve },
     [ZOOM_CONTROL_ID]: zoom ? { ...zoom, x: box.x + zoom.x - reserve } : null,
     'controls-strip': showControlsStrip(isTouch)
@@ -588,8 +615,8 @@ function pickChrome(chrome: Record<string, Rect | null>, ids: readonly string[])
 
 /** The readout rects a WORLD LABEL must clear this frame — a0-115's own list
  *  (`HUD_READOUT_IDS`), built from the same geometry the frame paints. */
-function readoutsFor(p: Profile, s: HudSignals): Rect[] {
-  return pickChrome(fixedChrome(p, s), HUD_READOUT_IDS);
+function readoutsFor(p: Profile, wheelOpen: boolean): Rect[] {
+  return pickChrome(fixedChrome(p, wheelOpen), HUD_READOUT_IDS);
 }
 
 /**
@@ -599,8 +626,8 @@ function readoutsFor(p: Profile, s: HudSignals): Rect[] {
  * strip), and a fourth arrived the moment D1's fix moved the HOME cluster out of
  * the corner that had been shielding it from the fullscreen button.
  */
-function arrowKeepOutFor(p: Profile, s: HudSignals): Rect[] {
-  return pickChrome(fixedChrome(p, s), ARROW_KEEPOUT_IDS);
+function arrowKeepOutFor(p: Profile, wheelOpen: boolean): Rect[] {
+  return pickChrome(fixedChrome(p, wheelOpen), ARROW_KEEPOUT_IDS);
 }
 
 /**
@@ -613,15 +640,16 @@ function arrowKeepOutFor(p: Profile, s: HudSignals): Rect[] {
  * returns the rect that lands on the clock, which is what makes the sweep able to
  * fail.
  */
-function alarmArrow(p: Profile, s: HudSignals, readouts: readonly Rect[]): Rect | null {
+function alarmArrow(p: Profile, sit: MatchSituation, readouts: readonly Rect[]): Rect | null {
   const { vp } = p;
-  const bearing = s.bearing ?? 0;
+  // `./layout-reachable` `arrowHome` is `Hud.drawHomeArrow`, both rectangles:
+  // visibility against the WHOLE viewport (which is what makes the wheel and the
+  // arrow unable to appear together — both read the one home offset) and the edge
+  // clamp against the CONTENT BOX, which is where the view actually stands it and
+  // is 960 px from the screen edge on the 32:9.
+  const arrow = arrowHome(sit, vp, contentBox(vp));
+  if (!arrow) return null;
   const centre = { x: vp.width / 2, y: vp.height / 2 };
-  // Home a long way off in that direction, so the arrow is definitely clamped to
-  // the edge rather than sitting on a visible station.
-  const home = { x: centre.x + Math.cos(bearing) * 6000, y: centre.y + Math.sin(bearing) * 6000 };
-  const arrow = homeArrow(centre, home, vp);
-  if (arrow.onScreen) return null;
   const cleared = arrowClearOfReadouts(arrow, centre, readouts);
   return polyBounds(arrowPoly(cleared, ARROW_SIZE));
 }
@@ -832,10 +860,16 @@ export function refusalAtConstant(p: Profile): Unlayered[] {
 // The states
 // ---------------------------------------------------------------------------
 
-/** One frame's worth of elements, and the name of the cell it is. */
+/** One frame's worth of elements, the name of the cell it is, and — since
+ *  a0-128 — how the game gets there. */
 export interface Variant {
   /** Appended to the state id when present — a camera stop, a bearing. */
   readonly id?: string;
+  /** The world this frame was staged from (`./layout-reachable`). Every variant
+   *  carries one: a frame staged without saying how a player reaches it is the
+   *  seed of the next D5, and `./layout-overlap.test.ts` fails on a frame whose
+   *  painted list disagrees with what its stage would draw. */
+  readonly stage: Stage;
   readonly painted: readonly Unlayered[];
 }
 
@@ -845,6 +879,10 @@ export interface StateSpec {
   readonly title: string;
   /** Which of the six defects lived here — the reason the state is in scope. */
   readonly from: string;
+  /** How the game reaches this screen, in words — the sentence a0-127 could not
+   *  write for `match-alarm-wheel`'s arrow and had to file a `failed` verdict
+   *  instead. */
+  readonly reached: string;
   build(p: Profile): Variant[];
 }
 
@@ -1071,114 +1109,153 @@ export const STATES: readonly StateSpec[] = [
     id: 'match-hud',
     title: 'the match HUD at rest',
     from: 'a0-115 (a nameplate through the word ORE)',
-    build: (p) => plateStops(p).map((at, i) => ({
-      id: `stop${i}`,
-      painted: matchHud(p, { wheelOpen: false, alarm: false, prompt: null, plateAt: at }),
-    })),
+    reached: 'parked at your own station with BUILD not held — the wheel stays shut on ' +
+      '`canOpenWheel`’s `requested` term, which is the conjunction’s other half',
+    build: (p) =>
+      plateStops(p).map((at, i) => {
+        const sit = situation({ plateAt: at });
+        return { id: `stop${i}`, stage: { kind: 'match', sit }, painted: matchHud(p, sit) };
+      }),
   },
   {
     id: 'match-prompt',
     title: 'the match HUD with an onboarding prompt up',
     from: 'a0-100 (the prompt drawn through the wheel)',
-    build: (p) => [{ painted: matchHud(p, { wheelOpen: false, alarm: false, prompt: PROMPT, plateAt: null }) }],
+    reached: 'an onboarding sentence fires with no wheel open (GDD §2.10)',
+    build: (p) => {
+      const sit = situation({ prompt: PROMPT });
+      return [{ stage: { kind: 'match', sit }, painted: matchHud(p, sit) }];
+    },
   },
   {
     id: 'match-wheel',
     title: 'the build wheel open, with the SPEND prompt firing',
     from: 'a0-100 (318 px of prompt through the wheel)',
-    build: (p) => [{ painted: matchHud(p, { wheelOpen: true, alarm: false, prompt: PROMPT, plateAt: null }) }],
+    reached: 'docked at your own station holding BUILD — the SPEND prompt fires while the ' +
+      'wheel is open, which is why `src/ui/hud.ts` paints it last (GDD §2.10)',
+    build: (p) => {
+      const sit = situation({ buildRequested: true, prompt: PROMPT });
+      return [{ stage: { kind: 'match', sit }, painted: matchHud(p, sit) }];
+    },
   },
   {
     id: 'match-alarm',
     title: 'the match HUD under alarm, at every bearing',
     from: 'a0-116 (the alarm arrow across the wave clock)',
+    reached: 'out in the field at `ARROW_STAGED_RANGE` while your own station takes sustained ' +
+      'damage — GDD §2.2’s own sentence, and every one of the 360 bearings is a separation a ' +
+      'shipped map can produce (`./layout-reachable` `arenaReach`)',
     build: (p) =>
-      BEARINGS.map((bearing, i) => ({
-        id: `bearing${i}`,
-        painted: matchHud(p, { wheelOpen: false, alarm: true, prompt: null, bearing, plateAt: null }),
-      })),
+      BEARINGS.map((bearing, i) => {
+        const sit = situation({ alarmFiring: true, home: homeAway(bearing) });
+        return { id: `bearing${i}`, stage: { kind: 'match', sit }, painted: matchHud(p, sit) };
+      }),
   },
   {
     id: 'match-alarm-wheel',
     title: 'the alarm sounding with the wheel open',
     from: 'a0-116 + a0-100 — the clock re-flows to one row while the wheel is up (a0-24)',
-    build: (p) =>
-      BEARINGS.filter((_, i) => i % 5 === 0).map((bearing, i) => ({
-        id: `bearing${i * 5}`,
-        painted: matchHud(p, { wheelOpen: true, alarm: true, prompt: null, bearing, plateAt: null }),
-      })),
+    // a0-128. This state is reachable and stays: flying home to spend under
+    // siege is the triangle decision GDD §2.2 is about, and the compact clock
+    // (a0-24) only exists here. What is NOT reachable is the arrow on it — the
+    // wheel opens inside `STATION.dockRange` (160 u) and the arrow is only drawn
+    // once home is off the inset rect, which on the tightest of the four
+    // viewports is 164 u away. So the 72 bearings this state used to sweep were
+    // 72 copies of one frame, distinguished only by an element the game does not
+    // draw here, and they are one frame now. Nothing is skipped: the arrow's
+    // absence is derived, and `./layout-overlap.test.ts` proves it holds over the
+    // WHOLE docked disc rather than at the 72 points a sweep could sample.
+    reached: 'docked at your own station holding BUILD while the station is under sustained ' +
+      'attack — the arrow is not drawn because the station you are standing on is on screen, ' +
+      'and §2.2 hands the tell to the station at that point',
+    build: (p) => {
+      const sit = situation({ alarmFiring: true, buildRequested: true });
+      return [{ stage: { kind: 'match', sit }, painted: matchHud(p, sit) }];
+    },
   },
   {
     id: 'pause-menu',
     title: 'the pause menu',
     from: 'a0-97 (the corner offer stands here, and here only)',
-    build: (p) => [{ painted: pauseState('menu', p) }],
+    reached: 'PAUSE from a live match',
+    build: (p) => [{ stage: { kind: 'pause', screen: 'menu' }, painted: pauseState('menu', p) }],
   },
   {
     id: 'pause-settings',
     title: 'the pause SETTINGS screen',
     from: 'a0-97 (DONE under the DOWNLOAD LOG button)',
-    build: (p) => [{ painted: pauseState('settings', p) }],
+    reached: 'SETTINGS from the pause menu',
+    build: (p) => [{ stage: { kind: 'pause', screen: 'settings' }, painted: pauseState('settings', p) }],
   },
   {
     id: 'pause-confirm',
     title: 'the pause EXIT confirmation',
     from: 'a0-97 (the second screen stacked over pause)',
-    build: (p) => [{ painted: pauseState('confirm', p) }],
+    reached: 'EXIT from the pause menu',
+    build: (p) => [{ stage: { kind: 'pause', screen: 'confirm' }, painted: pauseState('confirm', p) }],
   },
   {
     id: 'doors',
     title: 'the doors screen, idle',
     from: 'a0-114 (the screen the refusal landed on)',
-    build: (p) => [{ painted: doorsState(p, false) }],
+    reached: 'the entry screen with nothing refused',
+    build: (p) => [{ stage: { kind: 'entry', screen: 'doors', refused: false }, painted: doorsState(p, false) }],
   },
   {
     id: 'doors-refused',
     title: 'a refused HOST — the doors with the refusal panel on them',
     from: 'a0-114 (DOWNLOAD LOG over the word HOST)',
-    build: (p) => [{ painted: doorsState(p, true) }],
+    reached: 'HOST refused by the allocator — the panel stands in the band `entryLayout` reserved',
+    build: (p) => [{ stage: { kind: 'entry', screen: 'doors', refused: true }, painted: doorsState(p, true) }],
   },
   {
     id: 'keypad-refused',
     title: 'a refused JOIN — the keypad with the refusal panel on it',
     from: 'a0-114 (the mode switch under RETRY, missed by a centre probe)',
-    build: (p) => [{ painted: keypadState(p, true) }],
+    reached: 'JOIN refused with a room code entered',
+    build: (p) => [{ stage: { kind: 'entry', screen: 'keypad', refused: true }, painted: keypadState(p, true) }],
   },
   {
     id: 'online-error',
     title: 'the online error overlay',
     from: 'a0-97 (an error screen carries the corner offer)',
-    build: (p) => [{ painted: onlineState(p, true) }],
+    reached: 'a session that failed — the overlay offers BACK TO MENU',
+    build: (p) => [{ stage: { kind: 'online', withAction: true }, painted: onlineState(p, true) }],
   },
   {
     id: 'online-reconnecting',
     title: 'the reconnecting overlay',
     from: 'a0-97 (an overlay that is merely waiting)',
-    build: (p) => [{ painted: onlineState(p, false) }],
+    reached: 'a dropped link the client is still retrying — nothing to press yet',
+    build: (p) => [{ stage: { kind: 'online', withAction: false }, painted: onlineState(p, false) }],
   },
   {
     id: 'end-victory',
     title: 'the end-of-match screen — VICTORY',
     from: 'the four outcomes the brief names',
-    build: (p) => [{ painted: endState(p, 'victory') }],
+    reached: 'the match ends with the local player the last core standing',
+    build: (p) => [{ stage: { kind: 'end', outcome: 'victory' }, painted: endState(p, 'victory') }],
   },
   {
     id: 'end-defeat',
     title: 'the end-of-match screen — DEFEAT',
     from: 'the four outcomes the brief names',
-    build: (p) => [{ painted: endState(p, 'defeat') }],
+    reached: 'the match ends with somebody else the last core standing',
+    build: (p) => [{ stage: { kind: 'end', outcome: 'defeat' }, painted: endState(p, 'defeat') }],
   },
   {
     id: 'end-draw',
     title: 'the end-of-match screen — DRAW',
     from: 'a0-113 made DRAW reachable; it had never been swept',
-    build: (p) => [{ painted: endState(p, 'draw') }],
+    reached: 'the collapse takes the last two cores in the same tick (a0-113)',
+    build: (p) => [{ stage: { kind: 'end', outcome: 'draw' }, painted: endState(p, 'draw') }],
   },
   {
     id: 'end-eliminated',
     title: 'the end-of-match screen — ELIMINATED',
     from: 'the four outcomes the brief names',
-    build: (p) => [{ painted: endState(p, 'eliminated') }],
+    reached: 'the local core dies while the match runs on',
+    build: (p) => [{ stage: { kind: 'end', outcome: 'eliminated' }, painted: endState(p, 'eliminated') }],
   },
 ];
 
@@ -1245,7 +1322,7 @@ export const CONTROLS: readonly Control[] = [
     // The phone is where a0-99 photographed it and where the band runs out: the
     // wheel is 318.5px of a 384px screen, so there is no clear band left under it.
     expect: [{ over: 'onboarding', under: 'build-wheel', on: ['phone-798x384'] }],
-    frame: (p) => matchHud(p, { wheelOpen: true, alarm: false, prompt: PROMPT, bypass: 'a0-100' }),
+    frame: (p) => matchHud(p, situation({ buildRequested: true, prompt: PROMPT }), 'a0-100'),
   },
   {
     brief: 'a0-114',
@@ -1271,8 +1348,7 @@ export const CONTROLS: readonly Control[] = [
     what: 'a rival nameplate drawn through the word ORE',
     bypassed: 'labelYieldsToReadouts — a world label steps out of a fixed readout',
     expect: [{ over: 'ore-hud', under: 'nameplate-station', on: ALL_VIEWPORTS }],
-    frame: (p) =>
-      matchHud(p, { wheelOpen: false, alarm: false, prompt: null, plateAt: overTheOreCounter(p), bypass: 'a0-115' }),
+    frame: (p) => matchHud(p, situation({ plateAt: overTheOreCounter(p) }), 'a0-115'),
   },
   {
     brief: 'a0-116',
@@ -1280,7 +1356,7 @@ export const CONTROLS: readonly Control[] = [
     bypassed: 'arrowClearOfReadouts — the arrow gives up radius to clear a readout',
     expect: [{ over: 'alarm-arrow', under: 'wave-clock', on: ALL_VIEWPORTS }],
     frame: (p) =>
-      matchHud(p, { wheelOpen: false, alarm: true, prompt: null, bearing: -Math.PI / 2, bypass: 'a0-116' }),
+      matchHud(p, situation({ alarmFiring: true, home: homeAway(-Math.PI / 2) }), 'a0-116'),
   },
   {
     brief: 'a0-119',
@@ -1288,13 +1364,7 @@ export const CONTROLS: readonly Control[] = [
     bypassed: 'labelRepeatsOwner — an owner’s second label stands down',
     expect: [{ over: 'nameplate-ship', under: 'nameplate-station', on: ALL_VIEWPORTS }],
     frame: (p) =>
-      matchHud(p, {
-        wheelOpen: false,
-        alarm: false,
-        prompt: null,
-        plateAt: { x: p.vp.width / 2, y: p.vp.height * 0.6 },
-        bypass: 'a0-119',
-      }),
+      matchHud(p, situation({ plateAt: { x: p.vp.width / 2, y: p.vp.height * 0.6 } }), 'a0-119'),
   },
 ];
 
@@ -1312,14 +1382,15 @@ export const CONTROLS: readonly Control[] = [
 export function sweepFrames(
   states: readonly StateSpec[] = STATES,
   viewports: readonly Profile[] = VIEWPORTS,
-): Frame[] {
-  const out: Frame[] = [];
+): StagedFrame[] {
+  const out: StagedFrame[] = [];
   for (const state of states) {
     for (const p of viewports) {
       for (const variant of state.build(p)) {
         out.push({
           state: variant.id === undefined ? state.id : `${state.id}/${variant.id}`,
           viewport: p.id,
+          stage: variant.stage,
           painted: layer(variant.painted),
         });
       }
