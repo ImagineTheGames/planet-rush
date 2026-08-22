@@ -1,0 +1,41 @@
+a0-135 — board `doorstep`: the bot on its own doorstep, an attacker standing on the station
+station alarm not pinned (control); core at 0.8 of max (last-stand fires below 0.3)
+ceiling 12s = 720 ticks
+
+character  tier    hull    retreat  keeping  mean away   closest  first leaf
+---------- ------- ------- -------- -------- ---------- --------- ----------
+rusty      easy    25/70        310      410       431u       80u  retreat
+rusty      easy    0.50         310      410       431u       80u  retreat
+rusty      easy    0.35         310      410       431u       80u  retreat
+rusty      easy    0.20         310      410       431u       80u  retreat
+rusty      easy    5/70         310      410       431u       80u  retreat
+bolt       easy    25/70          0      720       213u       80u  defend
+bolt       easy    0.50           0      720       213u       80u  defend
+bolt       easy    0.35           0      720       213u       80u  defend
+bolt       easy    0.20         310      410       431u       80u  retreat
+bolt       easy    5/70         310      410       431u       80u  retreat
+foreman    medium  25/70        305      415       432u       80u  retreat
+foreman    medium  0.50           0      720       291u       80u  defend
+foreman    medium  0.35         305      415       432u       80u  retreat
+foreman    medium  0.20         305      415       432u       80u  retreat
+foreman    medium  5/70         305      415       432u       80u  retreat
+patch      medium  25/70        305      415       432u       80u  retreat
+patch      medium  0.50           0      720       291u       80u  defend
+patch      medium  0.35         305      415       432u       80u  retreat
+patch      medium  0.20         305      415       432u       80u  retreat
+patch      medium  5/70         305      415       432u       80u  retreat
+sable      hard    25/70          0      720       304u       80u  defend
+sable      hard    0.50           0      720       304u       80u  defend
+sable      hard    0.35           0      720       304u       80u  defend
+sable      hard    0.20           0      720       304u       80u  defend
+sable      hard    5/70         300      420       432u       80u  retreat
+vulture    hard    25/70          0      720       304u       80u  defend
+vulture    hard    0.50           0      720       304u       80u  defend
+vulture    hard    0.35           0      720       304u       80u  defend
+vulture    hard    0.20           0      720       304u       80u  defend
+vulture    hard    5/70         300      420       432u       80u  retreat
+warden     hard    25/70          0      720       304u       80u  defend
+warden     hard    0.50           0      720       304u       80u  defend
+warden     hard    0.35           0      720       304u       80u  defend
+warden     hard    0.20           0      720       304u       80u  defend
+warden     hard    5/70         300      420       432u       80u  retreat

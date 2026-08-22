@@ -1,0 +1,41 @@
+a0-135 — board `doorstep`: the bot on its own doorstep, an attacker standing on the station
+station UNDER ATTACK; core at 0.2 of max (last-stand fires below 0.3)
+ceiling 12s = 720 ticks
+
+character  tier    hull    retreat  keeping  mean away   closest  first leaf
+---------- ------- ------- -------- -------- ---------- --------- ----------
+rusty      easy    25/70          0      720       213u       80u  last-stand
+rusty      easy    0.50           0      720       213u       80u  last-stand
+rusty      easy    0.35           0      720       213u       80u  last-stand
+rusty      easy    0.20           0      720       213u       80u  last-stand
+rusty      easy    5/70           0      720       213u       80u  last-stand
+bolt       easy    25/70          0      720       213u       80u  last-stand
+bolt       easy    0.50           0      720       213u       80u  last-stand
+bolt       easy    0.35           0      720       213u       80u  last-stand
+bolt       easy    0.20           0      720       213u       80u  last-stand
+bolt       easy    5/70           0      720       213u       80u  last-stand
+foreman    medium  25/70          0      720       291u       80u  last-stand
+foreman    medium  0.50           0      720       291u       80u  last-stand
+foreman    medium  0.35           0      720       291u       80u  last-stand
+foreman    medium  0.20           0      720       291u       80u  last-stand
+foreman    medium  5/70           0      720       291u       80u  last-stand
+patch      medium  25/70          0      720       291u       80u  last-stand
+patch      medium  0.50           0      720       291u       80u  last-stand
+patch      medium  0.35           0      720       291u       80u  last-stand
+patch      medium  0.20           0      720       291u       80u  last-stand
+patch      medium  5/70           0      720       291u       80u  last-stand
+sable      hard    25/70          0      720       304u       80u  last-stand
+sable      hard    0.50           0      720       304u       80u  last-stand
+sable      hard    0.35           0      720       304u       80u  last-stand
+sable      hard    0.20           0      720       304u       80u  last-stand
+sable      hard    5/70           0      720       304u       80u  last-stand
+vulture    hard    25/70          0      720       304u       80u  last-stand
+vulture    hard    0.50           0      720       304u       80u  last-stand
+vulture    hard    0.35           0      720       304u       80u  last-stand
+vulture    hard    0.20           0      720       304u       80u  last-stand
+vulture    hard    5/70           0      720       304u       80u  last-stand
+warden     hard    25/70          0      720       304u       80u  last-stand
+warden     hard    0.50           0      720       304u       80u  last-stand
+warden     hard    0.35           0      720       304u       80u  last-stand
+warden     hard    0.20           0      720       304u       80u  last-stand
+warden     hard    5/70           0      720       304u       80u  last-stand
