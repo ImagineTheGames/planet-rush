@@ -42,7 +42,7 @@
       "bundle": "after",
       "profile": "phone-798x384",
       "stamp": {
-        "text": "6febb51*",
+        "text": "4bc7ee5*",
         "visible": true,
         "withinAnchor": true
       },
@@ -54,7 +54,7 @@
       },
       "behindTheStamp": {
         "max": 81.9,
-        "mean": 27.1,
+        "mean": 26.5,
         "pixels": 2262
       },
       "plateTopInStampColumns": 315,

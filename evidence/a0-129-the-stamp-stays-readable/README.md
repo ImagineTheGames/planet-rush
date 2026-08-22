@@ -34,7 +34,7 @@ arena card. Nothing is stubbed and no seam sets the state.
 | | sha the frame wears | tree |
 |---|---|---|
 | **before** | `85c173d*` | `origin/main` at `85c173dd`, built from a detached worktree |
-| **after** | `6febb51*` | this branch at `6febb51d` |
+| **after** | `4bc7ee5*` | this branch at `4bc7ee51` |
 
 Both wear the `*`: the container carries untracked build output (`dist/`,
 `dist-a088/`) so `git status --porcelain` is non-empty and
@@ -63,12 +63,12 @@ the tag.
 
 ### The numbers
 
-| | before (`85c173d*`) | after (`6febb51*`) |
+| | before (`85c173d*`) | after (`4bc7ee5*`) |
 |---|---|---|
 | the stamp's rect, off `__buildBadge` | `{8, 363, 43.5×13}` | `{8, 363, 43.5×13}` — **unmoved** |
 | `withinAnchor` | true | true |
 | brightest pixel inside that rect | **255.0** | **81.9** |
-| mean pixel inside that rect | 67.3 | 27.1 |
+| mean pixel inside that rect | 67.3 | 26.5 |
 | top of the bright plate, in the stamp's columns | **335.5** | **315.0** |
 | the stamp's row begins at | 363 | 363 |
 
