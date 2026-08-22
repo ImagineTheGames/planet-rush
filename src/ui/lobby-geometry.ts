@@ -1911,20 +1911,18 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       submit.width + footerGutter,
     ),
   );
-  /** What the lift costs the band below — see `./gantry` `bandOverflow`. */
-  const footerOverflow = Math.max(
-    bandOverflow(frame, back),
-    bandOverflow(frame, submit),
-    bandOverflow(frame, erase),
+  /** The y the band's content may not pass: the top of the lifted footer row.
+   *  Equal to the band's own bottom edge on every viewport whose beam already
+   *  held its plates — every desktop — so it costs those screens nothing. */
+  const contentFloor = Math.min(
+    frame.band.y + frame.band.height,
+    back.width > 0 ? back.y : Infinity,
+    erase.width > 0 ? erase.y : Infinity,
+    submit.width > 0 ? submit.y : Infinity,
   );
 
   // --- The band both screens divide ----------------------------------------
-  // Short by whatever the footer row's lift took off its bottom, which is air
-  // between the band and the beam by construction plus whatever the band lends.
-  const band: Rect = {
-    ...frame.band,
-    height: Math.max(0, frame.band.height - footerOverflow),
-  };
+  const band = frame.band;
   const messageHeight = Math.min(
     band.height,
     Math.max(0, Math.round(ENTRY_MESSAGE_HEIGHT * m.scale)),
@@ -1947,14 +1945,38 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     width: band.width,
     height: Math.max(0, band.y + band.height - middleY),
   };
+  /** …and the same band cut off at the footer row (a0-129). */
+  const middleAboveFooter: Rect = {
+    ...middle,
+    height: Math.max(0, Math.min(middle.y + middle.height, contentFloor) - middle.y),
+  };
 
+  // **The band gives it up to the content that actually reaches it** (a0-129) —
+  // the same "reserved when it is there and not otherwise" ruling `./minimap`'s
+  // FIRE column keeps, and here it decides whether four plates move.
+  //
+  // The doors are a CENTRED stack (`placeDoors`) and on almost every screen they
+  // have slack: charging them for a lift they never touch would re-centre the
+  // front door of the game for a plate 40px below them. So they are placed in the
+  // whole band and re-placed in the short one only where the stack really does
+  // run into the footer row — a refusal panel up on a short phone, which is the
+  // one case a0-114 measured them filling it.
   const doors: Rect[] = [];
-  const doorShape = placeDoors(doors, middle, m);
+  let doorShape = placeDoors(doors, middle, m);
+  if (doors.some((d) => d.y + d.height > contentFloor + 1e-6)) {
+    doors.length = 0;
+    doorShape = placeDoors(doors, middleAboveFooter, m);
+  }
 
   // The JOIN screen's two modes share one band: the switch leads its top strip in
   // both, the code cells take the rest of that strip in CODE mode, and the list
   // takes everything under it in BROWSE mode. Both are laid out every time.
-  const join = placeJoinModes(middle, m);
+  //
+  // These two FILL their band rather than centring in it — the bottom key row and
+  // the browse list both end on its edge — so they take the short one every time.
+  // Measured without it: 5px of `key29`..`key31` under ERASE and 5px of the list
+  // under all three plates, on the 798x384 handset a0-127 photographed.
+  const join = placeJoinModes(middleAboveFooter, m);
 
   return {
     content: frame.content,
@@ -1966,7 +1988,8 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     refusal,
     doors,
     doorShape,
-    ...placeCodeEntry(middle, join.cellsRow),
+    // The keypad fills its band like the list above it, so it takes the short one.
+    ...placeCodeEntry(middleAboveFooter, join.cellsRow),
     segments: join.segments,
     segmentShape: join.shape,
     browseRows: join.rows,
