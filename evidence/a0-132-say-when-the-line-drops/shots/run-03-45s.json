@@ -1,0 +1,45 @@
+{
+  "atMs": 48297,
+  "host": {
+    "overlay": {
+      "mounted": false
+    },
+    "presence": null,
+    "link": {
+      "phase": "live",
+      "state": "open",
+      "closeReason": null
+    }
+  },
+  "joiner": {
+    "overlay": {
+      "mounted": true,
+      "shown": true,
+      "html": 2077,
+      "title": "RECONNECTING…",
+      "detail": "no server data for 48s — reclaiming your seat, your seat is held for as long as the match runs.",
+      "buttons": [
+        {
+          "id": "pr-link-loss-reconnect",
+          "label": "RECONNECT NOW"
+        },
+        {
+          "id": "pr-link-loss-abandon",
+          "label": "ABANDON MATCH"
+        }
+      ],
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 798,
+        "h": 384
+      }
+    },
+    "presence": null,
+    "link": {
+      "phase": "redialing",
+      "state": "reconnecting",
+      "closeReason": null
+    }
+  }
+}

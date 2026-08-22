@@ -145,8 +145,33 @@ function linkLossCss(accent: string): string {
 // The DOM edge
 // ---------------------------------------------------------------------------
 
+/**
+ * A parent this overlay can be appended to. Deliberately narrower than
+ * {@link TraceElement}, and for the same reason `./playtest-log-button`'s
+ * `DownloadLogHost` is: `document.fullscreenElement` is typed `Element`, which has
+ * no `hidden`, so demanding a full `TraceElement` here would refuse the one host
+ * that matters. Appending is the whole of what a parent is asked to do.
+ */
+export interface LinkLossHost {
+  appendChild(child: unknown): void;
+}
+
+/**
+ * `TraceDom` plus the two members a0-28 needs, both optional so every existing
+ * caller — and every fake DOM in a test — still satisfies it unchanged.
+ */
+export interface LinkLossDom extends TraceDom {
+  /**
+   * The element the browser is presenting fullscreen, or null/absent. **Where this
+   * overlay has to live when there is one** (a0-28) — see {@link LinkLossView.desiredHost}.
+   */
+  readonly fullscreenElement?: LinkLossHost | null;
+  /** Document-level events — `fullscreenchange`. Optional for the same reason. */
+  addEventListener?(type: string, handler: () => void): void;
+}
+
 export interface LinkLossViewConfig {
-  readonly dom: TraceDom;
+  readonly dom: LinkLossDom;
   /** RECONNECT — redial now and reclaim the seat (`./session` `reconnect`). */
   readonly onReconnect: () => void;
   /** ABANDON MATCH — a stated leave, seat freed, back to the menu. */
@@ -162,6 +187,9 @@ export interface LinkLossViewConfig {
  */
 export class LinkLossView {
   private root: TraceElement | null = null;
+  /** The parent the element is currently in, so a re-home costs one comparison
+   *  rather than an `appendChild` every frame ({@link rehome}). */
+  private host: LinkLossHost | null = null;
   private lastHtml = '';
   private shown = false;
 
@@ -195,6 +223,7 @@ export class LinkLossView {
     this.lastHtml = '';
     this.root?.remove();
     this.root = null;
+    this.host = null;
   }
 
   // --- Internals ----------------------------------------------------------
@@ -223,14 +252,69 @@ export class LinkLossView {
     bind(LINK_LOSS_BUTTON_IDS.menu, () => this.config.onMenu());
   }
 
+  /**
+   * Where this overlay has to live *right now*: the fullscreen element when the
+   * browser is presenting one, else `body`.
+   *
+   * **This is a0-28, and this module never got it.** A fullscreen element is in the
+   * browser's **top layer**, which paints above every normal-flow box *regardless of
+   * z-index* and lays a `::backdrop` over the rest of the document. So a scrim left
+   * in `body` while the game root is fullscreen is mounted, laid out at the full
+   * viewport, `display:flex`, `visibility:visible`, `opacity:1`, carrying the
+   * largest z-index the platform has — and painted underneath the canvas. Not
+   * hidden: buried. `document.elementFromPoint` at the centre of the screen returns
+   * the CANVAS, so the scrim does not even take the taps its `pointer-events:auto`
+   * was written to intercept.
+   *
+   * On touch that is the **ordinary** state of a match — PLAY enters fullscreen on
+   * `#app` (`@platform/fullscreen`) — which is why the phone player, the one the
+   * reconnect grace exists for at all (GDD §4.2, "mobile play, where screen lock,
+   * app backgrounding and cellular drops are routine"), was the one player who could
+   * never see this card. a0-131 photographed the result and read it correctly: a
+   * frame that is identical thirty seconds after the cut, because the only thing
+   * that changed is a `<div>` nobody can see.
+   *
+   * `./playtest-log-button` solved this once for the DOWNLOAD LOG affordance. This
+   * is the same rule, not the same surface — the brief is explicit that the log
+   * offer is for *reporting* a problem and must not be used to *announce* one.
+   */
+  private desiredHost(): LinkLossHost | null {
+    return this.config.dom.fullscreenElement ?? this.config.dom.body;
+  }
+
+  /**
+   * Move the element to {@link desiredHost} if it is not already there. Creates
+   * nothing, and costs one property read and one comparison on the frames where the
+   * answer has not changed.
+   *
+   * No `fullscreenchange` listener, unlike `./playtest-log-button`: this view is
+   * driven by `./link-loss-attach` `poll`, which `main.ts` calls **once per rendered
+   * frame** and keeps calling while the sim is frozen. {@link render} therefore
+   * re-homes on every frame the card is up, which catches entering fullscreen,
+   * leaving it, and the vendor-prefixed cases that fire no standard event at all —
+   * without a second source of truth to keep in step or tear down.
+   */
+  private rehome(): void {
+    if (!this.root) return;
+    const host = this.desiredHost();
+    if (!host || host === this.host) return;
+    // `appendChild` moves a node that already has a parent; no detach step needed.
+    host.appendChild(this.root);
+    this.host = host;
+  }
+
   private mount(): TraceElement | null {
-    if (this.root) return this.root;
-    const host = this.config.dom.body;
+    if (this.root) {
+      this.rehome();
+      return this.root;
+    }
+    const host = this.desiredHost();
     if (!host) return null;
     const root = this.config.dom.createElement('div');
     root.id = LINK_LOSS_ROOT_ID;
     host.appendChild(root);
     this.root = root;
+    this.host = host;
     return root;
   }
 }

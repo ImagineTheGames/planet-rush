@@ -134,6 +134,17 @@ export function nodeWebSocket(url: string): WebSocketLike {
         const copy = new ArrayBuffer(frame.payload.byteLength);
         new Uint8Array(copy).set(frame.payload);
         ws.onmessage?.({ data: copy });
+      } else if (frame.opcode === 0x9) {
+        // **Answer the keepalive.** RFC 6455 §5.5.2 requires a pong echoing the
+        // ping's payload verbatim, and every browser does it in the network stack
+        // where no page script can decline. Without this line the harness client is
+        // *less alive than a browser*: `server/ws.ts` pings every
+        // `PING_INTERVAL_MS` and destroys a socket that has not answered within
+        // `PONG_TIMEOUT_MS`, so every node test client here was reaped at ~35 s and
+        // its seat quietly substituted. Nothing noticed while the tests were short;
+        // a0-132 measures a 45-second drop, where it is the difference between
+        // photographing the product and photographing the harness.
+        socket.write(maskedFrame(Buffer.from(frame.payload), 0xa));
       } else if (frame.opcode === 0x8) socket.destroy();
     }
   });

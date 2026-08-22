@@ -1,0 +1,24 @@
+{
+  "host": {
+    "overlay": {
+      "mounted": false
+    },
+    "presence": null,
+    "link": {
+      "phase": "live",
+      "state": "open",
+      "closeReason": null
+    }
+  },
+  "joiner": {
+    "overlay": {
+      "mounted": false
+    },
+    "presence": null,
+    "link": {
+      "phase": "live",
+      "state": "open",
+      "closeReason": null
+    }
+  }
+}

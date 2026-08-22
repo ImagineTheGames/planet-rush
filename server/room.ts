@@ -212,6 +212,49 @@ export const MAX_CATCHUP_TICKS = 30;
  */
 export const INTENT_HOLD_TICKS = 15;
 
+/**
+ * How long a **live seat** may send the room nothing at all before the room
+ * concludes its player is gone, seats the substitute and tells everybody
+ * ({@link MatchRoom.sweepSilentSeats}; GDD §4.2 — "a bot substitutes for the player
+ * immediately, so the match keeps its shape and the room doesn't stall").
+ *
+ * **Why this exists, and why a TCP close is not enough.** Until a0-132 the room's
+ * only notice that a player had gone was the socket closing. That covers a hang-up,
+ * a crashed tab, and QA's emulated cut — every one of which sends a FIN. It does
+ * not cover the drop this game is actually built for: GDD §4.2 puts reconnect grace
+ * in scope *because of* "mobile play, where screen lock, app backgrounding, and
+ * cellular drops are routine", and **none of those send anything**. The link simply
+ * stops carrying packets, both TCP connections stay open, and the only thing that
+ * eventually notices is `server/ws.ts`'s keepalive — `PING_INTERVAL_MS` (20 s) plus
+ * `PONG_TIMEOUT_MS` (15 s), so **up to 35 seconds** in which the room broadcasts
+ * nothing, no bot takes the controls, and the seat's ship coasts to a halt in front
+ * of players who are told nothing about why. Measured, not assumed: 34.8 s in
+ * `src/net/session.test.ts` over a real socket blackholed at the TCP layer.
+ *
+ * **Why input silence is the right signal.** A live match is a continuous
+ * conversation: the client files an input tick every tick and probes twice a second
+ * (`src/net/ping`). Silence from a *seated, live* connection is therefore as strong
+ * a signal here as it is on the client (`src/net/link-loss` — "silence is a
+ * signal"), and it arrives on the application's own clock rather than on a
+ * middlebox timer. Note the two conditions in that sentence: **seated** and
+ * **live**. A lobby is legitimately quiet — nothing is being simulated and nothing
+ * is being sent — so this sweep never runs outside `'live'`, for exactly the reason
+ * `src/net/link-loss-attach` refuses to watch a lobby.
+ *
+ * **Five seconds, and why not less.** It has to be longer than any stall this build
+ * has measured, because a false substitution puts a bot on a living player's ship:
+ * ten times {@link INTENT_HOLD_TICKS} (the gap the room already covers as ordinary),
+ * about six times the worst stall on record (~750 ms at 250 ms RTT), and ten times
+ * the M10 telemetry's 500 ms hiccup. And it has to be longer than the client's own
+ * verdict, so the two ends never disagree about who noticed first: the client
+ * declares itself lost at `SILENCE_FLOOR_MS` (2.5 s) and is already redialling by
+ * the time this fires, which turns the substitution into the first half of a
+ * reconnect the client is *expecting* rather than a surprise. Seven times faster
+ * than the keepalive it front-runs, and the keepalive stays exactly where it is as
+ * the backstop for sockets no seat is behind.
+ */
+export const SEAT_SILENCE_MS = 5_000;
+
 /** Most unacknowledged arrival ids one slot's tick-queue measurement will hold
  *  ({@link Slot.arrivals}). One lead budget's worth with room to spare; a client
  *  whose input the queue keeps refusing drops its oldest rather than growing this. */
@@ -295,6 +338,17 @@ interface Slot {
   /** Wall-clock ms at which the reconnect window closes, or -1 when the seat is
    *  not being held for anyone. */
   graceUntil: number;
+  /**
+   * Wall-clock ms of the last frame of *any* kind this seat's connection sent —
+   * input, a ping probe, a lobby choice. The liveness signal a half-open socket
+   * cannot fake ({@link SEAT_SILENCE_MS}).
+   *
+   * `-1` means "not armed": no connection, or a live match this seat has not yet
+   * spoken in. {@link MatchRoom.sweepSilentSeats} arms it rather than any of the
+   * seating paths, so there is one place that decides when the clock starts and no
+   * way to add a seventh way to fill a seat and forget to wind it.
+   */
+  lastHeardMs: number;
   /** The secret issued to the human who holds this seat (GDD §4.2 reclaim). */
   token: string | null;
   /**
@@ -598,6 +652,7 @@ export class MatchRoom {
       personality: null,
       difficulty: null,
       graceUntil: -1,
+      lastHeardMs: -1,
       token: null,
       ackSeq: 0,
       ackTick: 0,
@@ -839,6 +894,10 @@ export class MatchRoom {
     // drop them forever (`acceptInput`). The seat's ack restarts with the seat.
     slot.ackSeq = 0;
     slot.ackTick = 0;
+    // New hands, and the silence watchdog starts over with them: the returning
+    // client has not spoken on THIS connection yet, and the sweep arms itself on the
+    // next update rather than judging it against the clock of the one that left.
+    slot.lastHeardMs = -1;
     // …and so does the tick-queue measurement: the ids it is keyed by belong to the
     // connection that left ({@link Slot.arrivals}).
     slot.arrivals.clear();
@@ -907,6 +966,10 @@ export class MatchRoom {
     const slot = this.slots[player];
     if (!slot || slot.socket === null) return;
     slot.socket = null;
+    // Disarmed with the connection: a seat with no socket has nothing to be silent
+    // *for*, and leaving the stamp behind would have the sweep re-vacating an
+    // already-vacated seat on every update ({@link sweepSilentSeats}).
+    slot.lastHeardMs = -1;
     slot.fog = null;
     // Nobody is listening to this seat's economy channel any more, and whoever
     // reclaims it will be told the wallet afresh in their welcome (`welcome`).
@@ -949,6 +1012,19 @@ export class MatchRoom {
   receive(player: PlayerId, message: ClientMessage): void {
     const slot = this.slots[player];
     if (!slot || slot.socket === null) return;
+    // **Proof of life**, and the mirror of the rule the client keeps about us
+    // (`src/net/link-loss` — any frame is proof, whatever it carries). Stamped for
+    // every message kind rather than for input alone, so a client that is between
+    // matches, or holding still, or sending nothing but ping probes, is never
+    // mistaken for one that is gone ({@link SEAT_SILENCE_MS}).
+    //
+    // `lastUpdateMs` rather than a fresh clock read: this class takes its time from
+    // its caller and reads no clock of its own (which is what lets a sixty-second
+    // window be tested in microseconds), and the process loop refreshes that reading
+    // every iteration — so it is at most one loop interval stale against a five
+    // second window. `Math.max` because a room whose loop has not run yet leaves it
+    // at -1, and a frame that arrived is never evidence of *less* life than the last.
+    slot.lastHeardMs = Math.max(slot.lastHeardMs, this.lastUpdateMs);
 
     switch (message.type) {
       case 'join':
@@ -1300,6 +1376,10 @@ export class MatchRoom {
    */
   update(nowMs: number): void {
     this.sweepGrace(nowMs);
+    // …and the seats that stopped talking without ever hanging up (a0-132). Before
+    // the sim steps, so a seat the room has just decided is gone is flown by its
+    // substitute on this tick rather than coasting through one more.
+    this.sweepSilentSeats(nowMs);
     this.refreshLobbyPings(nowMs);
 
     const world = this.authoritative;
@@ -1735,6 +1815,52 @@ export class MatchRoom {
   }
 
   // --- Grace --------------------------------------------------------------
+
+  /**
+   * **A seat that stopped talking has lost its player, whatever its socket says.**
+   * (a0-132; GDD §4.2.)
+   *
+   * The room's other notice of a departure is the socket closing, and everything
+   * that hangs up politely is caught there. This catches what does not: a screen
+   * that locked, a tab that went to the background, a phone that walked into a
+   * tunnel. Those send no FIN, so both TCP connections stay open and healthy-looking
+   * while the link carries nothing, and the room would otherwise learn nothing until
+   * `server/ws.ts`'s keepalive reaped the socket up to 35 seconds later
+   * ({@link SEAT_SILENCE_MS}).
+   *
+   * Live-phase only, and seated connections only. A lobby is legitimately silent and
+   * a bot's seat has no one to hear from.
+   */
+  private sweepSilentSeats(nowMs: number): void {
+    if (this.phase !== 'live') return;
+    for (const slot of this.slots) {
+      const socket = slot.socket;
+      if (socket === null) continue;
+      // Arm on first sight. Doing it here rather than in the seating paths means a
+      // seat filled by a join, a reclaim, or RUSH!'s renumbering all start their
+      // clock the same way, and none of them can forget to.
+      if (slot.lastHeardMs < 0) {
+        slot.lastHeardMs = nowMs;
+        continue;
+      }
+      if (nowMs - slot.lastHeardMs < SEAT_SILENCE_MS) continue;
+      // The seat goes exactly the way a hang-up sends it: a bot on the controls, the
+      // seat held for the life of the match, and `playerSubstituted` to everyone
+      // still listening ({@link vacate}). One path, one set of words — peers must not
+      // be able to tell which of the two ways the room found out.
+      this.disconnect(slot.player, nowMs);
+      // …and then hang up, because we have just told the room this connection is
+      // dead and it must not be able to come back as if nothing happened. `vacate`
+      // has already dropped the room's reference to it, so a socket left open would
+      // be a client still receiving nothing, still believing it is seated, and
+      // holding a seat number the room has given to a bot. Closing it turns the next
+      // thing that happens into the reconnect both ends already agree on: the client
+      // sees the close, redials, and reclaims the ship it never lost
+      // (`src/net/websocket-transport`). On a genuinely dead link this write goes
+      // nowhere, which costs nothing and is why it is safe to make unconditionally.
+      socket.close();
+    }
+  }
 
   /** Close any reconnect window that has run out (GDD §4.2). */
   private sweepGrace(nowMs: number): void {
