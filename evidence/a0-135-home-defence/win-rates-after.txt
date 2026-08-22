@@ -1,0 +1,13 @@
+
+strategy contest (GDD §3.8) — Hard pool, Vanguard, fair share 33.3% — 96 matches, 0 unfinished
+  match length: mean 812s, min 766s, max 841s
+  sable        38/96  39.6%  ok
+  warden       32/96  33.3%  ok
+  vulture      26/96  27.1%  ok
+
+class contest (GDD §2.11) — sable, four hulls, fair share 25% — 128 matches, 0 unfinished
+  match length: mean 806s, min 374s, max 843s
+  excavator    57/128  44.5%  ok
+  vanguard     33/128  25.8%  ok
+  hauler       30/128  23.4%  ok
+  interceptor  8/128  6.3%  ok

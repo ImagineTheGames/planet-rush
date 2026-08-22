@@ -1,0 +1,9 @@
+
+class contest (sable, four hulls) — 128 matches
+  outside 10–15 min: 2 short, 0 long
+    seed  20001   374s  winner excavator    finished yes
+    seed  32003   464s  winner vanguard     finished yes
+  census:
+     300– 600s    2  ##
+     700– 800s   26  ##########################
+     800– 900s  100  ####################################################################################################

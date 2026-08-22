@@ -55,14 +55,18 @@ import {
   THREAT_RANGE,
   coveringFire,
   haulHome,
+  ownHomeThreatened,
   retreat,
   roam,
   scavenge,
   standoffPatience,
+  wantsRetreat,
 } from './behaviors';
 import { createBot, type Bot } from './bot';
 import { committed } from './commitment';
 import { ARRIVE_RADIUS } from './steering';
+import { HOME_ALARM_RANGE } from './targeting';
+import { standoffCommitted } from './standoff';
 import { botInputs } from './harness';
 import { perceive } from './perception';
 import { Difficulty, PERSONALITIES, tuningFor, type PersonalityId } from './personalities';
@@ -414,11 +418,48 @@ const HULL_20_OF_70 = 20 / 70;
  *  every tier. */
 const WOUNDED_ANY_TIER = 0.14;
 
-/** Where the player parks: inside `RETREAT_CLEAR_RANGE` (676) so the retreat can
- *  never read *escaped*, and inside `GUARD_RADIUS * 2` of the station so this is
- *  a siege on the doorstep rather than a blockade of the road home — `./cornered`
- *  owns that other case, and it already terminates. */
+/** Core fraction a besieged station is held at: comfortably above
+ *  `CORE_FINAL_ASSAULT` (0.3), so `last-stand` — which has outranked the retreat
+ *  since v0.2.2 — cannot fire and take the credit for a0-135's ruling. The whole
+ *  span above that line is the gap this brief is about. */
+const HEALTHY_CORE = 0.8;
+
+/** Where the player parks, measured **from the bot** along the outward lane:
+ *  inside `RETREAT_CLEAR_RANGE` (676) so the retreat can never read *escaped*,
+ *  and inside `GUARD_RADIUS * 2` so this is a siege at knife range rather than a
+ *  blockade of the road home — `./cornered` owns that other case, and it already
+ *  terminates. */
 const PARK = 200;
+
+/**
+ * **How far out in the field these cells stage the bot, and why they had to move
+ * there** (a0-135).
+ *
+ * Until a0-135 every cell below staged the bot *at its own station*, because the
+ * a0-105 photograph was a bot camped on its own doorstep. That board is no longer
+ * a retreat board at all, and the arithmetic says so without needing a run:
+ * `HOME_ALARM_RANGE` (520) is wider than `THREAT_RANGE` (416), so **anything near
+ * enough to make a bot standing at its own station want to run is inside that
+ * station's alarm ring by construction**. `ownHomeThreatened` reads true, and
+ * a0-135's ruling — a threatened home outranks self-preservation, at any hull —
+ * takes the tick for `defend` before the flee latch is ever consulted.
+ *
+ * That is the ruling working, not a regression, and the cell that pins it is in
+ * the a0-135 block below: on the old `PARK` board every character now goes
+ * straight to `defend` and never retreats at all.
+ *
+ * But it would leave the a0-105 and a0-107 properties — *a retreat ends*, and
+ * *no annulus an opponent can hold the patience clock at zero from* — measured
+ * nowhere. Those properties are about a retreat, so they need a board with a
+ * retreat on it: the bot **out in the field**, far enough that its own home is
+ * quiet, with the same hostile at the same separations. Far enough means the
+ * hostile's distance from the station clears the alarm ring even at the widest
+ * separation these cells sweep, and this clears it by better than 2×.
+ *
+ * Nothing else about these cells moved: the same hulls, the same separations,
+ * the same pins, the same assertions.
+ */
+const OUT_OF_RING = 900;
 
 interface Standoff {
   world: World;
@@ -427,13 +468,27 @@ interface Standoff {
   player: World['ships'][number];
   /** Unit vector from the station out toward the field. */
   out: Vec2;
+  /** The bot's own station. */
+  home: World['stations'][number];
+  /** Hold that station under attack for every tick of the run. */
+  siege: boolean;
 }
 
 /**
  * Stage the photograph: the bot is already home — it ran, it arrived, and it is
  * out of road — with a hostile parked between it and the ore.
  */
-function standoff(opts: { personality: PersonalityId; hull: number; park?: number }): Standoff {
+function standoff(opts: {
+  personality: PersonalityId;
+  hull: number;
+  park?: number;
+  /** How far out from its own station the bot sits. `0` is the a0-105
+   *  photograph — on its own doorstep — and is what the a0-135 cells use; the
+   *  a0-105 and a0-107 cells pass {@link OUT_OF_RING} (see its note). */
+  from?: number;
+  /** Hold the bot's own station under attack, the developer's red ring. */
+  siege?: boolean;
+}): Standoff {
   const world = createWorld({
     seed: 20260819,
     players: [0, 1].map((id) => ({ id, shipClass: ShipClass.Vanguard })),
@@ -456,14 +511,26 @@ function standoff(opts: { personality: PersonalityId; hull: number; park?: numbe
   const d = Math.sqrt(dx * dx + dy * dy);
   const out: Vec2 = { x: dx / d, y: dy / d };
 
-  me.pos = { x: home.pos.x, y: home.pos.y };
+  const from = opts.from ?? 0;
+  me.pos = { x: home.pos.x + out.x * from, y: home.pos.y + out.y * from };
   me.vel = { x: 0, y: 0 };
   me.hull = me.maxHull * opts.hull;
+  // The park is measured from the BOT, so moving the staging out into the field
+  // moves the whole picture and leaves every separation these cells sweep exactly
+  // where it was. At `from: 0` this is the a0-105 photograph verbatim.
   const park = opts.park ?? PARK;
-  player.pos = { x: home.pos.x + out.x * park, y: home.pos.y + out.y * park };
+  player.pos = { x: me.pos.x + out.x * park, y: me.pos.y + out.y * park };
   player.vel = { x: 0, y: 0 };
 
-  return { world, bot: createBot({ id: 0, personality: opts.personality }, { seed: 3 }), me, player, out };
+  return {
+    world,
+    bot: createBot({ id: 0, personality: opts.personality }, { seed: 3 }),
+    me,
+    player,
+    out,
+    home,
+    siege: opts.siege === true,
+  };
 }
 
 /** What one staging did, tick by tick. */
@@ -504,6 +571,15 @@ function hold(state: Standoff, seconds: number, drift = 0): Held {
     };
     player.vel = { x: 0, y: 0 };
     player.hull = player.maxHull;
+    // The red ring, held: `underAttack` is `sinceDamage < alarmWindow`
+    // (`./perception`), so pinning it at zero is an attacker who never lets up —
+    // and the core is held healthy, well above `CORE_FINAL_ASSAULT` (0.3), so
+    // `last-stand` stays switched off and the only branch that can bring this bot
+    // home is the a0-135 ruling itself.
+    if (state.siege && state.home.alive) {
+      state.home.sinceDamage = 0;
+      state.home.coreHp = state.home.maxCoreHp * HEALTHY_CORE;
+    }
     step(world, botInputs(world, [bot], TICK_DT), TICK_DT);
     const leaf = bot.brain.lastBehavior;
     if (leaf === 'retreat') held.retreatTicks++;
@@ -520,20 +596,26 @@ const BOUND_S = 8;
 
 describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
   it('a retreat that cannot recover and cannot escape ends in a fight', () => {
-    // The photograph: Rusty, at its own station, at 20/70, with the developer
-    // parked between it and the ore. Neither exit the flee latch had can ever
-    // fire here — which is the whole defect.
-    const state = standoff({ personality: 'rusty', hull: HULL_20_OF_70 });
+    // The photograph: Rusty at 20/70 with the developer parked between it and the
+    // ore, staged {@link OUT_OF_RING} out in the field rather than on the
+    // doorstep it was originally staged on (a0-135 took the doorstep; see that
+    // constant's note). Neither exit the flee latch had can ever fire here —
+    // which is the whole defect.
+    const state = standoff({ personality: 'rusty', hull: HULL_20_OF_70, from: OUT_OF_RING });
     const ctx = decide(state);
     expect(ctx.self.hullFraction).toBeCloseTo(HULL_20_OF_70, 5);
     const seen = ctx.view.ships.find((s) => s.id === 1);
     expect(seen, 'the player is inside the bot\'s own fog').toBeTruthy();
     expect(seen!.distance).toBeLessThan(RETREAT_CLEAR_RANGE); // never *escaped*
     expect(seen!.distance).toBeLessThan(GUARD_RADIUS * 2); // a siege, not a blockade
+    // …and this bot's own home is quiet, or a0-135's ruling would take the tick
+    // before the flee latch was ever consulted and this cell would be measuring
+    // that instead.
+    expect(ownHomeThreatened(ctx), 'the a0-105 property needs a retreat to measure').toBe(false);
     // Nothing in the game heals a hull, so *recovered* is shut for the match.
     expect(ctx.self.hullFraction).toBeLessThan(0.8);
 
-    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70 }), BOUND_S);
+    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70, from: OUT_OF_RING }), BOUND_S);
 
     // It ran first — the retreat itself is good play and is not deleted.
     expect(held.retreatTicks).toBeGreaterThan(0);
@@ -553,7 +635,7 @@ describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
     // in `standoffPatience` is what makes "every tier turns" structural.
     const ticks = new Map<PersonalityId, number>();
     for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
-      const held = hold(standoff({ personality: id, hull: WOUNDED_ANY_TIER }), BOUND_S);
+      const held = hold(standoff({ personality: id, hull: WOUNDED_ANY_TIER, from: OUT_OF_RING }), BOUND_S);
       expect(held.retreatTicks, `${id} still retreats first`).toBeGreaterThan(0);
       expect(held.turnedAt, `${id} (${PERSONALITIES[id].difficulty}) turns`).toBeGreaterThan(0);
       ticks.set(id, held.turnedAt);
@@ -580,7 +662,7 @@ describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
     // is being out-flown — here, losing 30 units a second, well inside the
     // sensor picture and never past the clear range — watches the same wounded
     // bot keep running for as long as they care to chase it.
-    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70 }), BOUND_S, 30);
+    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70, from: OUT_OF_RING }), BOUND_S, 30);
     expect(held.turnedAt, 'a retreat that is gaining ground is not interrupted').toBe(-1);
     expect(held.retreatTicks).toBeGreaterThan(0);
   });
@@ -589,7 +671,7 @@ describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
     // The turn ends when its subject does. A committed window is not a grudge:
     // once the chaser is past the clear range there is nothing to fight, so the
     // commitment is dropped rather than swung at empty space.
-    const state = standoff({ personality: 'sable', hull: WOUNDED_ANY_TIER });
+    const state = standoff({ personality: 'sable', hull: WOUNDED_ANY_TIER, from: OUT_OF_RING });
     hold(state, 3);
     expect(state.bot.brain.lastBehavior).toBe('turn-and-fight');
     expect(state.bot.brain.standoff.until).toBeGreaterThan(0);
@@ -629,14 +711,40 @@ const RUN_HOME_FAR = 1600;
  *  retreat can never read *escaped* however far it flies. */
 const CHASE_HOLD = 300;
 
+/**
+ * The leaves that mean **the bot stopped running and did something about it**.
+ *
+ * a0-107's claim is about the *end of a retreat*, not about which branch serves
+ * it: the road anchor must not interrupt a retreat that is still getting
+ * somewhere, and the retreat must end once the road runs out. Which fighting
+ * leaf takes that tick is a question of tree order, and a0-135 changed the
+ * answer at the doorstep — a chaser that follows a bot home is inside
+ * `HOME_ALARM_RANGE` by the time the bot arrives, so `defend` outranks the turn
+ * and takes it. Measured on this branch: every character still flies the whole
+ * road (closest 201-211u, inside `ARRIVE_RADIUS`), still shows nothing but
+ * `retreat` out on the road past 440u, and still stops at t≈620 at 207-216u from
+ * its own station. Same flight, same ending, different leaf — so this set is
+ * what the cells below read, and the a0-105 block above still pins the turn
+ * itself by name on the board where it is the branch that answers.
+ */
+const STOPPED_RUNNING = new Set(['turn-and-fight', 'defend', 'cornered-fight', 'last-stand']);
+
 /** What one flight home did. */
 interface Flight {
-  /** Tick `turn-and-fight` first won, or -1. */
+  /** Tick a leaf in {@link STOPPED_RUNNING} first won, or -1. */
   turnedAt: number;
   /** Distance from the bot to its own station on that tick. */
   turnedAtRange: number;
+  /** Which leaf it was. */
+  turnedTo: string;
   /** The closest the bot ever got to its own station. */
   closest: number;
+  /** Every leaf that won a tick while the bot was still **inbound** and more
+   *  than `ARRIVE_RADIUS * 2` from home — the half of the claim that says a
+   *  working retreat is not interrupted. Inbound is load-bearing: an arrived bot
+   *  fighting at its doorstep drifts back past that range routinely, and counting
+   *  those ticks would make this read "interrupted" for a flight that was over. */
+  onRoad: Set<string>;
 }
 
 /**
@@ -657,7 +765,13 @@ function flyHome(personality: PersonalityId, seconds: number): Flight {
   me.pos = { x: home.pos.x + out.x * RUN_HOME_FAR, y: home.pos.y + out.y * RUN_HOME_FAR };
   me.vel = { x: 0, y: 0 };
 
-  const flight: Flight = { turnedAt: -1, turnedAtRange: -1, closest: Infinity };
+  const flight: Flight = {
+    turnedAt: -1,
+    turnedAtRange: -1,
+    turnedTo: '—',
+    closest: Infinity,
+    onRoad: new Set(),
+  };
   for (let tick = 0; tick < Math.round(seconds / TICK_DT); tick++) {
     const dx = me.pos.x - home.pos.x;
     const dy = me.pos.y - home.pos.y;
@@ -667,10 +781,14 @@ function flyHome(personality: PersonalityId, seconds: number): Flight {
     player.hull = player.maxHull;
     me.hull = me.maxHull * WOUNDED_ANY_TIER;
     step(world, botInputs(world, [bot], TICK_DT), TICK_DT);
-    flight.closest = Math.min(flight.closest, Math.hypot(me.pos.x - home.pos.x, me.pos.y - home.pos.y));
-    if (flight.turnedAt < 0 && bot.brain.lastBehavior === 'turn-and-fight') {
+    const range = Math.hypot(me.pos.x - home.pos.x, me.pos.y - home.pos.y);
+    const inbound = flight.closest > ARRIVE_RADIUS;
+    flight.closest = Math.min(flight.closest, range);
+    if (inbound && range > ARRIVE_RADIUS * 2) flight.onRoad.add(bot.brain.lastBehavior);
+    if (flight.turnedAt < 0 && STOPPED_RUNNING.has(bot.brain.lastBehavior)) {
       flight.turnedAt = tick;
-      flight.turnedAtRange = Math.hypot(me.pos.x - home.pos.x, me.pos.y - home.pos.y);
+      flight.turnedAtRange = range;
+      flight.turnedTo = bot.brain.lastBehavior;
     }
   }
   return flight;
@@ -699,13 +817,13 @@ interface Band {
  * cell reaches by drift and what this reaches deliberately.
  */
 function deadBand(personality: PersonalityId, park: number, seconds: number): Band {
-  const state = standoff({ personality, hull: WOUNDED_ANY_TIER });
-  const home = state.world.stations.find((st) => st.owner === 0)!;
+  const state = standoff({ personality, hull: WOUNDED_ANY_TIER, from: OUT_OF_RING });
   // In contact: the flee latch commits, which is the retreat this is about.
   hold(state, 1);
   expect(committed(state.bot.brain.fleeing), `${personality} is fleeing at ${PARK}`).toBe(true);
-  // …and now it backs off into the band and stands there.
-  state.player.pos = { x: home.pos.x + state.out.x * park, y: home.pos.y + state.out.y * park };
+  // …and now it backs off into the band and stands there. Measured from the bot,
+  // which is pinned by `hold`, so the separation IS the park distance.
+  state.player.pos = { x: state.me.pos.x + state.out.x * park, y: state.me.pos.y + state.out.y * park };
   const held = hold(state, seconds);
   return {
     held,
@@ -764,11 +882,15 @@ describe('an exit an opponent alone can satisfy is not an exit (a0-107)', () => 
     // only reason this bot is not turning is that it is getting somewhere.
     const flight = flyHome('rusty', 20);
     expect(flight.closest, 'it flew home').toBeLessThan(ARRIVE_RADIUS);
-    expect(flight.turnedAt, 'and it did not turn on the way').toBeGreaterThan(0);
+    expect(flight.turnedAt, 'and it stopped running once it got there').toBeGreaterThan(0);
     expect(
       flight.turnedAtRange,
       'the turn happens at its own doorstep, not out on the road',
     ).toBeLessThan(ARRIVE_RADIUS * 2);
+    // The direct statement of the same thing, and the one an opponent cannot
+    // argue with: out on the road this bot did exactly one thing, and that thing
+    // was run. No fighting leaf ever interrupted the flight itself.
+    expect([...flight.onRoad], 'nothing but the retreat, all the way home').toEqual(['retreat']);
   });
 
   it('and still ends the moment the road runs out, at every tier', () => {
@@ -778,6 +900,186 @@ describe('an exit an opponent alone can satisfy is not an exit (a0-107)', () => 
     for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
       const flight = flyHome(id, 16);
       expect(flight.turnedAt, `${id} (${PERSONALITIES[id].difficulty}) turns`).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-135 — a wounded bot that would not come and defend its own home
+// ---------------------------------------------------------------------------
+
+/**
+ * The developer, 2026-08-22, from a live match, with a screenshot of Rusty at
+ * **25/70** hull and its own station ringed red:
+ *
+ * > *"as I was attacking rusty base he was scared to come engage like he was low
+ * > on health, but ships are cheap you get a free one, they shouldn't fear death
+ * > just cause they are low on health... protection of their base is essential
+ * > to the game a player would defend at all costs"*
+ *
+ * **The ruling: a threatened home outranks self-preservation, at any hull
+ * fraction.** It is a0-105's "a respawn is free" (GDD §2.3, §2.7) applied to the
+ * one situation where retreating is not merely passive but actively losing the
+ * match.
+ *
+ * ── What was wrong, and it was one missing call ────────────────────────────
+ *
+ * `wantsRetreat` consulted `collapsed`, the cornered commitment, the standoff,
+ * the tier's nerve and `incomingThreat` — and **never asked whether this bot's
+ * own home was under attack**. `ownHomeThreatened` already existed and was
+ * already read on both ally-defence paths, so a bot would abandon a retreat to
+ * answer a *teammate's* alarm and not its own. The `defend` leaf that should have
+ * taken the tick sits BELOW `retreat` in all three trees, so the flee latch won.
+ *
+ * The before-picture, measured over the whole cast at five hull fractions
+ * (`evidence/a0-135-home-defence/`): the table is **byte-identical with the
+ * siege on and the siege off**, because nothing in the retreat read the home at
+ * all. Rusty at 25/70 spent 310 of 720 ticks on the `retreat` leaf and averaged
+ * 431 units from the station it was supposed to be holding.
+ *
+ * ── Why this survived a0-106's adversarial sweep ───────────────────────────
+ *
+ * That sweep's `siege-home` antagonist pins the subject's core at 0.2, below
+ * `CORE_FINAL_ASSAULT` (0.3), which switches on `last-stand` — a branch that has
+ * outranked the retreat since v0.2.2 and answers the whole board. Nothing in the
+ * suite staged a home under attack with a **healthy** core, and the entire span
+ * above 0.3 was the gap. So every cell below pins the core at
+ * {@link HEALTHY_CORE}, and `last-stand` is switched off throughout.
+ *
+ * What is pinned:
+ *
+ *  1. the ruling itself, at the developer's own hull and at every tier's;
+ *  2. **no hull-fraction exception** — the whole cast, swept down to 5/70;
+ *  3. an in-flight retreat is *released*, not shadowed, and the standoff with it;
+ *  4. the nerve is re-read from scratch when the siege lifts;
+ *  5. the ruling is the *home* reading and not the geometry — lift the siege at
+ *    the same range and the same bot runs;
+ *  6. the doorstep board a0-105 was staged on now answers through `defend`.
+ */
+describe('a bot never retreats while its own home is under attack (a0-135)', () => {
+  /** The photograph's hull: Rusty at 25 of 70, which is under its 0.65 nerve. */
+  const HULL_25_OF_70 = 25 / 70;
+
+  /** The board: the bot on its own doorstep at `hull`, a hostile standing on the
+   *  station at knife range, the station's alarm held on and its core healthy. */
+  const besieged = (personality: PersonalityId, hull: number) =>
+    standoff({ personality, hull, park: PARK, siege: true });
+
+  it('a bot never retreats while its own home is under attack', () => {
+    // The developer's frame, decision-level and one tick deep, so the claim is
+    // about the *test* rather than about how a run happened to go.
+    const state = besieged('rusty', HULL_25_OF_70);
+    state.home.sinceDamage = 0;
+    state.home.coreHp = state.home.maxCoreHp * HEALTHY_CORE;
+    const ctx = decide(state);
+
+    // The staging is the defect's own, or it proves nothing. Wounded below
+    // Rusty's own nerve...
+    expect(ctx.self.hullFraction).toBeCloseTo(HULL_25_OF_70, 5);
+    expect(ctx.self.hullFraction).toBeLessThan(ctx.tuning.retreatHullFraction);
+    // ...with something engageable inside the break-off band, so the flee
+    // latch's enter condition is genuinely live...
+    const seen = ctx.view.ships.find((s) => s.id === 1);
+    expect(seen, 'the hostile is inside the bot\'s own fog').toBeTruthy();
+    expect(seen!.distance).toBeLessThan(THREAT_RANGE);
+    // ...its own home reading true...
+    expect(ownHomeThreatened(ctx), 'the alarm is ringing').toBe(true);
+    // ...and its core nowhere near the last stand, which would otherwise be the
+    // branch answering this and would make the cell prove nothing about a0-135.
+    expect(ctx.self.station!.coreHp).toBeGreaterThan(ctx.self.station!.maxCoreHp * 0.3);
+
+    // **The ruling.** On the code this brief replaces, this reads `true`.
+    expect(wantsRetreat(ctx), 'a threatened home outranks self-preservation').toBe(false);
+  });
+
+  it('makes no hull-fraction exception — not at 25/70, not at 5/70', () => {
+    // "No hull-fraction exception. Not at 25/70, not at 5/70. That is the ruling
+    // and it is the whole point of it." Every character, every fraction, down to
+    // a hull that is one good burst from gone.
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      for (const hull of [HULL_25_OF_70, 0.5, 0.35, 0.2, 5 / 70]) {
+        const ctx = decide(besieged(id, hull));
+        expect(ownHomeThreatened(ctx), `${id} @${hull.toFixed(3)}`).toBe(true);
+        expect(
+          wantsRetreat(ctx),
+          `${id} (${PERSONALITIES[id].difficulty}) at hull ${hull.toFixed(3)}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('releases a retreat already in flight, rather than shadowing it', () => {
+    // The shape the brief asks for, and the shape `corneredCommitted` already
+    // uses: the latch is *dropped*, so when the siege lifts the bot re-reads its
+    // nerve from scratch instead of silently resuming the run it abandoned.
+    // Stage the commitment out in the field first, where the home is quiet.
+    const state = standoff({ personality: 'rusty', hull: WOUNDED_ANY_TIER, from: OUT_OF_RING });
+    hold(state, 1);
+    expect(committed(state.bot.brain.fleeing), 'it is running').toBe(true);
+
+    // Now its home comes under attack. Nothing else about the board changes.
+    state.home.sinceDamage = 0;
+    state.home.coreHp = state.home.maxCoreHp * HEALTHY_CORE;
+    const ctx = decide(state);
+    expect(wantsRetreat(ctx)).toBe(false);
+    expect(committed(state.bot.brain.fleeing), 'the flee latch is released, not ignored').toBe(false);
+    // And the standoff with it — leaving that committed would hand the tick to
+    // `turn-and-fight`, which outranks `defend` in all three trees, and the bot
+    // would fight whoever chased it instead of the ship on its core.
+    expect(standoffCommitted(state.bot.brain.standoff, state.world.time)).toBe(false);
+  });
+
+  it('re-reads the nerve from scratch once the siege lifts', () => {
+    // The other half of *released rather than shadowed*: this is a suppression
+    // with an end, not a mode the bot gets stuck in. Same board, same hull, same
+    // hostile — only the alarm goes quiet.
+    const state = standoff({ personality: 'rusty', hull: WOUNDED_ANY_TIER, from: OUT_OF_RING });
+    state.home.sinceDamage = 0;
+    state.home.coreHp = state.home.maxCoreHp * HEALTHY_CORE;
+    expect(wantsRetreat(decide(state))).toBe(false);
+
+    state.home.sinceDamage = 999;
+    const ctx = decide(state);
+    expect(ownHomeThreatened(ctx), 'the alarm has stopped').toBe(false);
+    expect(wantsRetreat(ctx), 'and the nerve is back to being the nerve').toBe(true);
+  });
+
+  it('is the home reading and not the geometry — the control', () => {
+    // The cell that says this is a0-135's ruling rather than a range being
+    // widened somewhere. Two boards identical in every particular except the
+    // distance from the bot's own station, at the same hull, with the same
+    // hostile at the same separation and no alarm on either.
+    const near = decide(standoff({ personality: 'rusty', hull: WOUNDED_ANY_TIER, from: 0 }));
+    const far = decide(standoff({ personality: 'rusty', hull: WOUNDED_ANY_TIER, from: OUT_OF_RING }));
+
+    // Same separation, so the flee latch sees the same threat on both.
+    const gap = (ctx: BotCtx) => ctx.view.ships.find((s) => s.id === 1)!.distance;
+    expect(gap(near)).toBeCloseTo(gap(far), 3);
+    expect(gap(near)).toBeLessThan(THREAT_RANGE);
+
+    // What differs is one reading, and it differs because `HOME_ALARM_RANGE`
+    // (520) is wider than `THREAT_RANGE` (416): anything near enough to frighten
+    // a bot standing at its own station is inside that station's alarm ring by
+    // construction, so a bot on its own doorstep can no longer be frightened off
+    // it — ever, at any hull. Out in the field, nothing changed.
+    expect(HOME_ALARM_RANGE).toBeGreaterThan(THREAT_RANGE);
+    expect(ownHomeThreatened(near)).toBe(true);
+    expect(ownHomeThreatened(far)).toBe(false);
+    expect(wantsRetreat(near), 'on its own doorstep it stands').toBe(false);
+    expect(wantsRetreat(far), 'out in the field it still runs').toBe(true);
+  });
+
+  it('answers the a0-105 doorstep board through defend, at every tier', () => {
+    // a0-105's own staging — the bot at its own station with the developer parked
+    // 200 units off — is a *home-threatened* board under this ruling, and it now
+    // resolves one branch higher up the tree. The a0-105 property is not weakened
+    // by that, it is reached sooner: the bot never runs at all, and it fights.
+    // (The standoff that a0-105 built is still pinned by name, on the field board
+    // that block is now staged on.)
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      const held = hold(standoff({ personality: id, hull: HULL_25_OF_70, siege: true }), BOUND_S);
+      expect(held.retreatTicks, `${id} (${PERSONALITIES[id].difficulty}) never runs`).toBe(0);
+      expect(held.turnedAt, `${id} never needs the standoff`).toBe(-1);
     }
   });
 });

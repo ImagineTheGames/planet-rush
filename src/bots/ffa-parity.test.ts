@@ -215,11 +215,11 @@
  * scope trap's own test — deleting the retreat would have moved the median —
  * and it comes out on the right side of it.
  *
- * | Seed | Post-a0-81 | Post-a0-105 | Post-a0-107 |
- * |---|---|---|---|
- * | 20260806 | `de94b69e` | `42e213df` | `d839695f` |
- * | 7 | `ab03dcd3` | `51f2e171` | `df4873c3` |
- * | 991 | `a37c4e2c` | `a096a954` | `b3055735` |
+ * | Seed | Post-a0-81 | Post-a0-105 | Post-a0-107 | Post-a0-135 |
+ * |---|---|---|---|---|
+ * | 20260806 | `de94b69e` | `42e213df` | `d839695f` | `f01248a1` |
+ * | 7 | `ab03dcd3` | `51f2e171` | `df4873c3` | `7b967ee1` |
+ * | 991 | `a37c4e2c` | `a096a954` | `b3055735` | `11bfa3bd` |
  *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
@@ -261,6 +261,21 @@
  * It now reads the FFA side live and compares against that, which fails on the
  * same perturbation (§5) and — the point — re-baselines itself, so it cannot rot
  * behind these goldens a seventh time. No hash moved to fix it.
+ *
+ * ### Re-baselined, 2026-08-22 (a0-135) — the eighth move
+ *
+ * a0-135 rules that a threatened home outranks self-preservation at any hull
+ * fraction, so `wantsRetreat` now stands down while `ownHomeThreatened` holds.
+ * Eight bots on a board with four stations reach that reading constantly, so the
+ * decision stream diverges early and the hash moves. A behaviour change moving
+ * these is the file working, not the file failing — the a0-81, a0-105 and a0-107
+ * rows above are the same event.
+ *
+ * **And the bite was re-proved before the bake**, because "a golden you re-baked
+ * without proving it still bites is a deleted test". Same protocol a0-120 used,
+ * on this branch, in `evidence/a0-135-home-defence/bite.txt`: a control on the
+ * clean tree, `WORLD_SIZE` +1 unit, and Rusty's `caution` 1.3 → 0.2. All three
+ * new hashes fail on both perturbations and all three pass on the control.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -339,9 +354,9 @@ const SECONDS = 180;
  * red still means revert.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'efc7c046'],
-  [7, '7a79fe8c'],
-  [991, '9410f78e'],
+  [20260806, 'f01248a1'],
+  [7, '7b967ee1'],
+  [991, '11bfa3bd'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */

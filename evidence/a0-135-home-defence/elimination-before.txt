@@ -1,0 +1,123 @@
+| seed | first elimination (s) | inside 120s? |
+|---|---|---|
+| 1 | 253.5 | no |
+| 2 | 234.7 | no |
+| 3 | 221.4 | no |
+| 4 | — (none by 360s) | no |
+| 5 | — (none by 360s) | no |
+| 6 | 178.5 | no |
+| 7 | 91.6 | YES |
+| 8 | 85.9 | YES |
+| 9 | 97.4 | YES |
+| 10 | 121.0 | no |
+| 11 | 48.5 | YES |
+| 12 | 130.8 | no |
+| 13 | 107.5 | YES |
+| 14 | 208.5 | no |
+| 15 | 58.7 | YES |
+| 16 | 82.5 | YES |
+| 17 | 169.4 | no |
+| 18 | 178.0 | no |
+| 19 | 201.2 | no |
+| 20 | 304.7 | no |
+| 21 | 147.6 | no |
+| 22 | 140.0 | no |
+| 23 | 243.8 | no |
+| 24 | 215.0 | no |
+| 25 | 237.2 | no |
+| 26 | 144.3 | no |
+| 27 | — (none by 360s) | no |
+| 28 | 204.2 | no |
+| 29 | 114.6 | YES |
+| 30 | 116.0 | YES |
+| 31 | 155.3 | no |
+| 32 | 135.3 | no |
+| 33 | — (none by 360s) | no |
+| 34 | 121.7 | no |
+| 35 | 56.2 | YES |
+| 36 | 198.6 | no |
+| 37 | 160.9 | no |
+| 38 | 54.4 | YES |
+| 39 | 195.2 | no |
+| 40 | 215.3 | no |
+| 41 | 72.7 | YES |
+| 42 | 122.1 | no |
+| 43 | 218.8 | no |
+| 44 | 202.7 | no |
+| 45 | 199.1 | no |
+| 46 | — (none by 360s) | no |
+| 47 | 90.0 | YES |
+| 48 | 110.3 | YES |
+| 49 | 104.1 | YES |
+| 50 | 357.6 | no |
+| 51 | 276.7 | no |
+| 52 | 125.6 | no |
+| 53 | 198.4 | no |
+| 54 | 190.4 | no |
+| 55 | 219.6 | no |
+| 56 | 139.7 | no |
+| 57 | — (none by 360s) | no |
+| 58 | 232.4 | no |
+| 59 | 199.3 | no |
+| 60 | 92.2 | YES |
+| 61 | 343.4 | no |
+| 62 | 146.7 | no |
+| 63 | 164.2 | no |
+| 64 | 211.0 | no |
+| 65 | 136.5 | no |
+| 66 | 98.9 | YES |
+| 67 | 154.0 | no |
+| 68 | 216.6 | no |
+| 69 | 109.4 | YES |
+| 70 | 160.3 | no |
+| 71 | 190.4 | no |
+| 72 | 97.0 | YES |
+| 73 | 172.5 | no |
+| 74 | 160.0 | no |
+| 75 | 165.8 | no |
+| 76 | 287.3 | no |
+| 77 | 122.8 | no |
+| 78 | 281.9 | no |
+| 79 | 145.5 | no |
+| 80 | 139.4 | no |
+| 81 | 84.0 | YES |
+| 82 | 192.2 | no |
+| 83 | 129.5 | no |
+| 84 | 151.8 | no |
+| 85 | 212.4 | no |
+| 86 | 326.3 | no |
+| 87 | — (none by 360s) | no |
+| 88 | 228.5 | no |
+| 89 | 77.5 | YES |
+| 90 | — (none by 360s) | no |
+| 91 | 154.9 | no |
+| 92 | 193.3 | no |
+| 93 | 191.9 | no |
+| 94 | 242.2 | no |
+| 95 | 75.2 | YES |
+| 96 | 287.8 | no |
+
+seeds with a first-out inside the 120s window: 22/96
+  seed 11: 48.5s — 71.5s of margin
+  seed 38: 54.4s — 65.6s of margin
+  seed 35: 56.2s — 63.8s of margin
+  seed 15: 58.7s — 61.3s of margin
+  seed 41: 72.7s — 47.3s of margin
+  seed 95: 75.2s — 44.8s of margin
+  seed 89: 77.5s — 42.5s of margin
+  seed 16: 82.5s — 37.5s of margin
+  seed 81: 84.0s — 36.0s of margin
+  seed 8: 85.9s — 34.1s of margin
+  seed 47: 90.0s — 30.0s of margin
+  seed 7: 91.6s — 28.4s of margin
+  seed 60: 92.2s — 27.8s of margin
+  seed 72: 97.0s — 23.0s of margin
+  seed 9: 97.4s — 22.6s of margin
+  seed 66: 98.9s — 21.1s of margin
+  seed 49: 104.1s — 15.9s of margin
+  seed 13: 107.5s — 12.5s of margin
+  seed 69: 109.4s — 10.6s of margin
+  seed 48: 110.3s — 9.7s of margin
+  seed 29: 114.6s — 5.4s of margin
+  seed 30: 116.0s — 4.0s of margin
+

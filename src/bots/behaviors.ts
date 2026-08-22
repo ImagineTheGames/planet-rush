@@ -1745,6 +1745,19 @@ export function coreUnderFinalAssault(ctx: BotCtx): boolean {
  * cancels the whole thing — there is no hold worth saving and a respawn is free
  * (GDD §2.3, §2.7) — and releases the latch so the endgame reads cleanly.
  *
+ * **And it never starts while this bot's own home is being hit** (a0-135;
+ * developer, 2026-08-22, with Rusty at 25/70 and its station ringed red:
+ * *"protection of their base is essential to the game a player would defend at
+ * all costs"*). {@link ownHomeThreatened} is asked first of everything below the
+ * death and collapse guards, with **no hull-fraction exception** — not at 25/70,
+ * not at 5/70 — and it *releases* an in-flight retreat rather than shadowing it.
+ * Before a0-135 this function consulted `collapsed`, the cornered commitment,
+ * the standoff, the tier's nerve and {@link incomingThreat}, and never once
+ * asked about its own doorstep, so a bot would abandon a retreat to answer a
+ * *teammate's* alarm ({@link wantsAllyDefence} has read `ownHomeThreatened`
+ * since Stage 2) and not its own. The `defend` leaf that would have taken the
+ * tick sits BELOW `retreat` in all three trees, which is why the flee latch won.
+ *
  * **And it ends** (a0-105; developer, 2026-08-19: *"he just stayed in that same
  * spot scared of me. ship lives are cheap. enemies should not fear death"*).
  * Both exits above are conditions the *opponent* controls — park inside
@@ -1777,12 +1790,59 @@ export function wantsRetreat(ctx: BotCtx): boolean {
     resetStandoff(stand);
     return false;
   }
+  // **Home is being hit: there is no retreat to want, at any hull fraction.**
+  // The a0-135 ruling (developer, 2026-08-22, with Rusty at 25/70 and its own
+  // station ringed red): *"protection of their base is essential to the game a
+  // player would defend at all costs"*. Deliberately the **first** thing asked
+  // after death and collapse, because it outranks everything below it — it is
+  // a0-105's "a respawn is free" (GDD §2.3, §2.7) applied to the one situation
+  // where running is not merely passive but actively losing the match.
+  //
+  // The predicate is {@link ownHomeThreatened} and not a second spelling of it,
+  // for the reason that function's own doc gives: it is the identical expression
+  // the trees' `defend` test uses, so **the branch that would take this tick can
+  // never disagree with the branch that stands aside for it.** A narrower read
+  // here would put the tree straight back into the reported state one notch
+  // down — the doorstep occupied, `defend` live, and the flee latch still
+  // winning the selector above it.
+  //
+  // Both the latch and the standoff are *released* rather than ignored, the same
+  // shape as the cornered guard below and for the same two reasons. The latch,
+  // so an in-flight retreat is genuinely abandoned and the nerve is re-read from
+  // scratch when the siege lifts, rather than silently resumed. The standoff,
+  // because leaving it committed would hand the tick to `turn-and-fight` — which
+  // sits ABOVE `defend` in all three trees — and the bot would fight whoever
+  // chased it here instead of the ship standing on its core.
+  //
+  // Fog-honest, and it has to be said out loud because it is the one place this
+  // gate is softer than it looks: `station.underAttack` is this bot's own alarm
+  // and is always legible, but the intruder half is `intruderNear`, which reads
+  // `ctx.view.ships`. A bot that has already run far enough to lose sight of a
+  // *silent* trespasser stops reading its home as threatened — the same thing
+  // `defend` does today, through the same eyes. The developer's frame is the
+  // hard half: a station taking fire rings its own klaxon from anywhere on the
+  // map, so nothing about distance can switch that reading off.
+  //
+  // What this does NOT do is order a charge. It removes a reason to leave; the
+  // bot then takes `defend`, which is `engage` at a stand-off inside its own
+  // turret cover (GDD §2.6) — it still fights well, and it fights *here*.
+  if (ownHomeThreatened(ctx)) {
+    release(latch);
+    resetStandoff(stand);
+    return false;
+  }
   // Cornered and committed: there is no retreat to want, because the road home
   // runs through the thing being run from (`./cornered`; ratified p15 point 2 —
   // "no fear re-evaluation mid-commitment"). The flee latch is *released* rather
   // than merely ignored, so when the commitment lifts the bot re-reads its nerve
   // from scratch instead of silently resuming a run it abandoned to fight —
   // exactly how the last stand pre-empts a retreat.
+  //
+  // Below the home guard above and not beside it: `cornered-fight` outranks
+  // `defend` in the trees and is a *fight*, not a flight, so a bot cutting its
+  // way home through a blockade is already doing what this brief asks. The
+  // cornered commitment is left alone here for that reason — only `lastStandDefend`
+  // drops it, and only because a core actually falling outranks a grudge.
   if (corneredCommitted(ctx.brain.cornered, ctx.view.time)) {
     release(latch);
     resetStandoff(stand);

@@ -1,0 +1,41 @@
+a0-135 — board `field`: the bot caught 900u out with a chaser on its tail, nothing near its station
+station UNDER ATTACK; core at 0.8 of max (last-stand fires below 0.3)
+ceiling 12s = 720 ticks
+
+character  tier    hull    retreat  keeping  mean away   closest  first leaf
+---------- ------- ------- -------- -------- ---------- --------- ----------
+rusty      easy    25/70        230        0       503u      135u  retreat
+rusty      easy    0.50         230        0       503u      135u  retreat
+rusty      easy    0.35         230        0       503u      135u  retreat
+rusty      easy    0.20         230        0       503u      135u  retreat
+rusty      easy    5/70         230        0       503u      135u  retreat
+bolt       easy    25/70          0        0      1068u      900u  potshot
+bolt       easy    0.50           0        0      1068u      900u  potshot
+bolt       easy    0.35           0        0      1068u      900u  potshot
+bolt       easy    0.20         230        0       503u      135u  retreat
+bolt       easy    5/70         230        0       503u      135u  retreat
+foreman    medium  25/70        230        0       510u      143u  retreat
+foreman    medium  0.50           0        0      1066u      900u  attack
+foreman    medium  0.35         230        0       510u      143u  retreat
+foreman    medium  0.20         230        0       510u      143u  retreat
+foreman    medium  5/70         230        0       510u      143u  retreat
+patch      medium  25/70        230        0       510u      143u  retreat
+patch      medium  0.50           0        0       531u      143u  fix-base
+patch      medium  0.35         230        0       510u      143u  retreat
+patch      medium  0.20         230        0       510u      143u  retreat
+patch      medium  5/70         230        0       510u      143u  retreat
+sable      hard    25/70          0        0      1065u      900u  attack
+sable      hard    0.50           0        0      1065u      900u  attack
+sable      hard    0.35           0        0      1065u      900u  attack
+sable      hard    0.20           0        0      1065u      900u  attack
+sable      hard    5/70         438        0       580u      394u  retreat
+vulture    hard    25/70          0        0      1065u      900u  attack
+vulture    hard    0.50           0        0      1065u      900u  attack
+vulture    hard    0.35           0        0      1065u      900u  attack
+vulture    hard    0.20           0        0      1065u      900u  attack
+vulture    hard    5/70         438        0       580u      393u  retreat
+warden     hard    25/70          0        0      1065u      900u  attack
+warden     hard    0.50           0        0      1065u      900u  attack
+warden     hard    0.35           0        0      1065u      900u  attack
+warden     hard    0.20           0        0      1065u      900u  attack
+warden     hard    5/70         429        0       585u      394u  retreat
