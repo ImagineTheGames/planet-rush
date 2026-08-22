@@ -208,5 +208,11 @@ export function buildStampEntry(viewport: Viewport, lift = 0): LayoutEntry {
 export function clearBuildStamp(rect: Rect, stampRow: Rect): Rect {
   if (rect.width <= 0 || rect.height <= 0) return rect;
   if (rect.y + rect.height <= stampRow.y) return rect;
-  return { ...rect, y: stampRow.y - rect.height };
+  // Never off the top of the frame. On a viewport too short to hold a control
+  // and a stamp at once there is no placement that satisfies both, and a plate
+  // pushed above y=0 is a control the player cannot reach — which is a worse
+  // answer than a stamp that is hard to read. Unreachable on every profile in
+  // the matrix (the shortest is 320px against a 21px row); it is here so the
+  // function is total, like `promptBounds`'s own clamp.
+  return { ...rect, y: Math.max(0, stampRow.y - rect.height) };
 }
