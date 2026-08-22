@@ -13,6 +13,9 @@ import type { ClientMessage, ServerMessage } from './transport';
 import { WebSocketTransport } from './websocket-transport';
 import type { TimerHandle, WebSocketLike } from './websocket-transport';
 import { encodeServerMessage } from './wire';
+import { seatMemory } from './seat-memory';
+import type { SeatMemory } from './seat-memory';
+import { memorySeatStorage } from '../../tests/net/seat-storage';
 
 /** A socket a test can open, drop and inspect. */
 class FakeSocket implements WebSocketLike {
@@ -56,6 +59,9 @@ function harness(
     reconnectWindowMs?: number;
     ticket?: string;
     checkRoomAlive?: () => Promise<'live' | 'gone' | 'unknown'>;
+    /** This device's seat memory (a0-133). Absent means the pre-a0-133 transport:
+     *  nowhere to write a seat down, so nothing to recall on the first dial. */
+    seatMemory?: SeatMemory | null;
   } = {},
 ): {
   transport: WebSocketTransport;
@@ -92,6 +98,10 @@ function harness(
       : {}),
     ...(options.ticket !== undefined ? { ticket: options.ticket } : {}),
     ...(options.checkRoomAlive !== undefined ? { checkRoomAlive: options.checkRoomAlive } : {}),
+    // Explicitly null by default rather than merely absent: absent means "take the
+    // browser's `localStorage`", and a test that quietly shared one with the next
+    // test would be the flakiest thing in this file.
+    seatMemory: options.seatMemory ?? null,
   });
 
   const states: string[] = [];
@@ -464,5 +474,156 @@ describe('WebSocketTransport.leave — ABANDON MATCH', () => {
     // And no redial is left pending behind it.
     h.tick(60_000);
     expect(h.sockets).toHaveLength(1);
+  });
+});
+
+describe('WebSocketTransport — the seat this device wrote down (a0-133)', () => {
+  it('dials as a reclaim on the first socket when the device remembers this room', () => {
+    // The whole of the a0-133 fix, in one assertion. A page that was never open
+    // before — a rebuilt tab after a phone slept, the player typing the code back
+    // in — knocks with the seat token the *previous* page was issued, so the room
+    // reads a returning player instead of a stranger at a live match's door.
+    const device = memorySeatStorage();
+    seatMemory(device).remember({ room: 'QK7P', seat: 5, token: 'tok-5' }, 1_000);
+
+    const h = harness({ seatMemory: seatMemory(device) });
+    h.latest().open();
+    expect(h.latest().messages()).toEqual([
+      { type: 'join', room: 'QK7P', reclaim: 5, reclaimToken: 'tok-5' },
+    ]);
+  });
+
+  it('knocks as a newcomer when the remembered seat is another room’s', () => {
+    const device = memorySeatStorage();
+    seatMemory(device).remember({ room: 'ZZZZ', seat: 5, token: 'tok-5' }, 1_000);
+
+    const h = harness({ seatMemory: seatMemory(device) });
+    h.latest().open();
+    expect(h.latest().messages()).toEqual([{ type: 'join', room: 'QK7P' }]);
+  });
+
+  it('writes the seat down on welcome, and again when RUSH! renumbers it', () => {
+    // Two writes, because a seat can move once. RUSH! compacts the roster (a0-11)
+    // and tells each client the seat it came out on — so a transport still holding
+    // its lobby number would reclaim a chair that is somebody else's, or one that
+    // no longer exists, and be refused for a reason the player had no part in.
+    const device = memorySeatStorage();
+    const h = harness({ seatMemory: seatMemory(device) });
+    h.latest().open();
+    h.latest().deliver({ type: 'welcome', you: 5, room: 'QK7P', tick: 0, reclaimToken: 'tok-5' });
+    expect(seatMemory(device).recall('QK7P', 1_000)).toEqual({
+      room: 'QK7P',
+      seat: 5,
+      token: 'tok-5',
+    });
+
+    h.latest().deliver({ type: 'matchStart', tick: 0, seed: 1, slots: [], you: 1 });
+    expect(seatMemory(device).recall('QK7P', 1_000)?.seat).toBe(1);
+    expect(h.transport.player).toBe(1);
+
+    // …and the redial that follows a drop asks for the seat that was PLAYED.
+    h.latest().drop();
+    h.tick(500);
+    h.latest().open();
+    expect(h.latest().messages()[0]).toMatchObject({ reclaim: 1, reclaimToken: 'tok-5' });
+  });
+
+  it('falls back to an ordinary join when the room refuses the remembered seat', () => {
+    // A credential that outlives its page also outlives its match. Being refused
+    // for one must not cost the player the ordinary join they would have had
+    // before any of this existed — so the seat is dropped and the door is knocked
+    // on again, plainly.
+    const device = memorySeatStorage();
+    seatMemory(device).remember({ room: 'QK7P', seat: 2, token: 'stale' }, 1_000);
+
+    const h = harness({ seatMemory: seatMemory(device) });
+    h.latest().open();
+    const refused = h.latest();
+    expect(refused.messages()[0]).toMatchObject({ reclaim: 2 });
+
+    refused.deliver({ type: 'joinError', reason: 'reclaim-expired' } as never);
+    // Not terminal, and not reported: the refusal was an answer about a
+    // credential, not about this player.
+    expect(h.received).toHaveLength(0);
+    expect(h.transport.state).not.toBe('closed');
+    expect(refused.closedByClient).toBe(true);
+    // The stale credential is gone from the device, and the second knock is plain.
+    expect(seatMemory(device).recall('QK7P', 1_000)).toBeNull();
+    expect(h.sockets).toHaveLength(2);
+    h.latest().open();
+    expect(h.latest().messages()).toEqual([{ type: 'join', room: 'QK7P' }]);
+
+    // …and *that* answer is the player's, whatever it is. A live match still says
+    // the thing it has always said to somebody with nothing to present.
+    h.latest().deliver({ type: 'joinError', reason: 'match-live' } as never);
+    expect(h.received.map((m) => m.type)).toEqual(['joinError']);
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.rejectReason).toBe('match-live');
+  });
+
+  it('does not re-knock when the refusal is about the player rather than the seat', () => {
+    // `match-live` to a client that had no credential is the front door working.
+    // There is no second thing to try, and a redial would only hear it again.
+    const h = harness({ seatMemory: seatMemory(memorySeatStorage()) });
+    h.latest().open();
+    h.latest().deliver({ type: 'joinError', reason: 'match-live' } as never);
+    expect(h.sockets).toHaveLength(1);
+    expect(h.transport.state).toBe('closed');
+    expect(h.transport.rejectReason).toBe('match-live');
+  });
+
+  it('forgets the seat when the match it belonged to is over', () => {
+    const device = memorySeatStorage();
+    seatMemory(device).remember({ room: 'QK7P', seat: 2, token: 'tok-2' }, 1_000);
+    const h = harness({ seatMemory: seatMemory(device) });
+    h.latest().open();
+    h.latest().deliver({ type: 'joinError', reason: 'match-over' } as never);
+
+    // The one refusal that says the seat itself is finished (a0-72): there is
+    // nothing for a later page to present it to.
+    expect(h.transport.rejectReason).toBe('match-over');
+    expect(seatMemory(device).recall('QK7P', 1_000)).toBeNull();
+  });
+
+  it('forgets on ABANDON MATCH and remembers through a silent hang-up', () => {
+    // The two exits, and they are not the same exit. ABANDON is a *statement*: the
+    // seat is freed at once (`server/room.ts` `abandon`), so the credential is dead
+    // and is dropped here rather than left to expire.
+    const stated = memorySeatStorage();
+    const a = harness({ seatMemory: seatMemory(stated) });
+    a.latest().open();
+    a.latest().deliver({ type: 'welcome', you: 1, room: 'QK7P', tick: 0, reclaimToken: 'tok-1' });
+    a.transport.leave('abandoned');
+    expect(seatMemory(stated).recall('QK7P', 1_000)).toBeNull();
+
+    // Closing without saying so is a *drop*, and a dropped seat is held for as long
+    // as the match runs (a0-72). Forgetting it here would take the ruling back from
+    // every player who closed a tab instead of pressing a button — which is exactly
+    // the player this brief is about.
+    const silent = memorySeatStorage();
+    const b = harness({ seatMemory: seatMemory(silent) });
+    b.latest().open();
+    b.latest().deliver({ type: 'welcome', you: 1, room: 'QK7P', tick: 0, reclaimToken: 'tok-1' });
+    b.transport.close();
+    expect(seatMemory(silent).recall('QK7P', 1_000)?.token).toBe('tok-1');
+  });
+
+  it('forgets the seat once the allocator says the room is gone', () => {
+    const device = memorySeatStorage();
+    const h = harness({
+      seatMemory: seatMemory(device),
+      checkRoomAlive: () => Promise.resolve('gone' as const),
+    });
+    h.latest().open();
+    h.latest().deliver({ type: 'welcome', you: 1, room: 'QK7P', tick: 0, reclaimToken: 'tok-1' });
+    expect(seatMemory(device).recall('QK7P', 1_000)).not.toBeNull();
+
+    h.latest().drop();
+    return Promise.resolve().then(() => {
+      h.tick(500);
+      expect(h.transport.closeReason).toBe('room-gone');
+      // No Machine hosts the code: nobody can reclaim that seat ever again.
+      expect(seatMemory(device).recall('QK7P', 1_000)).toBeNull();
+    });
   });
 });

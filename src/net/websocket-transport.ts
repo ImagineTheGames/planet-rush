@@ -28,6 +28,8 @@ import { encodeClientMessage, parseServerMessage } from './wire';
 import type { WireFrame } from './wire';
 import { decideReconnect } from './reconnect';
 import type { RoomLiveness, StopReason } from './reconnect';
+import { browserSeatMemory } from './seat-memory';
+import type { SeatMemory } from './seat-memory';
 import type { PlayerId } from '@shared/types';
 import type {
   ClientMessage,
@@ -99,6 +101,25 @@ export interface WebSocketTransportConfig {
    * alone — exactly today's behaviour.
    */
   readonly checkRoomAlive?: () => Promise<RoomLiveness>;
+  /**
+   * **Where this device writes down the seat it is flying** (a0-133,
+   * `./seat-memory`), so a client that comes back as a *fresh page* can still say
+   * which seat is its own.
+   *
+   * Defaults to the browser's `localStorage`; `null` on a platform with no
+   * storage, which is the pre-a0-133 behaviour exactly — the token lives in this
+   * object and dies with it.
+   *
+   * The reconnect this transport was written for is a socket dying under a page
+   * that keeps running, and for that the in-memory token is enough. A phone that
+   * sleeps long enough does not resume a socket: the tab is discarded, the page is
+   * rebuilt, and the player re-enters the code by hand. That client's token field
+   * is empty, so its `join` is a stranger's and the room refuses it `match-live` —
+   * which is the developer's report of 2026-08-17 and the a0-131 finding. Recalling
+   * the credential here means the first dial of a rebuilt page is already the
+   * reclaim it always should have been.
+   */
+  readonly seatMemory?: SeatMemory | null;
   /** Opens a socket. Defaults to the browser's `WebSocket`. */
   readonly connect?: (url: string) => WebSocketLike;
   /** Wall clock, ms. Defaults to `Date.now`. */
@@ -161,10 +182,37 @@ export class WebSocketTransport implements Transport {
   private messageHandler: ((message: ServerMessage) => void) | null = null;
   private stateHandler: ((state: ConnectionState) => void) | null = null;
 
-  /** The slot the server seated us in, once `welcome` has arrived. */
+  /**
+   * The slot the server seated us in — from `welcome`, and then from the
+   * `matchStart` that renumbers it.
+   *
+   * Both, because RUSH! compacts the roster and the seat a client played on is not
+   * always the seat it was welcomed into (a0-11; `./transport`
+   * `MatchStartMessage.you` — *"the room therefore compacts at RUSH! and tells each
+   * client the seat it came out on"*). A reclaim names a seat, so a transport still
+   * holding its lobby number would ask for somebody else's chair — or for one that
+   * no longer exists — and be refused for a reason that is nothing to do with the
+   * player. The room's own bookkeeping moves with the compaction
+   * (`server/room.ts` `compactRoster` → `socket.reseat`); this is that same move,
+   * on this side of the wire.
+   */
   private seat: PlayerId | null = null;
   /** The secret that proves we are the same player coming back (GDD §4.2). */
   private token: string | null = null;
+  /** Where the seat above is written down between page loads, or null on a device
+   *  that cannot remember one (`./seat-memory`, a0-133). */
+  private readonly memory: SeatMemory | null;
+  /**
+   * True while the seat/token we are dialling on came out of {@link memory} rather
+   * than out of a `welcome` this transport itself received.
+   *
+   * It is the difference between a credential we *know* is current and one we are
+   * merely presenting in good faith, and it decides what a reclaim refusal means:
+   * ours going stale is a fact about the room, while a recalled one being refused
+   * may only mean this device is remembering a match that has moved on — in which
+   * case the honest next move is to knock as a newcomer ({@link retryAsNewcomer}).
+   */
+  private recalled = false;
 
   /** True once `close()` was called: a deliberate exit never redials. */
   private left = false;
@@ -215,6 +263,19 @@ export class WebSocketTransport implements Transport {
     this.windowMs = config.reconnectWindowMs ?? RECONNECT_WINDOW_MS;
     this.retryBase = config.retryBaseMs ?? RETRY_BASE_MS;
     this.retryMax = config.retryMaxMs ?? RETRY_MAX_MS;
+    this.memory = config.seatMemory === undefined ? browserSeatMemory() : config.seatMemory;
+    // **Before the first dial, ask this device whether it is coming back.** A
+    // credential for *this* room means a page that held this seat, so the very
+    // first `join` is a reclaim and the room hands the ship back instead of
+    // reading a returning player as a stranger at the door of a live match
+    // (`./seat-memory`, a0-133). No credential — or one for another room — and
+    // nothing changes: the dial is the plain join it always was.
+    const remembered = this.memory?.recall(config.room, this.now()) ?? null;
+    if (remembered) {
+      this.seat = remembered.seat;
+      this.token = remembered.token;
+      this.recalled = true;
+    }
     this.open();
   }
 
@@ -330,6 +391,16 @@ export class WebSocketTransport implements Transport {
         encodeClientMessage({ type: 'leave', ...(reason !== undefined ? { reason } : {}) }),
       );
     }
+    // A stated leave frees the seat at once (`server/room.ts` `abandon`), so the
+    // credential this device is holding is dead the moment the frame goes out —
+    // and it is forgotten here rather than left to expire, so the next page does
+    // not present a seat its owner gave up (a0-133).
+    //
+    // {@link close} deliberately does **not** do this. Hanging up without saying so
+    // is a *drop*, and a dropped seat is held for as long as the match runs (a0-72):
+    // the credential is still good, and forgetting it there would take the ruling
+    // back from every player who closed a tab instead of pressing a button.
+    this.forgetSeat();
     this.close();
   }
 
@@ -446,12 +517,26 @@ export class WebSocketTransport implements Transport {
       if (message.type === 'welcome') {
         this.seat = message.you;
         if (message.reclaimToken) this.token = message.reclaimToken;
+        // Seated, on this connection, by this server: whatever we were carrying is
+        // now confirmed rather than merely remembered.
+        this.recalled = false;
+        this.rememberSeat();
+      }
+      // RUSH! may have moved us (a0-11). The seat we would reclaim is the seat we
+      // are *playing*, so it is re-recorded here as well as on the welcome.
+      if (message.type === 'matchStart' && message.you !== undefined) {
+        this.seat = message.you;
+        this.rememberSeat();
       }
       // A refused join is terminal, not a drop: the same ticket redialled would
       // lose the same edge lottery again (M10). Surface the reason and stop —
       // never fall through to the reconnect loop this message's own socket-close
       // would otherwise start. Forwarded first so an observer sees the reason too.
       if (message.type === 'joinError') {
+        // …unless it is this device's *memory* being refused rather than this
+        // player being refused, in which case there is a second door to try and
+        // the refusal is not yet the answer to anything (a0-133).
+        if (this.retryAsNewcomer(message.reason)) return;
         this.messageHandler?.(message);
         this.rejectJoin(message.reason);
         return;
@@ -483,6 +568,12 @@ export class WebSocketTransport implements Transport {
     if (this.left || this.rejected) return;
     this.rejected = true;
     this.rejectReasonValue = reason;
+    // The one refusal that says the seat itself is finished: the match this
+    // credential belongs to has ended, so there is nothing for a later page to
+    // present it to (a0-133; `server/room.ts` — *"their window never ran out,
+    // their match finished"*). Every other reason leaves it written down, because
+    // every other reason may be about this dial rather than about the seat.
+    if (reason === 'match-over') this.forgetSeat();
     if (this.retry !== null) {
       this.cancel(this.retry);
       this.retry = null;
@@ -491,6 +582,100 @@ export class WebSocketTransport implements Transport {
     this.socket = null;
     this.closeReasonValue = 'join-rejected';
     this.setState('closed');
+  }
+
+  /**
+   * The refusals that mean *this device's memory is stale*, as against *this
+   * player may not come in*.
+   *
+   * All three are answers to a reclaim, and each of them is also what the room
+   * says to a client presenting a credential for a match that has moved on: the
+   * seat was freed when they left a lobby (`'reclaim-expired'`), somebody else is
+   * in it or the token no longer matches (`'reclaim-denied'`), or the four letters
+   * now belong to a room that never issued it (`'reclaim-unknown'`). None of them
+   * is a verdict on a player who simply wants to join, so a client that reached
+   * the door on a *remembered* credential has one more thing to try
+   * ({@link retryAsNewcomer}) before any of them is reported as the end.
+   *
+   * `'match-over'` is deliberately not here, and neither is `'match-live'`: the
+   * first is the room's truthful, final answer to a returning player, and the
+   * second is what a stranger is told — knocking again as a newcomer would only
+   * hear it a second time.
+   */
+  private static readonly STALE_CREDENTIAL: ReadonlySet<string> = new Set([
+    'reclaim-expired',
+    'reclaim-denied',
+    'reclaim-unknown',
+  ]);
+
+  /** Write the seat down for the next page (a0-133). A no-op until there is both a
+   *  seat and a token to write, and on a device with nowhere to put them. */
+  private rememberSeat(): void {
+    if (this.seat === null || this.token === null) return;
+    this.memory?.remember(
+      { room: this.config.room, seat: this.seat, token: this.token },
+      this.now(),
+    );
+  }
+
+  /** Drop the seat this device was remembering, in memory and in storage alike. */
+  private forgetSeat(): void {
+    this.seat = null;
+    this.token = null;
+    this.recalled = false;
+    this.memory?.forget(this.config.room);
+  }
+
+  /**
+   * **The remembered seat was refused, so knock as a newcomer** (a0-133).
+   *
+   * A credential that outlives its page also outlives its match: a player who left
+   * a lobby, whose seat was freed, or whose four letters have since been dealt to a
+   * different room is still holding one. Presenting it is right — it is the only
+   * way a rebuilt page can say *"this seat is mine"* — but being refused for it
+   * must not cost them the ordinary join they would otherwise have had. Before
+   * a0-133 there was nothing to get wrong here, because a fresh page never
+   * presented anything; the fallback is what keeps that promise intact.
+   *
+   * So the credential is dropped and the dial goes out again, this time as a plain
+   * join. Whatever the room says to *that* is the answer the player gets: a lobby
+   * seats them, a live match tells them `match-live` exactly as it did before any
+   * of this existed. One extra round trip, in the one case where this device was
+   * remembering something the room had forgotten.
+   *
+   * Returns true when it has taken the refusal over. Then the `joinError` is **not**
+   * forwarded and **not** terminal: it was an answer about a credential, not about
+   * this player, and a screen that painted `REFUSED: reclaim-expired` for a quarter
+   * second before the welcome landed would be telling the player something that
+   * never happened to them.
+   *
+   * The connection state is left where it is on purpose. This is a second knock on
+   * the same door within one connect attempt — `connecting` on a first dial,
+   * `reconnecting` on a redial — and neither of those has stopped being true.
+   */
+  private retryAsNewcomer(reason: string): boolean {
+    if (this.left || this.rejected) return false;
+    if (!this.recalled) return false;
+    if (!WebSocketTransport.STALE_CREDENTIAL.has(reason)) return false;
+
+    this.forgetSeat();
+    if (this.retry !== null) {
+      this.cancel(this.retry);
+      this.retry = null;
+    }
+    // Detach before closing, exactly as {@link redial} does: the server hangs up
+    // right after a `joinError`, and that close must not start a backoff loop
+    // behind the dial we are making ourselves.
+    const dead = this.socket;
+    this.socket = null;
+    dead?.close();
+    this.attempt = 0;
+    // Through `reopen` rather than `open`, for the ticket: a *reclaim* is admitted
+    // on a lapsed-but-genuine pass and a plain join is not (`server/match-server.ts`
+    // `admitsJoin`), so the knock that follows needs a current one or it would be
+    // refused `bad-ticket` for a reason the player has even less to do with.
+    this.reopen();
+    return true;
   }
 
   private sendJoin(): void {
@@ -602,6 +787,13 @@ export class WebSocketTransport implements Transport {
 
   /** Give up reconnecting: record why, then close. */
   private stop(reason: StopReason): void {
+    // A room the allocator can no longer find has ended, and a seat in it cannot be
+    // reclaimed by anybody ever again — so the credential goes with it (a0-133).
+    // `'grace-elapsed'` does not, and that asymmetry is the a0-72 ruling: we stopped
+    // dialling on a *clock*, having never established that the room was gone, and a
+    // player who reopens the page a minute later must still be able to say the seat
+    // is theirs.
+    if (reason === 'room-gone') this.forgetSeat();
     this.closeReasonValue = reason;
     this.setState('closed');
   }

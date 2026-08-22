@@ -40,6 +40,8 @@ import { signTicket } from './ticket';
 import { createOnlineSession } from './session';
 import type { OnlineSession } from './session';
 import { VISIBILITY_STALE_MS, linkNotice, refusalTitle } from './link-loss';
+import { seatMemory } from './seat-memory';
+import { memorySeatStorage } from '../../tests/net/seat-storage';
 import type { TicketRefresh, WebSocketLike } from './websocket-transport';
 import { createServer as createTcpServer, connect as tcpConnect } from 'node:net';
 import type { Socket } from 'node:net';
@@ -888,4 +890,289 @@ describe('session — when the line drops, both sides are told (a0-132)', () => 
     expect(match.seatHeldForMatch(stays.you)).toBe(false);
     expect(told).toHaveLength(1); // and still exactly one telling, not a repeat every update
   }, 60_000);
+});
+
+// ---------------------------------------------------------------------------
+// a0-133 — a correct code, a live match, and the door said REFUSED
+// ---------------------------------------------------------------------------
+
+/**
+ * **The path a phone must use was the one that refused it.**
+ *
+ * a0-131 pointed two real browsers at one real match and came back with a pair of
+ * findings that only make sense read together:
+ *
+ *   • *verified* — the client whose **socket** returns is put back into the running
+ *     match, caught up and playing. That is the test above this one, and it has
+ *     been green since a0-72.
+ *   • *failed* — a **fresh client** typing the correct code into that same live
+ *     match is told `REFUSED: match-live — that match already started`.
+ *
+ * A phone that sleeps long enough does not resume a socket. The tab is discarded,
+ * the page is rebuilt from nothing, and the player types the four letters again —
+ * so the working path is the one they cannot reach, and the one they must use is
+ * the one that turns them away. That is the developer's own report of 2026-08-17,
+ * and their ruling stands: *"i should be able to join back if the match is still
+ * on-going no matter what."*
+ *
+ * **What was actually missing was not a rule but a credential.** The room has
+ * always been able to tell a returning player from a stranger, and has never
+ * refused one: `server/room.ts` `join` sends anything carrying a `reclaim` to the
+ * reclaim door, which checks the per-seat token the room minted at `welcome` —
+ * *"The room code is shared with the whole classroom by design, so it cannot be
+ * the credential. The token is."* The `match-live` refusal is only ever reached by
+ * a request with **no** credential at all. And a rebuilt page had none, because the
+ * token lived in a private field of the transport it lost.
+ *
+ * So this test drives the *front door*: a session object that has never seen this
+ * match, dialling with the code, on a device that kept the seat token
+ * (`./seat-memory`). And in the same run it drives the stranger who types the same
+ * correct code with nothing to present, because "let the returning player in" is
+ * only the right fix if it is still a closed door to everybody else.
+ */
+describe('session — a returning player comes back through the front door (a0-133)', () => {
+  it('a returning player is let back into a live match', async () => {
+    const machine = await startFleetMachine();
+    const room = 'BACK';
+    const sessions: OnlineSession[] = [];
+    cleanup = async (): Promise<void> => {
+      for (const session of sessions) session.close();
+      await machine.stop();
+    };
+
+    // **The device**, as against the page. This is the whole of what a0-133 adds:
+    // one storage cell that outlives the JavaScript heap, exactly as a phone's
+    // `localStorage` outlives the tab that is discarded when the screen stays black
+    // (`./seat-memory` `browserSeatMemory`). The test injects it for the same
+    // reason every clock and socket in `src/net` is injected.
+    const device = memorySeatStorage();
+
+    let live: (WebSocketLike & { suspend(): void }) | null = null;
+    const phone = createOnlineSession({
+      url: machine.url,
+      room,
+      shipClass: ShipClass.Interceptor,
+      transport: {
+        ticket: mintTicket(room),
+        seatMemory: seatMemory(device),
+        connect: (url): WebSocketLike => {
+          const socket = suspendableSocket(url);
+          live = socket;
+          return socket;
+        },
+        retryBaseMs: 100,
+        retryMaxMs: 250,
+      },
+    });
+    sessions.push(phone);
+
+    let welcomes = 0;
+    phone.observe((message) => {
+      if (message.type === 'welcome') welcomes++;
+    });
+    await until('the welcome', () => welcomes > 0);
+    const seat = phone.you;
+    phone.chooseInLobby({ shipClass: ShipClass.Interceptor, seats: ['open', 'bot'] });
+    await sleep(120);
+    phone.startMatch();
+
+    const match = machine.matches.room(room);
+    if (!match) throw new Error('the room never opened');
+    await until('the match to start', () => match.world !== null && phone.world !== null);
+
+    // Stamp authority's ship, so "the same seat came back" has an answer a fresh
+    // spawn could not fake.
+    const ship = match.world?.ships.find((s) => s.id === seat);
+    if (!ship) throw new Error('no authoritative ship for the seat');
+    ship.banked = 42;
+    const track = Object.keys(ship.tiers)[0]!;
+    (ship.tiers as Record<string, number>)[track] = 3;
+
+    // --- The screen goes black, and this time the page does not survive it ----
+    phone.linkHidden();
+    (live as unknown as { suspend(): void }).suspend();
+    await until('the server to notice and seat a bot', () => match.lobbyState()[seat]?.isBot === true);
+    expect(match.seatHeldForMatch(seat)).toBe(true);
+    expect(match.state).toBe('live');
+
+    // A discarded tab runs no handlers and says nothing on the wire — it does not
+    // hang up politely and it certainly does not press ABANDON MATCH. `close()` is
+    // that: this object stops existing, in silence. The seat stays held for the
+    // life of the match (a0-72), which is the state the room is in when the player
+    // picks the phone back up.
+    phone.close();
+    await sleep(200);
+    expect(match.seatHeldForMatch(seat)).toBe(true);
+
+    // --- A stranger types the same correct code ------------------------------
+    // First, the door that must stay shut. Same four letters, same Machine, a valid
+    // ticket — and nothing whatever to say the seat is theirs. This is the refusal
+    // a0-131 photographed, and it is still exactly right.
+    const strangerRefusals: string[] = [];
+    const stranger = createOnlineSession({
+      url: machine.url,
+      room,
+      shipClass: ShipClass.Interceptor,
+      transport: {
+        ticket: mintTicket(room),
+        // A different device: no credential, and nowhere one could have come from.
+        seatMemory: null,
+        connect: nodeWebSocket,
+        retryBaseMs: 100,
+        retryMaxMs: 250,
+      },
+    });
+    sessions.push(stranger);
+    stranger.observe((message) => {
+      if (message.type === 'joinError') strangerRefusals.push(message.reason);
+    });
+    await until('the stranger to be turned away', () => strangerRefusals.length > 0);
+    expect(strangerRefusals).toEqual(['match-live']);
+    expect(stranger.rejectReason).toBe('match-live');
+    // …and the room is untouched by the knock: the seat is still being held for
+    // the player it belongs to, and no bot handed anything over.
+    expect(match.seatHeldForMatch(seat)).toBe(true);
+    expect(match.lobbyState()[seat]?.isBot).toBe(true);
+
+    // --- …and now the player comes back --------------------------------------
+    // A **fresh client**, and every word of that matters: a new session object, a
+    // new socket, a new ticket, and not one byte of the connection that dropped.
+    // The only thing it shares with the phone that went dark is the device it is
+    // running on — and therefore the seat token that device wrote down. This is a
+    // page reload with the code typed in again, which is the only path a slept
+    // phone has.
+    const returningRefusals: string[] = [];
+    let returningWelcomes = 0;
+    const returning = createOnlineSession({
+      url: machine.url,
+      room,
+      shipClass: ShipClass.Interceptor,
+      transport: {
+        ticket: mintTicket(room),
+        seatMemory: seatMemory(device),
+        connect: nodeWebSocket,
+        retryBaseMs: 100,
+        retryMaxMs: 250,
+      },
+    });
+    sessions.push(returning);
+    returning.observe((message) => {
+      if (message.type === 'welcome') returningWelcomes++;
+      if (message.type === 'joinError') returningRefusals.push(message.reason);
+    });
+
+    // THE RULING: the match was still running and the seat was still theirs, so
+    // they are back in it. Through the front door, on a client that had to be told
+    // the room code by a human, and not refused once on the way.
+    await until(
+      'the door to answer the returning player',
+      () => returningWelcomes > 0 || returningRefusals.length > 0,
+      15_000,
+    );
+    // On the code this test was written against, the answer here is
+    // `[ 'match-live' ]` — the refusal a0-131 photographed, reproduced by the only
+    // client a slept phone can be.
+    expect(returningRefusals).toEqual([]);
+    expect(returningWelcomes).toBeGreaterThan(0);
+    expect(returning.you).toBe(seat);
+    expect(returning.state).toBe('open');
+
+    await until('the bot to hand the controls back', () => match.lobbyState()[seat]?.isBot === false);
+    expect(match.seatHeldForMatch(seat)).toBe(false);
+
+    // The same ship, not a new one: authority never rebuilt it, so the wealth and
+    // the upgrade tier the player left the field with are the ones they are flying
+    // (GDD §4.2 — "reclaim their ship, with all upgrades intact").
+    expect(match.world?.ships.find((s) => s.id === seat)).toBe(ship);
+    expect(ship.cargo + ship.banked).toBeCloseTo(42, 9);
+    expect((ship.tiers as Record<string, number>)[track]).toBe(3);
+
+    // …and the half the player actually sees: the reclaim `welcome` carries the
+    // wallet and `matchStart` stamps it onto the world this fresh client builds.
+    await until(
+      'the returning client to be flying its own wallet again',
+      () => {
+        const mine = returning.world?.ships.find((s) => s.id === returning.you);
+        return mine !== undefined && mine.cargo + mine.banked > 0;
+      },
+      10_000,
+    );
+    const mine = returning.world?.ships.find((s) => s.id === returning.you);
+    expect(mine).toBeDefined();
+    expect(mine!.cargo + mine!.banked).toBeCloseTo(ship.cargo + ship.banked, 1);
+    expect((mine!.tiers as Record<string, number>)[track]).toBe(3);
+  }, 60_000);
+
+  it('a remembered seat that the room has forgotten falls back to an ordinary join', async () => {
+    // The cost of a credential that outlives its page: it also outlives its match.
+    // A player who was in this room's **lobby**, reloaded, and came back is holding
+    // a seat the room freed the moment their socket closed — so the reclaim is
+    // refused, and that refusal must not cost them the ordinary join they would
+    // have had before a0-133 existed. One extra round trip, then the lobby, and the
+    // player is never told about any of it.
+    const machine = await startFleetMachine();
+    const room = 'STAL';
+    const sessions: OnlineSession[] = [];
+    cleanup = async (): Promise<void> => {
+      for (const session of sessions) session.close();
+      await machine.stop();
+    };
+
+    const device = memorySeatStorage();
+    const first = createOnlineSession({
+      url: machine.url,
+      room,
+      shipClass: ShipClass.Interceptor,
+      transport: {
+        ticket: mintTicket(room),
+        seatMemory: seatMemory(device),
+        connect: nodeWebSocket,
+        retryBaseMs: 100,
+        retryMaxMs: 250,
+      },
+    });
+    sessions.push(first);
+    let seated = 0;
+    first.observe((message) => {
+      if (message.type === 'welcome') seated++;
+    });
+    await until('the first welcome', () => seated > 0);
+    // The credential is written down…
+    expect(seatMemory(device).recall(room, Date.now())).not.toBeNull();
+    // …and then the page goes away in a lobby, where a seat is simply freed
+    // (`server/room.ts` `vacate` — there is no match to hold it for).
+    first.close();
+    const match = machine.matches.room(room);
+    if (!match) throw new Error('the room never opened');
+    await until('the seat to free', () => match.lobbyState().every((slot) => !slot.ready));
+
+    const refusals: string[] = [];
+    let welcomes = 0;
+    const second = createOnlineSession({
+      url: machine.url,
+      room,
+      shipClass: ShipClass.Interceptor,
+      transport: {
+        ticket: mintTicket(room),
+        seatMemory: seatMemory(device),
+        connect: nodeWebSocket,
+        retryBaseMs: 100,
+        retryMaxMs: 250,
+      },
+    });
+    sessions.push(second);
+    second.observe((message) => {
+      if (message.type === 'welcome') welcomes++;
+      if (message.type === 'joinError') refusals.push(message.reason);
+    });
+
+    await until('the second client to be seated anyway', () => welcomes > 0, 15_000);
+    // Not one word of the stale credential's refusal reached the player…
+    expect(refusals).toEqual([]);
+    expect(second.state).toBe('open');
+    // …and the seat it is now holding is one the room gave it in this handshake,
+    // written down in place of the one that had gone stale.
+    const remembered = seatMemory(device).recall(room, Date.now());
+    expect(remembered?.seat).toBe(second.you);
+  }, 45_000);
 });

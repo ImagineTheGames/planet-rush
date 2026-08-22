@@ -1,0 +1,25 @@
+{
+  "code": "SNQH",
+  "seatMemory": {
+    "room": "SNQH",
+    "seat": 1,
+    "tokenChars": 24,
+    "v": 1
+  },
+  "joiner": {
+    "screen": "online",
+    "matchStarted": false,
+    "online": {
+      "screen": "join",
+      "title": "ENTER THE ROOM CODE",
+      "status": "idle",
+      "error": ""
+    },
+    "lobby": null,
+    "badge": {
+      "text": "d081e3f*",
+      "visible": true,
+      "server": null
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "measuredAtMs": 51565,
+  "seatMemory": null,
+  "host": {
+    "screen": "online",
+    "matchStarted": true,
+    "online": {
+      "screen": "home",
+      "title": "JOINED · SEAT 1",
+      "status": "connecting",
+      "error": ""
+    },
+    "lobby": {
+      "visible": false,
+      "room": "AB9Y",
+      "you": 0,
+      "humanCount": 2
+    },
+    "badge": {
+      "text": "3f6cf82* · 0800d5b6 (iad) · 291ms",
+      "visible": true,
+      "server": {
+        "machine": "0800d5b6f1e208",
+        "region": "iad"
+      }
+    }
+  },
+  "joiner": {
+    "screen": "online",
+    "matchStarted": false,
+    "online": {
+      "screen": "join",
+      "title": "REFUSED: match-live — that match already started",
+      "status": "error",
+      "error": "REFUSED: match-live"
+    },
+    "lobby": null,
+    "badge": {
+      "text": "3f6cf82*",
+      "visible": true,
+      "server": null
+    }
+  }
+}

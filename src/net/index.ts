@@ -84,6 +84,19 @@
  * button) or ABANDON MATCH — which is a *stated* leave, so the seat is freed instead
  * of held empty for a minute (`./transport` LeaveMessage, `server/room.ts` `abandon`).
  *
+ * `./seat-memory` is the other half of that reconnect story, and the half a
+ * *phone* actually needs. Everything above about redialling assumes a page that is
+ * still running when its socket dies; a screen that stays black long enough gets
+ * neither — the tab is discarded, the page is rebuilt, and the player types the code
+ * again by hand. That client held the seat five seconds ago and could not say so,
+ * because the reclaim token lived only in the transport it lost, so the room read a
+ * returning player as a stranger and refused them `match-live` (a0-131 item 4; the
+ * developer, 2026-08-17). The token is now written to `localStorage` and presented
+ * on the first dial when it names the room being entered — the same secret, from
+ * the same welcome, read back by the same device. Nothing else changed about who
+ * gets in: a client with no credential still knocks as a newcomer and a live match
+ * still turns it away.
+ *
  * And `./ping` with `./ping-badge` are the round trip finally shown to the person
  * whose connection it is (ratified developer): a pure grading model both surfaces
  * share — the lobby row beside each human's name, and one mono line in the corner
@@ -138,5 +151,9 @@ export * from './allocator-client';
 export * from './lobby-list';
 export * from './region-probe';
 export * from './server-url';
+// The seat token, written down so it outlives the page that was issued it — a
+// phone that sleeps gets a new page, not a new socket, and a rebuilt page with no
+// credential is a stranger at the door of its own match (a0-133).
+export * from './seat-memory';
 export * from './websocket-transport';
 export * from './session';

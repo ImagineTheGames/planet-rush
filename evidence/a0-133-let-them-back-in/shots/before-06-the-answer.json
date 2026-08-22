@@ -1,0 +1,19 @@
+{
+  "measuredAtMs": 39390,
+  "joiner": {
+    "screen": "online",
+    "matchStarted": false,
+    "online": {
+      "screen": "join",
+      "title": "REFUSED: match-live — that match already started",
+      "status": "error",
+      "error": "REFUSED: match-live"
+    },
+    "lobby": null,
+    "badge": {
+      "text": "3f6cf82*",
+      "visible": true,
+      "server": null
+    }
+  }
+}

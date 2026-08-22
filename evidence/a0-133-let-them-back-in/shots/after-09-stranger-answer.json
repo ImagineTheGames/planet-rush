@@ -1,0 +1,19 @@
+{
+  "seatMemory": null,
+  "stranger": {
+    "screen": "online",
+    "matchStarted": false,
+    "online": {
+      "screen": "join",
+      "title": "REFUSED: match-live — that match already started",
+      "status": "error",
+      "error": "REFUSED: match-live"
+    },
+    "lobby": null,
+    "badge": {
+      "text": "d081e3f*",
+      "visible": true,
+      "server": null
+    }
+  }
+}
