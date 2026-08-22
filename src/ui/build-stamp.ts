@@ -161,19 +161,6 @@ export function buildStampRow(viewport: Viewport, lift = 0): Rect {
 }
 
 /**
- * The y a plate's BOTTOM edge may not pass if the stamp is to stay readable
- * under it — the top of {@link buildStampRow}.
- *
- * Named separately because that is how every caller uses it: a footer plate is
- * placed by an existing rule (centred in its beam, bottom-aligned where the beam
- * is shorter than the thumb floor) and then clamped, and a clamp wants a number
- * rather than a rect.
- */
-export function buildStampFloor(viewport: Viewport, lift = 0): number {
-  return buildStampRow(viewport, lift).y;
-}
-
-/**
  * The stamp as the layout registry sees it on a screen that draws it —
  * {@link BUILD_STAMP_ID}, its declared anchor, and the row it owns.
  *
