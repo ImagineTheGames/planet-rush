@@ -25,37 +25,40 @@ const read = (name) => {
   return PNG.sync.read(readFileSync(p));
 };
 
-/** The moment a0-131 read its finding off: the standoff, both clients. */
-const MOMENT = process.env.MOMENT ?? 'V-01-standoff';
+/**
+ * The two moments the recipe names. `V-01-standoff` is where a0-131 read its
+ * finding off; `V-04-close-burst-12` is thirty seconds later in the same run,
+ * kept because it is the frame in which the BEFORE bundle draws no attacker at
+ * all — the phone alone with a vignette, which is a0-131's sentence exactly.
+ */
+const MOMENTS = ['V-01-standoff', 'V-04-close-burst-12'];
 
-// 1. THE WHOLE FRAMES, halved (dpr 2 specimens): before over after, phone beside
-//    desktop. The one plate that answers the brief on its own.
-save(
-  stack([
-    row([half(read(`before-${MOMENT}-joiner`)), half(read(`before-${MOMENT}-host`))]),
-    row([half(read(`after-${MOMENT}-joiner`)), half(read(`after-${MOMENT}-host`))]),
-  ]),
-  'a0-134-the-pair-restaged',
-);
+for (const moment of MOMENTS) {
+  // 1. THE WHOLE FRAMES, halved (dpr 2 specimens): before over after, phone
+  //    beside desktop. The one plate that answers the brief on its own.
+  save(
+    stack([
+      row([half(read(`before-${moment}-joiner`)), half(read(`before-${moment}-host`))]),
+      row([half(read(`after-${moment}-joiner`)), half(read(`after-${moment}-host`))]),
+    ]),
+    `a0-134-the-pair-restaged-${moment}`,
+  );
 
-// 2. The phone alone, before and after, at full dpr-2 resolution — so the
-//    attacker's hull and nameplate can be read rather than inferred from a
-//    halved frame.
-save(
-  stack([
-    crop(read(`before-${MOMENT}-joiner`), { x: 0, y: 0, w: 1596, h: 768, scale: 1 }),
-    crop(read(`after-${MOMENT}-joiner`), { x: 0, y: 0, w: 1596, h: 768, scale: 1 }),
-  ]),
-  'a0-134-the-phone-before-and-after',
-);
+  // 2. The phone alone, before over after, at full dpr-2 resolution — so the
+  //    attacker's hull bar can be read rather than inferred from a halved frame.
+  save(
+    stack([read(`before-${moment}-joiner`), read(`after-${moment}-joiner`)]),
+    `a0-134-the-phone-before-and-after-${moment}`,
+  );
 
-// 3. The top-right corner at 2×, both bundles: the VIEW chip. It reads `1×`
-//    before and `1.5×` after WITHOUT ANYONE HAVING PRESSED IT, which is the whole
-//    of the fix stated in two glyphs. The rect is `zoomControlBounds(798,384,
-//    true)` in logical px, doubled for dpr 2.
-const CHIP = { x: 1380, y: 100, w: 180, h: 130, scale: 2 };
-save(
-  row([crop(read(`before-${MOMENT}-joiner`), CHIP), crop(read(`after-${MOMENT}-joiner`), CHIP)]),
-  'a0-134-the-view-chip-nobody-pressed',
-);
+  // 3. The top-right corner at 2×, both bundles: the VIEW chip. It reads `1×`
+  //    before and `1.5×` after WITH NOBODY HAVING PRESSED IT, which is the whole
+  //    of the fix stated in two glyphs. The rect is `zoomControlBounds(798, 384,
+  //    true)` in logical px, doubled for the dpr-2 specimen.
+  const CHIP = { x: 1380, y: 100, w: 190, h: 130, scale: 2 };
+  save(
+    row([crop(read(`before-${moment}-joiner`), CHIP), crop(read(`after-${moment}-joiner`), CHIP)]),
+    `a0-134-the-view-chip-nobody-pressed-${moment}`,
+  );
+}
 console.log('DONE');

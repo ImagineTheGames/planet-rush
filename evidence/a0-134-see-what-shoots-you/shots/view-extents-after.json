@@ -1,0 +1,261 @@
+{
+  "label": "after",
+  "base": "http://localhost:4320",
+  "rows": [
+    {
+      "profile": "desktop",
+      "css": "1280x800",
+      "world": {
+        "left": 1328,
+        "top": 800,
+        "right": 2608,
+        "bottom": 1600,
+        "width": 1280,
+        "height": 800
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "zoom": 1,
+      "control": null,
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "qa-phone/landscape",
+      "css": "798x384",
+      "world": {
+        "left": 1369.5,
+        "top": 912,
+        "right": 2566.5,
+        "bottom": 1488,
+        "width": 1197,
+        "height": 576
+      },
+      "viewport": {
+        "width": 798,
+        "height": 384
+      },
+      "zoom": 1.5,
+      "control": {
+        "rect": {
+          "x": 718,
+          "y": 61,
+          "width": 64,
+          "height": 48
+        },
+        "step": 1.5
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "iphone/landscape",
+      "css": "844x390",
+      "world": {
+        "left": 1335,
+        "top": 907.5,
+        "right": 2601,
+        "bottom": 1492.5,
+        "width": 1266,
+        "height": 585
+      },
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "zoom": 1.5,
+      "control": {
+        "rect": {
+          "x": 764,
+          "y": 61,
+          "width": 64,
+          "height": 48
+        },
+        "step": 1.5
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "iphone/portrait",
+      "css": "390x844",
+      "world": {
+        "left": 1335,
+        "top": 907.5,
+        "right": 2601,
+        "bottom": 1492.5,
+        "width": 1266,
+        "height": 585
+      },
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "zoom": 1.5,
+      "control": {
+        "rect": {
+          "x": 764,
+          "y": 61,
+          "width": 64,
+          "height": 48
+        },
+        "step": 1.5
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "pixel/landscape",
+      "css": "915x412",
+      "world": {
+        "left": 1281.75,
+        "top": 891,
+        "right": 2654.25,
+        "bottom": 1509,
+        "width": 1372.5,
+        "height": 618
+      },
+      "viewport": {
+        "width": 915,
+        "height": 412
+      },
+      "zoom": 1.5,
+      "control": {
+        "rect": {
+          "x": 835,
+          "y": 61,
+          "width": 64,
+          "height": 48
+        },
+        "step": 1.5
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "iphone-se/portrait",
+      "css": "375x667",
+      "world": {
+        "left": 1467.75,
+        "top": 918.75,
+        "right": 2468.25,
+        "bottom": 1481.25,
+        "width": 1000.5,
+        "height": 562.5
+      },
+      "viewport": {
+        "width": 667,
+        "height": 375
+      },
+      "zoom": 1.5,
+      "control": {
+        "rect": {
+          "x": 587,
+          "y": 61,
+          "width": 64,
+          "height": 48
+        },
+        "step": 1.5
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "small/landscape",
+      "css": "568x320",
+      "world": {
+        "left": 1400,
+        "top": 880,
+        "right": 2536,
+        "bottom": 1520,
+        "width": 1136,
+        "height": 640
+      },
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "zoom": 2,
+      "control": {
+        "rect": {
+          "x": 488,
+          "y": 58.66666666666667,
+          "width": 64,
+          "height": 48
+        },
+        "step": 2
+      },
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "ultrawide-21:9",
+      "css": "2560x1080",
+      "world": {
+        "left": 688,
+        "top": 660,
+        "right": 3248,
+        "bottom": 1740,
+        "width": 2560,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 2560,
+        "height": 1080
+      },
+      "zoom": 1,
+      "control": null,
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    },
+    {
+      "profile": "ultrawide-32:9",
+      "css": "3840x1080",
+      "world": {
+        "left": 48,
+        "top": 660,
+        "right": 3888,
+        "bottom": 1740,
+        "width": 3840,
+        "height": 1080
+      },
+      "viewport": {
+        "width": 3840,
+        "height": 1080
+      },
+      "zoom": 1,
+      "control": null,
+      "build": {
+        "sha": "3b09971",
+        "time": "2026-08-22T09:13:10.017Z",
+        "dirty": false
+      }
+    }
+  ]
+}
