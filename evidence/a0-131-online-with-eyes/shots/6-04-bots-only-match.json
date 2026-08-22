@@ -1,0 +1,92 @@
+{
+  "menu": {
+    "screen": "online",
+    "matchStarted": true
+  },
+  "online": {
+    "visible": false,
+    "screen": "home",
+    "status": "connecting",
+    "title": "JOINED · SEAT 1",
+    "error": "",
+    "notice": "",
+    "code": "",
+    "resolvedCode": "W7DS",
+    "joinMode": "browse",
+    "browseRows": [],
+    "browseStamp": "",
+    "browseEmpty": [],
+    "regionLine": "IAD —",
+    "regionPickerVisible": false
+  },
+  "lobby": {
+    "visible": false,
+    "online": true,
+    "room": "W7DS",
+    "you": 0,
+    "isHost": true,
+    "humanCount": 1,
+    "mode": "ffa",
+    "size": 4,
+    "abundance": "scarce",
+    "claim": "PUBLIC",
+    "selectedClass": "vanguard",
+    "seatStates": [
+      {
+        "index": 0,
+        "label": "TAKEN",
+        "live": false
+      },
+      {
+        "index": 1,
+        "label": "BOT",
+        "live": false
+      },
+      {
+        "index": 2,
+        "label": "BOT",
+        "live": false
+      },
+      {
+        "index": 3,
+        "label": "BOT",
+        "live": false
+      },
+      {
+        "index": 4,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 5,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 6,
+        "label": "OPEN",
+        "live": false
+      },
+      {
+        "index": 7,
+        "label": "OPEN",
+        "live": false
+      }
+    ],
+    "worldMapId": "octagon",
+    "worldCast": [
+      null,
+      "rusty",
+      "bolt",
+      "foreman"
+    ]
+  },
+  "badge": {
+    "text": "01a8353 · 4d891e33 (iad)",
+    "visible": true,
+    "server": {
+      "machine": "4d891e33b27a95",
+      "region": "iad"
+    }
+  }
+}

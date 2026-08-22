@@ -1,0 +1,28 @@
+{
+  "menu": {
+    "screen": "online",
+    "matchStarted": false
+  },
+  "online": {
+    "visible": true,
+    "screen": "join",
+    "status": "error",
+    "title": "REFUSED: match-live — that match already started",
+    "error": "REFUSED: match-live",
+    "notice": "",
+    "code": "C7TV",
+    "resolvedCode": "C7TV",
+    "joinMode": "code",
+    "browseRows": [],
+    "browseStamp": "",
+    "browseEmpty": [],
+    "regionLine": "IAD —",
+    "regionPickerVisible": false
+  },
+  "lobby": null,
+  "badge": {
+    "text": "01a8353",
+    "visible": true,
+    "server": null
+  }
+}

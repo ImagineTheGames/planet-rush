@@ -1,0 +1,58 @@
+{
+  "host": {
+    "menu": {
+      "screen": "menu",
+      "matchStarted": false
+    },
+    "online": {
+      "visible": false,
+      "screen": "home",
+      "status": "idle",
+      "title": "MINE · DEFEND · ATTACK",
+      "error": "",
+      "notice": "",
+      "code": "",
+      "resolvedCode": null,
+      "joinMode": "browse",
+      "browseRows": [],
+      "browseStamp": "",
+      "browseEmpty": [],
+      "regionLine": "",
+      "regionPickerVisible": false
+    },
+    "lobby": null,
+    "badge": {
+      "text": "01a8353",
+      "visible": true,
+      "server": null
+    }
+  },
+  "joiner": {
+    "menu": {
+      "screen": "menu",
+      "matchStarted": false
+    },
+    "online": {
+      "visible": false,
+      "screen": "home",
+      "status": "idle",
+      "title": "MINE · DEFEND · ATTACK",
+      "error": "",
+      "notice": "",
+      "code": "",
+      "resolvedCode": null,
+      "joinMode": "browse",
+      "browseRows": [],
+      "browseStamp": "",
+      "browseEmpty": [],
+      "regionLine": "",
+      "regionPickerVisible": false
+    },
+    "lobby": null,
+    "badge": {
+      "text": "01a8353",
+      "visible": true,
+      "server": null
+    }
+  }
+}
