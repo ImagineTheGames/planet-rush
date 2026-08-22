@@ -307,10 +307,19 @@ export function nextViewZoom(step: number, steps: readonly number[] = VIEW_ZOOM_
   return ladder[(i + 1) % ladder.length] as number;
 }
 
-/** The label a zoom step wears on the control — `1×`, `1.5×`, `2×`. Trailing
- *  zeroes are dropped so 1.5 does not read as `1.50×`. */
+/**
+ * The label a zoom step wears on the control — `1×`, `1.5×`, `2×`. Trailing
+ * zeroes are dropped so 1.5 does not read as `1.50×`.
+ *
+ * It labels the rung it is HANDED rather than seating it on a ladder first
+ * (a0-134). The caller is the HUD, drawing the rung the camera is actually on,
+ * and a readout that quietly re-seats its own input is a readout that can print a
+ * view the player is not looking at — which is the class of bug this whole file
+ * is now about. The only guard left is against a number that is not one:
+ * `undefined×` on a HUD whose host has not fed it a rung yet.
+ */
 export function viewZoomLabel(step: number): string {
-  const s = normaliseZoom(step);
+  const s = Number.isFinite(step) && step > 0 ? step : DEFAULT_VIEW_ZOOM;
   return `${Number(s.toFixed(2))}×`;
 }
 
