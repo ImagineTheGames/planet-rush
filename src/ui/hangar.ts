@@ -65,7 +65,8 @@ import type { Rect, Viewport } from '@platform/layout-registry';
 import type { ShipClass } from '@shared/types';
 import { COLUMN, plateHeight, rowHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole, PlateScale, PlateState } from '../art/materials';
-import { beamContent, gantryFrame, menuColumnWidth } from './gantry';
+import { bandOverflow, beamContent, gantryFrame, menuColumnWidth } from './gantry';
+import { clearBuildStamp } from './build-stamp';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { CLASS_OPTIONS } from './lobby';
@@ -470,16 +471,26 @@ export function hangarLayout(viewport: Viewport, options: HangarLayoutOptions = 
   const footerStrip = beamContent(frame.footer, metrics, 'footer');
   const backHeight = Math.min(plateHeight('compact', metrics), footerStrip.height);
   const backWidth = Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width);
-  const back: Rect = {
-    x: footerStrip.x + footerStrip.width - backWidth,
-    y: footerStrip.y + (footerStrip.height - backHeight) / 2,
-    width: Math.max(0, backWidth),
-    height: Math.max(0, backHeight),
-  };
+  // Lifted clear of the build stamp's row (a0-129, `./build-stamp`). This plate is
+  // bolted to the TRAILING end, so it clears the stamp by construction on any
+  // screen wide enough — but it is 300px at the reference, and on a portrait
+  // handset a 300px plate crosses the midline into the corner the stamp owns.
+  const back = clearBuildStamp(
+    {
+      x: footerStrip.x + footerStrip.width - backWidth,
+      y: footerStrip.y + (footerStrip.height - backHeight) / 2,
+      width: Math.max(0, backWidth),
+      height: Math.max(0, backHeight),
+    },
+    frame.stamp,
+  );
 
   // The band, capped at the same column the other screens use so a 4K desktop
   // does not stretch the hangar across a metre of glass.
-  const band = frame.band;
+  const band: Rect = {
+    ...frame.band,
+    height: Math.max(0, frame.band.height - bandOverflow(frame, back)),
+  };
   // Absolutely AND proportionally capped ({@link ./gantry} `menuColumnWidth`), the
   // same ceiling the title and settings screens take. The absolute is this
   // screen's own — two panes want more room than one stack of plates — and the
@@ -565,3 +576,8 @@ export const HANGAR_BAY_PLATE: { role: PlateRole; scale: PlateScale } = { role: 
 
 /** The hangar's layout-registry id: it owns the screen. */
 export const HANGAR_ID = 'hangar';
+
+/** BACK's own registry id (a0-129). Trailing-aligned, so it clears the stamp on
+ *  any screen wide enough — and it is a 300px plate, so a portrait handset is
+ *  not one of them. */
+export const HANGAR_BACK_ID = 'hangar-back';

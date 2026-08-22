@@ -53,7 +53,10 @@ import {
   settingsLayout,
   volumeButtons,
 } from './settings';
+import { SETTINGS_DONE_ID } from './settings';
 import type { SettingsLayout, SettingsModel, SettingsRowView, SettingsTarget } from './settings';
+import { FOOTER_PLATE_TRAILING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 import type { Insets } from './menu-geometry';
 import { CodexHintView } from './codex-hint-view';
 import { ScreenCache } from './screen-cache';
@@ -194,9 +197,17 @@ export class SettingsView extends Container {
     return settingsHitTest(this.layout, x, y);
   }
 
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: SETTINGS_ID, anchor: SETTINGS_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: SETTINGS_ID, anchor: SETTINGS_ANCHOR, bounds: { ...this.layout.content } },
+      { id: SETTINGS_DONE_ID, anchor: FOOTER_PLATE_TRAILING_ANCHOR, bounds: { ...this.layout.back } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   update(model: SettingsModel): void {

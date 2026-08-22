@@ -35,9 +35,10 @@
  * unit-tests headless like the rest of `src/ui/`.
  */
 
-import type { Rect, Viewport } from '@platform/layout-registry';
+import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, REFERENCE_VIEWPORT, TOUCH_MIN, beamContentInset, frameMetrics, plateHeight } from '../art/materials';
 import type { BeamKind, FrameMetrics, PlateRole, PlateScale } from '../art/materials';
+import { buildStampRow, clearBuildStamp } from './build-stamp';
 import type { Insets } from './menu-geometry';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,17 @@ export interface GantryFrame {
   readonly content: Rect;
   /** The band between the two beams and their gutters — where the plates live. */
   readonly band: Rect;
+  /**
+   * The row along the bottom edge the build stamp owns (`./build-stamp`
+   * `buildStampRow`) — resolved off the RAW viewport, because the badge corners
+   * itself off the logical viewport rather than off the safe area.
+   *
+   * It is part of the frame and not a thing each screen resolves for itself for
+   * the reason a0-129 was filed: the stamp is on every page, so the corner it
+   * occupies is furniture of the frame in the same way the beams are, and a
+   * screen that had to remember to look it up is a screen that can forget to.
+   */
+  readonly stamp: Rect;
 }
 
 /** Non-negative safe-area inset, defaulting to zero. */
@@ -114,7 +126,7 @@ export function gantryFrame(viewport: Viewport, insets?: Insets): GantryFrame {
     height: Math.max(0, bandBottom - bandTop),
   };
 
-  return { metrics, header, footer, content, band };
+  return { metrics, header, footer, content, band, stamp: buildStampRow(viewport) };
 }
 
 /**
@@ -186,6 +198,15 @@ export function beamPlate(
  * from its band, and it is zero on every viewport whose beam is already tall
  * enough — which is every desktop and every phone in landscape.
  *
+ * **And it keeps off the build stamp** (a0-129). The beam runs to the bottom of
+ * the frame, and so does the stamp's row (`./build-stamp`), so a plate centred in
+ * the beam lands on the tag: a0-127 measured 55% of it under MAP SELECT's BACK,
+ * with the plate's accent bar across the last character. The plate is bottom-
+ * limited by {@link GantryFrame.stamp} rather than by the beam's own edge and
+ * grows upward out of the difference — the same movement, charged to the same
+ * band, that the thumb floor above already makes. `./build-stamp` argues at
+ * length why the plate is what yields and why it yields on this axis.
+ *
  * `align` picks the end of the beam: `leading` for a BACK plate, `trailing` for an
  * action (the settings screen's DONE, the lobby's RUSH!).
  */
@@ -203,15 +224,65 @@ export function beamActionPlate(
       frame.footer.height + m.gutter + frame.band.height,
     ),
   );
-  const overflow = Math.max(0, height - (frame.footer.height + m.gutter));
   const bottom = frame.footer.y + frame.footer.height;
   // Centred in the beam where it fits; bottom-aligned and growing up where it does
-  // not — never past the safe-area edge below it.
-  const y = Math.min(strip.y + (strip.height - height) / 2, bottom - height);
+  // not — never past the safe-area edge below it — and then lifted clear of the
+  // stamp's row, which on a short beam is the constraint that actually binds.
+  const centred = Math.min(strip.y + (strip.height - height) / 2, bottom - height);
   const w = Math.max(0, Math.min(width, strip.width));
   const x = align === 'leading' ? strip.x : strip.x + strip.width - w;
-  return { rect: { x, y, width: w, height }, overflow };
+  const rect = clearBuildStamp({ x, y: centred, width: w, height }, frame.stamp);
+  return { rect, overflow: bandOverflow(frame, rect) };
 }
+
+/**
+ * How far a footer plate reaches ABOVE the band's bottom edge — the pixels the
+ * band has to give up so the two do not land on each other.
+ *
+ * Stated as a function of the placed rect rather than as arithmetic on the plate
+ * height, which is what it was before a0-129. The two agreed exactly while the
+ * only reason a plate left its beam was the thumb floor; they stop agreeing the
+ * moment a second rule can raise it (the stamp's row), and a band charged for
+ * one lift but not the other is how a screen quietly grows its next overlap.
+ *
+ * Zero on every viewport whose beam already holds its plate — which is every
+ * desktop, and every phone in landscape until the stamp's row bites.
+ */
+export function bandOverflow(frame: GantryFrame, plate: Rect): number {
+  if (plate.width <= 0 || plate.height <= 0) return 0;
+  return Math.max(0, frame.band.y + frame.band.height - plate.y);
+}
+
+// ---------------------------------------------------------------------------
+// What a footer plate declares to the layout registry (a0-129)
+// ---------------------------------------------------------------------------
+
+/**
+ * The anchor a plate bolted to the **leading** end of a footer beam declares —
+ * BACK, on every screen that carries one.
+ *
+ * `bottom-left` is the real claim and it is kept: a leading footer plate starts
+ * at the beam's own content inset and is at most 140px wide at the reference, so
+ * it is inside the left half of the frame on every profile in
+ * `./hud-geometry.test.ts`'s matrix, down to a 320px screen. It is also, and not
+ * coincidentally, the region the build stamp declares — which is the whole of
+ * a0-129 in one line, and now something a registry reader can see.
+ */
+export const FOOTER_PLATE_LEADING_ANCHOR: AnchorSpec = { region: 'bottom-left', margin: 0 };
+
+/**
+ * …and the anchor a plate bolted to the **trailing** end declares: `full`.
+ *
+ * Not `bottom-right`, and the reason is measured rather than cautious. The
+ * trailing plates are the wide ones — DONE and the hangar's BACK are 300px at the
+ * reference, RUSH! is 189px — and a 300px plate right-aligned in a 390px beam
+ * starts at x=120, which is left of the midline where the `bottom-right` zone
+ * begins. Four of the nine profiles fail containment for that reason, on a screen
+ * where nothing is wrong: the plate is as far right as a beam that wide can put
+ * it. `full` is the anchor that makes no promise it cannot keep — the same call
+ * the onboarding prompt makes, and for the same reason (`./anchor-reach` §1).
+ */
+export const FOOTER_PLATE_TRAILING_ANCHOR: AnchorSpec = { region: 'full', margin: 0 };
 
 // ---------------------------------------------------------------------------
 // The column — how much of the band a menu's content may claim

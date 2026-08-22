@@ -42,7 +42,9 @@ import {
 import type { FrameMetrics } from '../art/materials';
 import type { AnchorSpec, LayoutEntry, Viewport } from '@platform/layout-registry';
 import { PALETTE } from '@render/index';
-import { SHIP_SELECT_ID, shipSelectHitTest, shipSelectLayout } from './ship-select';
+import { SHIP_SELECT_BACK_ID, SHIP_SELECT_ID, shipSelectHitTest, shipSelectLayout } from './ship-select';
+import { FOOTER_PLATE_LEADING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 import type { ShipSelectLayout, ShipSelectModel, ShipSelectTarget } from './ship-select';
 import type { Insets } from './menu-geometry';
 import { createClassTileNodes, drawClassTile, hideClassTile } from './class-tile-view';
@@ -119,9 +121,17 @@ export class ShipSelectView extends Container {
   }
 
   /** The layout-registry seam: while up, this screen owns the display. */
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: SHIP_SELECT_ID, anchor: SHIP_SELECT_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: SHIP_SELECT_ID, anchor: SHIP_SELECT_ANCHOR, bounds: { ...this.layout.content } },
+      { id: SHIP_SELECT_BACK_ID, anchor: FOOTER_PLATE_LEADING_ANCHOR, bounds: { ...this.layout.back } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   /** Show or hide the whole screen. Invalidates the cache on a change, so the

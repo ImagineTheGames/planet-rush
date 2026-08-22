@@ -98,6 +98,65 @@ export interface ExclusionViolation {
  * on all of those and teach everyone to ignore it. An exclusion is a claim about
  * two specific elements, and it is added when there is a reason.
  */
+/**
+ * **The plates a menu bolts to a footer beam** — the corner the build stamp has
+ * been drawn in on every page since M10 (a0-129).
+ *
+ * A list rather than ten hand-written rows, because the argument is one argument
+ * and repeating it ten times would only let the tenth copy drift. `./build-stamp`
+ * carries it in full; the short form is that the stamp is a fixed corner mark
+ * whose WIDTH grows at runtime (a welcomed session appends the server and the
+ * round trip), so a control cannot be placed to clear it sideways, and the footer
+ * beam is the ground the stamp was ratified to sit on — `./main-menu`'s own
+ * layout says so, and the main menu, which bolts nothing to that beam, is the one
+ * screen this never happened on.
+ *
+ * The ids are literals rather than imports for this file's standing reason: it is
+ * written in the registry's own vocabulary and imports nothing from the screens
+ * it arbitrates, so it can be lifted into `@platform/layout-registry` unchanged.
+ * Each id is `export`ed by the screen that registers it (`MAP_SELECT_BACK_ID`,
+ * `LOBBY_LEAVE_ID`, …) and `./hud-geometry.test.ts` pins the list against them.
+ */
+export const MENU_FOOTER_PLATE_IDS: readonly string[] = [
+  'map-select-back',
+  'ship-select-back',
+  'codex-back',
+  'hangar-back',
+  'settings-done',
+  'lobby-leave',
+  'lobby-rush',
+  'lobby-entry-back',
+  'lobby-entry-erase',
+  'lobby-entry-submit',
+];
+
+/**
+ * One row per plate in {@link MENU_FOOTER_PLATE_IDS}: it may not share pixels
+ * with the build stamp.
+ *
+ * **Why this is an exclusion and not a reach reservation.** `./anchor-reach`
+ * already knows the stamp — `ARROW_KEEPOUT_IDS` names it, and
+ * `LAYOUT_RESERVATIONS` records the one lift it takes. But a reservation is
+ * about ONE element's distance from an EDGE, and this is a claim about two
+ * elements sharing pixels: a plate can sit at exactly its margin, satisfy every
+ * edge promise it made, and still be under the tag. That is the gap a0-100 opened
+ * this table for, one screen family over.
+ *
+ * The gap is `READOUT_KEEPOUT_PAD`'s reason, not its number: a plate is a surface
+ * rather than a run of type, so edge-to-edge really is enough here — a stamp that
+ * ends where a plate begins is a stamp on the beam, which is where it belongs.
+ */
+export const BUILD_STAMP_EXCLUSIONS: readonly LayoutExclusion[] = MENU_FOOTER_PLATE_IDS.map(
+  (id): LayoutExclusion => ({
+    a: 'build-badge',
+    b: id,
+    why:
+      'the build stamp is a fixed corner mark on every page (M10) whose width grows ' +
+      'when a session is welcomed, so a footer plate cannot clear it sideways — it ' +
+      'clears it upward (`./build-stamp`, a0-129)',
+  }),
+);
+
 export const LAYOUT_EXCLUSIONS: readonly LayoutExclusion[] = [
   {
     a: 'onboarding',
@@ -120,6 +179,8 @@ export const LAYOUT_EXCLUSIONS: readonly LayoutExclusion[] = [
     // day one of them moves, the prompt still has to clear both.
     why: 'the upgrade wheel is the same deliberate surface one level deeper (a0-100)',
   },
+  // a0-129, one row per menu footer plate — see {@link BUILD_STAMP_EXCLUSIONS}.
+  ...BUILD_STAMP_EXCLUSIONS,
 ];
 
 // ---------------------------------------------------------------------------

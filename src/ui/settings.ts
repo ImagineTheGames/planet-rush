@@ -30,7 +30,8 @@ import type { ControlScheme, DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, gantryFrame, menuColumnBand, menuColumnWidth } from './gantry';
+import { bandOverflow, beamContent, gantryFrame, menuColumnBand, menuColumnWidth } from './gantry';
+import { clearBuildStamp } from './build-stamp';
 import { FONT_HEADING } from './typography';
 import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
@@ -1109,14 +1110,24 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
   const footerStrip = beamContent(frame.footer, metrics, 'footer');
   const backHeight = Math.min(plateHeight('compact', metrics), footerStrip.height);
   const backWidth = Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width);
-  const back: Rect = {
-    x: footerStrip.x + footerStrip.width - backWidth,
-    y: footerStrip.y + (footerStrip.height - backHeight) / 2,
-    width: Math.max(0, backWidth),
-    height: Math.max(0, backHeight),
-  };
+  // Lifted clear of the build stamp's row (a0-129, `./build-stamp`). This plate is
+  // bolted to the TRAILING end, so it clears the stamp by construction on any
+  // screen wide enough — but it is 300px at the reference, and on a portrait
+  // handset a 300px plate crosses the midline into the corner the stamp owns.
+  const back = clearBuildStamp(
+    {
+      x: footerStrip.x + footerStrip.width - backWidth,
+      y: footerStrip.y + (footerStrip.height - backHeight) / 2,
+      width: Math.max(0, backWidth),
+      height: Math.max(0, backHeight),
+    },
+    frame.stamp,
+  );
 
-  const band = frame.band;
+  const band: Rect = {
+    ...frame.band,
+    height: Math.max(0, frame.band.height - bandOverflow(frame, back)),
+  };
   const rowH = rowHeight(metrics);
   const gap = metrics.rowGap;
   // Absolutely AND proportionally capped, the same ceiling the title screen uses
@@ -1244,4 +1255,8 @@ export function settingsHitTest(layout: SettingsLayout, x: number, y: number): S
 
 /** The settings screen's layout-registry id and anchor: it owns the screen. */
 export const SETTINGS_ID = 'settings';
+
+/** DONE's own registry id (a0-129) — the hangar's plate one screen over, with
+ *  the same width and therefore the same narrow-screen reach across the midline. */
+export const SETTINGS_DONE_ID = 'settings-done';
 export const SETTINGS_FONT = FONT_HEADING;

@@ -68,6 +68,8 @@ import type { EntryCodeCell, EntryDoorView, EntryModel, EntrySegmentView } from 
 import { LobbyBrowserView } from './lobby-browser-view';
 import type { BrowseModel } from './lobby-browser';
 import { entryHitTest, entryLayout } from './lobby-geometry';
+import { FOOTER_PLATE_LEADING_ANCHOR, FOOTER_PLATE_TRAILING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 import type { EntryLayout, EntryTarget, Insets } from './lobby-geometry';
 import { ScreenCache } from './screen-cache';
 import { FONT_BODY, FONT_HEADING } from './typography';
@@ -110,6 +112,12 @@ const EYEBROW_GAP = 4;
 
 /** The entry screen's layout-registry id and anchor: it owns the screen. */
 export const ENTRY_ID = 'lobby-entry';
+
+/** The doors/keypad footer row's registry ids (a0-129). Three plates in one
+ *  beam, and on a narrow phone all three reach the build stamp's corner. */
+export const ENTRY_BACK_ID = 'lobby-entry-back';
+export const ENTRY_ERASE_ID = 'lobby-entry-erase';
+export const ENTRY_SUBMIT_ID = 'lobby-entry-submit';
 export const ENTRY_ANCHOR: AnchorSpec = { region: 'full' };
 
 interface DoorNodes {
@@ -293,9 +301,19 @@ export class LobbyEntryView extends Container {
   }
 
   /** The layout-registry seam (`LayoutContributor`), same as `./lobby-view`. */
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: ENTRY_ID, anchor: ENTRY_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: ENTRY_ID, anchor: ENTRY_ANCHOR, bounds: { ...this.layout.content } },
+      { id: ENTRY_BACK_ID, anchor: FOOTER_PLATE_LEADING_ANCHOR, bounds: { ...this.layout.back } },
+      { id: ENTRY_ERASE_ID, anchor: FOOTER_PLATE_TRAILING_ANCHOR, bounds: { ...this.layout.erase } },
+      { id: ENTRY_SUBMIT_ID, anchor: FOOTER_PLATE_TRAILING_ANCHOR, bounds: { ...this.layout.submit } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   /**

@@ -89,6 +89,9 @@ import type {
   CodexTarget,
 } from './codex';
 import type { Insets } from './menu-geometry';
+import { CODEX_BACK_ID } from './codex';
+import { FOOTER_PLATE_LEADING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 
 export const CODEX_ANCHOR: AnchorSpec = { region: 'full' };
 
@@ -301,9 +304,17 @@ export class CodexView extends Container {
     this.detailScroll = clamp(this.detailScroll + dy, 0, max);
   }
 
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: CODEX_ID, anchor: CODEX_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: CODEX_ID, anchor: CODEX_ANCHOR, bounds: { ...this.layout.content } },
+      { id: CODEX_BACK_ID, anchor: FOOTER_PLATE_LEADING_ANCHOR, bounds: { ...this.layout.back } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   update(model: CodexModel): void {

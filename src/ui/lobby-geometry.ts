@@ -108,7 +108,8 @@ import {
   valueChipHeight,
 } from '../art/materials';
 import type { FrameMetrics, PlateScale } from '../art/materials';
-import { beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
+import { bandOverflow, beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
+import { clearBuildStamp } from './build-stamp';
 import { contentTopBelow, refusalStrip } from './refusal-strip';
 
 // ---------------------------------------------------------------------------
@@ -1155,7 +1156,26 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       frame.footer.height + metrics.gutter + frame.band.height,
     ),
   );
-  const actionOverflow = Math.max(0, actionHeight - (frame.footer.height + metrics.gutter));
+  // Where that row actually lands: centred in the beam, bottom-aligned where the
+  // beam is shorter than the plate — and then lifted clear of the build stamp's
+  // row (a0-129, `./build-stamp`), which owns the bottom-left corner of this
+  // screen as it does every other. BACK is the plate that was sitting on it.
+  const footerStrip = beamContent(frame.footer, metrics, 'footer');
+  const footerBottom = frame.footer.y + frame.footer.height;
+  const actionRow = clearBuildStamp(
+    {
+      x: footerStrip.x,
+      y: Math.min(
+        footerStrip.y + (footerStrip.height - actionHeight) / 2,
+        footerBottom - actionHeight,
+      ),
+      width: footerStrip.width,
+      height: actionHeight,
+    },
+    frame.stamp,
+  );
+  const actionY = actionRow.y;
+  const actionOverflow = bandOverflow(frame, actionRow);
   const band: Rect = {
     ...frame.band,
     height: Math.max(0, frame.band.height - actionOverflow),
@@ -1185,12 +1205,6 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // centred in it is bottom-aligned instead and grows upward — never past the
   // safe-area edge below it, and never into the band, which gave up exactly that
   // many pixels above.
-  const footerStrip = beamContent(frame.footer, metrics, 'footer');
-  const footerBottom = frame.footer.y + frame.footer.height;
-  const actionY = Math.min(
-    footerStrip.y + (footerStrip.height - actionHeight) / 2,
-    footerBottom - actionHeight,
-  );
   const backWidth = Math.max(0, Math.min(scaled(LOBBY_BACK_WIDTH, metrics), footerStrip.width));
   const leave: Rect = { x: footerStrip.x, y: actionY, width: backWidth, height: actionHeight };
   const rushWidth = Math.max(
@@ -1879,39 +1893,59 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const squeeze = wanted > 0 ? Math.min(1, room / wanted) : 0;
   const plateW = (reference: number): number =>
     Math.max(0, Math.min(Math.floor(reference * m.plateScale * squeeze), footerStrip.width));
-  const back = beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH));
-  const submit = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH));
-  const erase = beamPlate(
-    footerStrip,
-    m,
-    'trailing',
-    plateW(ENTRY_ERASE_WIDTH),
-    'compact',
-    submit.width + footerGutter,
+  // All three lifted clear of the build stamp's row together (a0-129,
+  // `./build-stamp`). Together and not just BACK: they are one row of plates in
+  // one beam, and a row whose three plates sit at two heights is not a row. On a
+  // narrow portrait phone the stamp's zone reaches past ERASE, so the two that
+  // move for their own sake would have moved anyway.
+  const lift = (r: Rect): Rect => clearBuildStamp(r, frame.stamp);
+  const back = lift(beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH)));
+  const submit = lift(beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH)));
+  const erase = lift(
+    beamPlate(
+      footerStrip,
+      m,
+      'trailing',
+      plateW(ENTRY_ERASE_WIDTH),
+      'compact',
+      submit.width + footerGutter,
+    ),
+  );
+  /** What the lift costs the band below — see `./gantry` `bandOverflow`. */
+  const footerOverflow = Math.max(
+    bandOverflow(frame, back),
+    bandOverflow(frame, submit),
+    bandOverflow(frame, erase),
   );
 
   // --- The band both screens divide ----------------------------------------
+  // Short by whatever the footer row's lift took off its bottom, which is air
+  // between the band and the beam by construction plus whatever the band lends.
+  const band: Rect = {
+    ...frame.band,
+    height: Math.max(0, frame.band.height - footerOverflow),
+  };
   const messageHeight = Math.min(
-    frame.band.height,
+    band.height,
     Math.max(0, Math.round(ENTRY_MESSAGE_HEIGHT * m.scale)),
   );
   const message: Rect = {
-    x: frame.band.x,
-    y: frame.band.y,
-    width: frame.band.width,
+    x: band.x,
+    y: band.y,
+    width: band.width,
     height: messageHeight,
   };
   // a0-114: a refusal's own buttons are a fixed DOM surface that lands between the
   // message and the doors, and until this line the doors were laid out straight
   // through it. The strip is claimed FIRST and the band resumes below it, so the
   // plate a thumb is aimed at is the plate it hits.
-  const refusal = refusalStrip({ message, band: frame.band, gutter: m.gutter, height: refusalHeight });
+  const refusal = refusalStrip({ message, band, gutter: m.gutter, height: refusalHeight });
   const middleY = contentTopBelow(message, refusal, m.gutter);
   const middle: Rect = {
-    x: frame.band.x,
+    x: band.x,
     y: middleY,
-    width: frame.band.width,
-    height: Math.max(0, frame.band.y + frame.band.height - middleY),
+    width: band.width,
+    height: Math.max(0, band.y + band.height - middleY),
   };
 
   const doors: Rect[] = [];

@@ -387,3 +387,7 @@ export function shipSelectHitTest(
 
 /** The screen's layout-registry id: it owns the screen while it is up. */
 export const SHIP_SELECT_ID = 'ship-select';
+
+/** BACK's own registry id — the same plate, the same corner and the same
+ *  arbitration as `./map-select` `MAP_SELECT_BACK_ID` (a0-129). */
+export const SHIP_SELECT_BACK_ID = 'ship-select-back';

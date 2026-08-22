@@ -312,3 +312,10 @@ export function mapSelectHitTest(
 
 /** The screen's layout-registry id: it owns the screen while it is up. */
 export const MAP_SELECT_ID = 'map-select';
+
+/** BACK's own registry id (a0-129). A screen that registers only its content box
+ *  tells the overlap sweep the screen is on and nothing about what is on it —
+ *  and the plate this screen bolts to the footer beam is the one that was drawn
+ *  across the build stamp. The plate registers so the pair can be arbitrated
+ *  (`./layout-exclusions`, `./build-stamp`). */
+export const MAP_SELECT_BACK_ID = 'map-select-back';

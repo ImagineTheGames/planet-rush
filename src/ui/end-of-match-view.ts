@@ -70,6 +70,7 @@ import type { Insets } from './menu-geometry';
 import { SUMMARY_MATCH_TIME_LABEL } from './summary-sequence';
 import type { SummaryFrame } from './summary-sequence';
 import { ScreenCache } from './screen-cache';
+import { buildStampEntry } from './build-stamp';
 
 export const END_OF_MATCH_ANCHOR: AnchorSpec = { region: 'full' };
 
@@ -209,9 +210,18 @@ export class EndOfMatchView extends Container {
     return endOfMatchHitTest(this.layout, x, y, this.buttonIds);
   }
 
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: END_OF_MATCH_ID, anchor: END_OF_MATCH_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: END_OF_MATCH_ID, anchor: END_OF_MATCH_ANCHOR, bounds: { ...this.layout.content } },
+      // The buttons are a stack centred in the band and have never reached the
+      // bottom corners; the overlay registers its content box as it always has.
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   /**
