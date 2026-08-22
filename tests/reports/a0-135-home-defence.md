@@ -29,8 +29,9 @@ situation where retreating is not merely passive but actively losing the match.
 | Home NOT threatened (`field` board) | **byte-identical** before and after |
 | a0-107's own `park@580` cell, QA's harness | **unchanged**, every character |
 | `last-stand` control (core 0.2) | **unchanged** |
-| Match length | mean 797s → **823s** (2v2 sweep); 0 timeouts |
-| Win rates | see §7 |
+| Match length | means unmoved (809→812 s, 813→806 s); **0 timeouts**; 126/128 and 96/96 matches in band — the two that are not are §7.3 |
+| Win rates | inside the band on both contests; the Hard **ordering** reshuffles (Sable 24.0→39.6%, Vulture 39.6→27.1%), attributed in §7.1 |
+| Outside the bot lane | two seed-locked cases re-measured, a0-81's protocol, §5 |
 
 ---
 
@@ -261,6 +262,8 @@ name, in the a0-105 block, on the field board that block is now staged on.
 | `src/bots/ffa-parity.test.ts` | three golden hashes | Eighth move. Bite re-proved first (§6). |
 | `src/bots/team-winning.test.ts` | `is not a fixed side that wins` | Tipped a null into a set of winning teams. Two of sixteen matches now end as a0-113 **draws**; the cell counts them separately and asserts no match **timed out**, which is the finding that would be a defect. |
 | `src/bots/team-winning.test.ts` | Task 1.7's seed, 10 → 8 | The fixture's own prescribed remedy (§6). |
+| `tests/net/online-radio.test.ts` | FFA control hash `9b587b0c` → `0c4ea31f` | **Outside the bot lane — flagged for the Netcode Engineer.** Fifth re-baseline of this literal (a0-58, a0-59, a0-81, a0-121). Answers that file's rule 3 in its own note: the call site this branch added (`behaviors.ts:1829`) reads `ctx.self.station` and the single `hostile` stamp; the ALLY-aware sites next door (`:1213`, `:1427`) are untouched. Everything the literal guards — three seats at `radio === null` at t0 and a minute in — still asserted and green. Measured twice, stable. |
+| `tests/harness/p1-08-pay.test.ts` | fixture seed 8 → 95, one case | **Outside the bot lane — flagged for its owner.** The one case whose *premise* is a property of the match: `placement` reaches `slots` only once somebody is out inside the 120 s probe. a0-81 moved it 9 → 8 for the same reason and set the standard — the replacement must clear on BOTH builds. Over a0-81's seeds 1–24 the clearing sets are now **disjoint** (7/24 before, 3/24 after), so the range widened to 96 and the standard held: exactly one seed clears on both. §7.3. |
 
 ---
 
@@ -297,4 +300,137 @@ seed **8** is the largest-margin replacement the fixture has ever carried:
 ---
 
 ## 7. Win rates and match length
+
+**Instrument** `evidence/a0-135-home-defence/win-rates.ts` — `harness/abundance.ts`'s
+`readContests` shape verbatim, every seed playing every rotation so a seat-order
+advantage cancels inside each seed. 32 seeds per contest. Raw output in
+`win-rates-before.txt` and `win-rates-after.txt`; the "before" run is the
+merge-base `5df8ec05` in a separate worktree, with `win-rates.ts` byte-identical
+to the branch copy and `harness/soak.ts` byte-identical to the merge base.
+
+This branch makes every bot defend harder, so these numbers were expected to
+move, and they did.
+
+### 7.1 Strategy contest — bot mirrors (GDD §3.8)
+
+One hull (Vanguard), the three equally-skilled Hard characters rotated across the
+eight seats. Fair share 33.3%, ceiling 55%. 96 matches per build, **0 unfinished
+on either**.
+
+| contestant | before (`5df8ec05`) | after |
+|---|---|---|
+| sable | 23/96 — 24.0% | 38/96 — **39.6%** |
+| warden | 35/96 — 36.5% | 32/96 — 33.3% |
+| vulture | 38/96 — **39.6%** | 26/96 — 27.1% |
+
+**Both builds are inside the band** — the top contestant is 39.6% on each, more
+than fifteen points clear of the 55% ceiling, and no character falls to a share
+that reads as broken. What did move is the *ordering*: Sable and Vulture swap
+ends. At this sample size SE ≈ 4.8 points, so Sable's +15.6 is about 3.2 SE and
+Vulture's −12.5 about 2.6 SE. That is too big to file as noise, so it is
+attributed rather than shrugged at.
+
+**The attribution**, measured in `evidence/a0-135-home-defence/who-stopped-running.ts`
+(the same contest with a0-112 telemetry on, leaf ticks pooled by *character*
+instead of by seat, 24 matches per build) — outputs in
+`by-character-{before,after}.txt`, as a share of each character's own observed
+ticks:
+
+| character | `retreat` | `last-stand` | `defend` | `attack` | `mine` |
+|---|---|---|---|---|---|
+| sable | 3.03% → **1.89%** | 19.63% → 27.39% | 7.78% → 7.49% | 23.97% → **23.21%** | 10.28% → 10.23% |
+| vulture | 2.19% → **1.11%** | 34.52% → **24.14%** | 6.26% → **9.35%** | 10.71% → **8.74%** | 4.05% → **3.33%** |
+| warden | 2.72% → 2.35% | 23.35% → 22.45% | 7.87% → 7.22% | 20.72% → 20.74% | 10.37% → 9.97% |
+
+`retreat` falls for all three, which is the branch working. The win column does
+not follow it — Vulture sheds the largest *relative* share of retreat and loses
+win rate — so the retreat column is not the driver, and the row that is, is
+Vulture's. Vulture spent a **third of its match in `last-stand`** before this
+branch and now spends a quarter: it is meeting attackers at its alarm ring
+(`defend` 6.26% → 9.35%, the largest defend gain of the three) instead of at its
+core. That is the ruling doing exactly what it says. It is also the character
+that can least afford the time, because the time comes out of the two columns
+Vulture converts into wins: it is the economy character (`greed` 0.9,
+`scavenge` 1.0 — the highest of the three on both), and its `attack` and `mine`
+both drop. Sable is the mirror image: `homebody` 0.2, the lowest on the board, so
+it holds its offence flat (`attack` 23.97% → 23.21%) while its two rivals pay a
+defensive tax. **This is a real re-weighting of the tuning table's characters
+against each other, not a competence change** — every character is still inside
+the band, and this is flagged for the Director in the PR as a tuning consequence
+rather than presented as a neutral result.
+
+### 7.2 Class contest (GDD §2.11)
+
+One behaviour (Sable), the four hulls rotated. Fair share 25%, ceiling 55%. 128
+matches per build, **0 unfinished on either**.
+
+| contestant | before (`5df8ec05`) | after |
+|---|---|---|
+| excavator | 59/128 — **46.1%** | 57/128 — **44.5%** |
+| vanguard | 27/128 — 21.1% | 33/128 — 25.8% |
+| hauler | 34/128 — 26.6% | 30/128 — 23.4% |
+| interceptor | 8/128 — 6.3% | 8/128 — 6.3% |
+
+Inside the band on both builds and quieter than the strategy contest: SE ≈ 3.8
+points, and the largest move is Vanguard's +4.7 (1.2 SE). The Excavator stays on
+top at 44.5%; the Interceptor's 8/128 is **identical** on both builds, which is
+worth saying out loud — the hull with the least hull to lose is the one a ruling
+about not fleeing at low hull might have been expected to move most, and it did
+not move at all.
+
+### 7.3 Match length — the one number that leaves the band, and it is two matches
+
+| contest | before | after |
+|---|---|---|
+| strategy, 96 matches | mean 809 s, min 768, max 837 | mean 812 s, min **766**, max 841 |
+| class, 128 matches | mean 813 s, min 769, max 834 | mean 806 s, min **374**, max 843 |
+
+The means are unmoved and inside the 10–15 minute target (GDD §1), and no match
+on either build timed out. **The class contest's minimum is not**: 374 s is
+6.2 minutes, well under the band's floor, and it is a number the summary line
+alone cannot settle — a min is one match and a mean is 128. It is not papered
+over here.
+
+`evidence/a0-135-home-defence/length-distribution.ts` re-runs that contest —
+same seeds, same rotations, same `runBotMatch` — printing one line per match:
+
+| | before | after |
+|---|---|---|
+| below 600 s | **0 / 128** | **2 / 128** (seeds 20001 @ 374 s, 32003 @ 464 s) |
+| above 900 s | 0 / 128 | 0 / 128 |
+| 700–800 s | 22 | 26 |
+| 800–900 s | 106 | 100 |
+| timed out | 0 | 0 |
+
+So the shape is intact — 126 of 128 in band, nothing at all between 600 s and
+700 s — and the finding is two outliers, not a shift. `short-match.ts` re-runs
+exactly those two with telemetry (`short-match-{before,after}.txt`) and the cause
+is a single column:
+
+| | seed 20001 | seed 32003 |
+|---|---|---|
+| length | 771 s → **374 s** | 822 s → **464 s** |
+| ended at | collapse (750 s) → outright, **no collapse** | collapse (750 s) → outright, **no collapse** |
+| pooled `retreat` ticks | 38,225 → **2,850** | 7,731 → **4,359** |
+| winning class | excavator → **excavator** | vanguard → **vanguard** |
+
+In seed 20001 a single seat — an Interceptor — held **31,334** of the before
+build's 38,225 retreat ticks: four fifths of the match's retreating was one bot
+orbiting the map while its home burned, alive and contesting nothing, until the
+750 s collapse timer ended the match for it. After this branch it holds its
+doorstep and dies there. **The winning class is identical on both builds in both
+seeds** — in seed 20001 the identical seat survives — so what shortened is the
+time to reach the same result, not the result. These are matches that were long
+because of the defect.
+
+The honest counter-reading, and it belongs here: on p1-08's board the sign is the
+**opposite**. That is an 8-slot scarce match, and there the first core falls
+*later* after this branch — the window at 120 s is cleared by 7 of a0-81's 24
+seeds before and 3 after (§5, and the fixture move in
+`tests/harness/p1-08-pay.test.ts`). Both readings are this branch's doing and
+they do not contradict each other: bots that hold their own doorstep make a
+station harder to finish, which lengthens a crowded board, and they stop
+producing the one-bot-orbiting-forever match that only ends on the collapse
+timer, which shortens the tail on a sparse one. The band is measured on the
+contests above, and on those it holds for 126 of 128 and 96 of 96.
 
