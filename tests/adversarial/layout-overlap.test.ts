@@ -35,7 +35,7 @@
  * of a cover by construction, and the deliberate keep-outs a0-115 established are
  * declared rows with a reason each, in the file, never a silent skip.
  *
- * ── THE FIVE ASSERTIONS ─────────────────────────────────────────────────────
+ * ── THE SIX ASSERTIONS ──────────────────────────────────────────────────────
  *
  *  1. **Nothing a player must read is covered by anything else** — the whole
  *     property, in one list, minus {@link KNOWN_COVERS}.
@@ -55,16 +55,48 @@
  *  5. **The cross-product is the full one, and every declared exception is one
  *     the sweep actually needs** — the two ways this instrument could quietly
  *     stop meaning anything.
+ *  6. **Every swept frame is a frame the game can draw** (a0-128) — the third
+ *     way, and the one that had already happened. A cross-product composes; a
+ *     game does not. See below.
+ *
+ * ── AND THE ONE THE CROSS-PRODUCT ITSELF GOT WRONG (a0-128) ─────────────────
+ *
+ * The sweep's own shape is what made D5: `wheelOpen` and `alarm` were
+ * independent booleans, two independent booleans are four screens, and the game
+ * only has three of them. 288 of the 1,896 frames — every frame of
+ * `match-alarm-wheel` — put the build wheel and the arrow home on one screen,
+ * which `src/` cannot do: the wheel opens inside `STATION.dockRange` and the
+ * arrow is drawn only once home is off the inset rect, and 160 < 164 on the
+ * tightest viewport. a0-125 spent a lane measuring 3.3 px of that overlap and
+ * a0-127 went to photograph it and could not.
+ *
+ * The fix is DERIVED, not declared: `./layout-reachable` stages a match frame
+ * from the world (where the ship's own station is, whether BUILD is held) and
+ * asks the shipped predicates what is on the glass, so the impossible frame is
+ * not excluded — it is unspellable. There is no exclusion list in `tests/` and
+ * no pair of ids is named impossible anywhere, because a hand-kept list of
+ * impossibilities rots exactly the way a0-124's dot list did.
  *
  * ── COST ────────────────────────────────────────────────────────────────────
  *
- * 1,896 frames, ~90 ms. Cheap enough to be a standing gate rather than an
+ * 1,612 frames, ~100 ms. Cheap enough to be a standing gate rather than an
  * evidence script somebody remembers to run — which is the whole difference
  * between this and the six hand measurements it replaces.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
+import { STATION } from '../../src/sim/constants';
+import { ARROW_EDGE_INSET } from '../../src/ui/alarm';
 import { CONTROLS, STATES, VIEWPORTS, baseState, sweepFrames } from './layout-frames';
+import {
+  ARROW_STAGED_RANGE,
+  arenaReach,
+  arrowIsDrawn,
+  situation,
+  unreachable,
+  wheelIsOpen,
+} from './layout-reachable';
+import type { StagedFrame } from './layout-reachable';
 import {
   LAYOUT_ALLOWANCES,
   coverLine,
@@ -75,12 +107,12 @@ import {
 import type { Cover, Frame } from './layout-model';
 
 /**
- * **The a0-122 findings, pinned — one line left of twenty-four.**
+ * **The a0-122 findings, pinned — and the list is EMPTY.**
  * `state | viewport | coverer | covered`, one line per cell that breaches today.
  *
  * a0-122 pinned five defects here because QA does not own `src/`. **a0-125 landed
- * four of the five**, and the arithmetic of that is in the list below: it was
- * twenty-four lines and it is one.
+ * four of the five, and a0-128 took the fifth off the board a different way** —
+ * by establishing that it was never on one. It was twenty-four lines; it is none.
  *
  *  1. **`fullscreen-reenter` over `station-hp`** — 462 frames, phone, every match
  *     state. **FIXED (a0-125 D1).** The affordance hugged the top-right of the
@@ -89,66 +121,53 @@ import type { Cover, Frame } from './layout-model';
  *     whether they reached the same one. The HOME column now steps left by exactly
  *     the intrusion while the button is up — `src/ui/hud-geometry.ts`
  *     `glassCornerReserve`, declared as a row in `src/ui/anchor-reach.ts`
- *     `LAYOUT_RESERVATIONS` — and the missing word the registry could not say has
- *     one: `LayoutSurface`, with `cornerRivals` as the check nobody had.
+ *     `LAYOUT_RESERVATIONS`.
  *  2. **`net-ping` over `alarm-arrow`** and
  *  3. **`build-badge` over `alarm-arrow`** — 21 and 22 frames. **FIXED (a0-125).**
  *  4. **`alarm-arrow` over `controls-strip`** — 440 of 1,440 alarm frames, desktop
  *     and both ultrawides. **FIXED (a0-125).** All three are one rule and were
  *     answered once: the arrow home gives up radius — never bearing — to clear
  *     every FIXED rect on the glass, in either direction, and may overlap only
- *     WORLD surfaces. `src/ui/layout-exclusions.ts` `ARROW_KEEPOUT_IDS`, which is
- *     deliberately not `HUD_READOUT_IDS`: that list is what a world LABEL may not
- *     enter, and its "furniture the thumb finds" argument was written about a
- *     nameplate, not about a screen mark on a desktop that has no thumb. The two
- *     stamps are `@render`/`@net` elements the HUD cannot measure, so `main.ts`
- *     hands their rects in on the frame (`HudFrame.hostChrome`).
- *  5. **`build-wheel` over `alarm-arrow`** — 38 frames, phone only, wheel open
- *     under alarm. **KEPT, and the one line below.** a0-125 measured it and found
- *     no position that fixes it:
+ *     WORLD surfaces (`src/ui/layout-exclusions.ts` `ARROW_KEEPOUT_IDS`).
+ *  5. **`build-wheel` over `alarm-arrow`** — 38 frames, phone only, "wheel open
+ *     under alarm". **WITHDRAWN (a0-128): the frame does not exist.** a0-125
+ *     measured the deepest overlap at 3.3 px and argued carefully about the one
+ *     pixel of band between the wave clock's compact row and the wheel's
+ *     footprint. a0-127 went to photograph that and could not:
  *
- *      - The yield that answered 2–4 cannot answer this one. It slides the arrow
- *        INWARD along its own ray, and the wheel is CENTRED: pulling a mark toward
- *        the middle cannot get it out of the middle. Fed the wheel's rect, the
- *        solver walks the arrow through the centre and out the far side, which is
- *        an arrow that lies about the bearing — the one thing a0-116 forbids.
- *      - On **18 of the 38 frames the arrow is not within the wheel's filled halo
- *        at all.** The registered footprint is a square that models a circle
- *        (`wheelFootprint`, 318.5 px on this phone), and at the diagonal bearings
- *        the arrow sits in a corner of that square — 213.9 px from the centre of a
- *        halo whose outermost filled band ends at 159.3. This is limit #4 of the
- *        a0-122 report, "a layout rect is not always an ink box", the same one
- *        `entry-eyebrow` over `entry-title` is carried for.
- *      - On the other 20 the arrow reaches the halo's outer bands, and on **7 of
- *        those it reaches the wheel's drawn disc — by 3.3 px, at its deepest**,
- *        with the arrow's bounding box; the triangle's own ink less than that.
- *        Those 7 are the top-centre bearings on a 384 px-tall phone, where the
- *        wave clock's own rect (a0-116, which the arrow must clear) ends 31.7 px
- *        down and the wheel's footprint begins at 32.75. **There is one pixel of
- *        band between them and the arrow is 23 px tall**: no position on that edge
- *        clears both, and the ruling that the clock wins is a0-116's, already made.
+ *     > *"THE VERDICT IS ABOUT THE PIN, NOT ABOUT THE SCREEN: nothing in these
+ *     > two frames is drawn wrongly. […] This camera went to reproduce that on the
+ *     > running build and COULD NOT, because the two elements have mutually
+ *     > exclusive conditions."*
  *
- *     So it is carried as a pin and not as an allowance, on purpose. An allowance
- *     would excuse this pair anywhere in that state, including a future frame where
- *     the arrow lands in the middle of the disc; the pin excuses exactly one cell,
- *     and it fails the day the halo's span or the clock's compact row changes the
- *     geometry that makes it unavoidable — which is when the call should be re-made.
+ *     The wheel is open only while the ship is inside `STATION.dockRange` (160 u)
+ *     of its own station — `canOpenWheel` on the sim's `isDocked`. The arrow home
+ *     is drawn only while that station is NOT already on screen, which on the
+ *     phone profile a0-127 shot means more than `384/2 − ARROW_EDGE_INSET` = 164 u
+ *     away. 160 < 164, so the disc that opens the wheel lies strictly inside the
+ *     rect that hides the arrow, and no ship position satisfies both. The pin
+ *     described a frame nobody can reach, and the sweep produced it because
+ *     `wheelOpen` and `alarm` were independent booleans in `./layout-frames`.
  *
- * The list is subtracted rather than skipped at measurement time, so a cell that
- * is pinned AND breaches for a second, unrelated reason is still only one line to
- * remove once the first is fixed.
+ *     It is **not** replaced by an exclusion row. `./layout-reachable` derives
+ *     both conditions from the one home offset, so the census can no longer spell
+ *     the frame; `every swept frame is a frame the game can draw`, below, proves
+ *     the inequality against the shipped constants over the whole docked disc.
+ *
+ * **An empty list is the honest state of this table, not a placeholder.** Five
+ * findings went in, four were fixed in `src/` and one was withdrawn as
+ * unreachable, and nothing has breached since. The assertion below still points
+ * the other way on purpose — the day a line is added it fails when the fix lands.
  */
-const KNOWN_COVERS: readonly string[] = [
-  // 5 — the wheel's halo over the arrow home. Kept, measured, argued above.
-  'match-alarm-wheel | phone-798x384 | build-wheel | alarm-arrow',
-];
+const KNOWN_COVERS: readonly string[] = [];
+
 /** The cell a finding is pinned under — the base state (variant suffix dropped,
  *  so 360 bearings pin as one line), the viewport, and the ordered pair. */
 const cell = (frame: Frame, over: string, under: string): string =>
   `${baseState(frame.state)} | ${frame.viewport} | ${over} | ${under}`;
 
 describe('a0-122 — the layout overlap sweep', () => {
-  let frames: Frame[] = [];
+  let frames: StagedFrame[] = [];
   /** Every cover, keyed by its pinnable cell, with one printable line each. */
   let breaches = new Map<string, { line: string; frames: number }>();
   /** Every nine-point probe finding, keyed the same way. */
@@ -289,6 +308,125 @@ describe('a0-122 — the layout overlap sweep', () => {
     // Every frame has something on it. A state whose builder silently returned
     // nothing would satisfy every assertion above.
     expect(frames.filter((f) => f.painted.length === 0).map((f) => f.state)).toEqual([]);
+  });
+
+  it('every swept frame is a frame the game can draw', () => {
+    // a0-128. The assertion that keeps this instrument from inventing its own
+    // findings — and it is the one the instrument had already failed. D5 measured
+    // the build wheel's halo over the arrow home to 3.3 px on a frame the running
+    // build cannot produce, because the cross-product treated `wheelOpen` and
+    // `alarm` as independent booleans and the game does not.
+    //
+    // Three claims, in the order they matter.
+
+    // ── 1. Every frame agrees with what its own stage would draw ─────────────
+    //
+    // Every swept frame carries the world it was staged from
+    // (`./layout-reachable` `Stage`), and `unreachable` re-asks the shipped
+    // predicates — `canOpenWheel` on the sim's `isDocked`, `homeArrow`'s
+    // `onScreen`, `pauseAllowsDownloadLog` — what belongs on that screen. Both
+    // directions: an element the game would not draw is a finding nobody can act
+    // on, and an element the game WOULD draw and the census left out reads
+    // exactly like an element that passed.
+    const impossible: string[] = [];
+    for (const frame of frames) {
+      const p = VIEWPORTS.find((v) => v.id === frame.viewport);
+      expect(p, `${frame.viewport} is not a swept viewport`).toBeDefined();
+      impossible.push(...unreachable(frame, (p as (typeof VIEWPORTS)[number]).vp));
+    }
+    expect(impossible).toEqual([]);
+
+    // ── 2. The wheel and the arrow are mutually exclusive, and it is arithmetic ─
+    //
+    // The non-tautological half. The census and the check above both call the
+    // same two helpers, so on their own they would only prove the helpers agree
+    // with themselves. This proves the property over the WHOLE input space
+    // instead of at the points a sweep happens to sample, and it proves it out of
+    // `src/`'s own two numbers:
+    //
+    //   the wheel opens within  STATION.dockRange
+    //   the arrow hides within  min(width, height) / 2 - ARROW_EDGE_INSET
+    //
+    // The docked disc lies strictly inside the on-screen rect on every viewport,
+    // so "wheel open" implies "home on screen" implies "no arrow" — and that is
+    // the whole of a0-127's `mutually exclusive`, as an inequality rather than as
+    // a row in a table somebody has to remember to delete.
+    const tooTight = VIEWPORTS.filter(
+      (v) => STATION.dockRange >= Math.min(v.vp.width, v.vp.height) / 2 - ARROW_EDGE_INSET,
+    ).map(
+      (v) =>
+        `${v.id}: dockRange ${STATION.dockRange} reaches the inset rect ` +
+        `(${Math.min(v.vp.width, v.vp.height) / 2 - ARROW_EDGE_INSET}) — the wheel and the arrow ` +
+        'can now be on screen together, so this sweep needs a state for it',
+    );
+    expect(tooTight).toEqual([]);
+
+    // …and the same claim by exhaustion, over the docked disc rather than over
+    // one bearing per frame: 720 bearings x 41 radii out to `dockRange`, on all
+    // four viewports, with BUILD held and the alarm up — the most favourable
+    // situation for the pair there is.
+    const together: string[] = [];
+    let wheelsInside = 0;
+    for (const v of VIEWPORTS) {
+      for (let b = 0; b < 720; b++) {
+        const bearing = (b * Math.PI) / 360;
+        for (let step = 0; step <= 40; step++) {
+          const r = (STATION.dockRange * step) / 40;
+          const sit = situation({
+            alarmFiring: true,
+            buildRequested: true,
+            home: { dx: Math.cos(bearing) * r, dy: Math.sin(bearing) * r },
+          });
+          const wheel = wheelIsOpen(sit);
+          if (wheel && step < 40) wheelsInside++;
+          if (wheel && arrowIsDrawn(sit, v.vp)) {
+            together.push(`${v.id}: wheel and arrow at bearing ${b / 2}°, ${r.toFixed(1)} u out`);
+          }
+        }
+      }
+    }
+    expect(together).toEqual([]);
+    // …and the sweep above is not vacuous: the wheel really did open on it, and
+    // the arrow really is drawable — just never on the same frame. Without these
+    // two, a `canOpenWheel` that returned false for everything would pass.
+    //
+    // Counted strictly INSIDE the rim. The last ring is at exactly
+    // `STATION.dockRange` and `isDocked` compares squared distances with `<=`, so
+    // `(cos b · r)² + (sin b · r)²` lands an ulp over `r²` on 145 of the 720
+    // bearings and the wheel shuts. That is a property of binary floating point
+    // on the boundary, not of the game — and it cuts the safe way, since a rim
+    // sample that does not open the wheel is one this check simply does not
+    // count. The rim stays in the `together` sweep above, where it is the most
+    // favourable position the pair could possibly have.
+    expect(wheelsInside).toBe(VIEWPORTS.length * 720 * 40);
+    expect(arrowIsDrawn(situation({ alarmFiring: true, home: { dx: 0, dy: -ARROW_STAGED_RANGE } }), VIEWPORTS[0]!.vp)).toBe(true);
+
+    // ── 3. The world the alarm states stand in is a world the arena can make ──
+    //
+    // The other half of "a frame the game can draw", and the sweep failed this
+    // too: it stood home 6000 u from the ship to be certain the arrow clamped to
+    // an edge, and the widest shipped arena is 3200x2000. `ARROW_STAGED_RANGE` is
+    // bracketed by two derived numbers and this is where the bracket is checked.
+    const shortOfTheEdge: string[] = [];
+    const beyondTheArena: string[] = [];
+    for (let i = 0; i < 360; i++) {
+      const bearing = (i * Math.PI) / 180;
+      const home = { dx: Math.cos(bearing) * ARROW_STAGED_RANGE, dy: Math.sin(bearing) * ARROW_STAGED_RANGE };
+      for (const v of VIEWPORTS) {
+        if (!arrowIsDrawn(situation({ alarmFiring: true, home }), v.vp)) {
+          shortOfTheEdge.push(`${v.id} @ ${i}°: home is still on screen at ${ARROW_STAGED_RANGE} u`);
+        }
+      }
+      const reach = arenaReach(home.dx, home.dy);
+      if (ARROW_STAGED_RANGE > reach) {
+        beyondTheArena.push(
+          `${i}°: staged at ${ARROW_STAGED_RANGE} u, and no shipped map can put home further ` +
+            `than ${reach.toFixed(1)} u in that direction`,
+        );
+      }
+    }
+    expect(shortOfTheEdge).toEqual([]);
+    expect(beyondTheArena).toEqual([]);
   });
 
   it('every declared exception is one this sweep actually needs', () => {

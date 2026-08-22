@@ -78,6 +78,14 @@ own CSS, marked `surface: 'dom'`, and painted above every canvas element.
 **17 states × 4 viewports × their variants = 1,896 frames, 26,803 painted
 elements, 360,750 ordered pairs.**
 
+> **Amended 2026-08-22, a0-128 — 1,612 frames.** 288 of the 1,896 were frames the
+> game cannot draw: every frame of `match-alarm-wheel` put the build wheel and the
+> arrow home on one screen, and the two have mutually exclusive conditions. That
+> state is still swept (its compact wave clock exists nowhere else) but it is one
+> frame per viewport now rather than 72, because the 72 differed only in the
+> bearing of an element that is not drawn there. Nothing else moved: every other
+> state's variant count is unchanged. See `tests/reports/a0-128-reachable.md`.
+
 Every rect comes out of the shipped geometry — `entryLayout`, `pauseLayout`,
 `settingsLayout`, `endOfMatchLayout`, `connectionStatusLayout`, `wheelFootprint`,
 `promptBounds`, `waveClockLayout`, `oreCounterLayout`, `stationHpBounds`,
@@ -144,6 +152,11 @@ so none can be quietly forgotten and none can be quietly re-broken.
 > Each heading below carries its disposition, and the rows are left standing
 > rather than struck because the measurements are what the fixes were built from.
 > Evidence for D1: `evidence/a0-125-the-corner-two-boxes-share/`.
+>
+> **a0-128 (2026-08-22): D5 is withdrawn and `KNOWN_COVERS` is empty.** Not fixed
+> — withdrawn: the frame it was measured on is not a frame the game can draw. Four
+> defects went into `src/` and one went out of the instrument, and an empty table
+> is the honest state of it rather than a placeholder.
 
 #### D1 — the re-enter-fullscreen affordance over own-station HP — **FIXED (a0-125)**
 
@@ -247,7 +260,19 @@ call gets made rather than forgotten. The phone is clean because
 > least able to hunt for. `controls-strip` is on `ARROW_KEEPOUT_IDS`; the arrow
 > clears the band and keeps its bearing bit-identical.
 
-#### D5 — the wheel's halo over the arrow home — **KEPT (a0-125), pinned**
+#### D5 — the wheel's halo over the arrow home — **WITHDRAWN (a0-128): the frame does not exist**
+
+> **Amended 2026-08-22, a0-128.** a0-127 went to photograph this pin and could
+> not, *"because the two elements have mutually exclusive conditions."* The wheel
+> is open only inside `STATION.dockRange` = 160 u of your own station; the arrow
+> home is drawn only while that station is **not** already on screen, which on this
+> 384 px-tall phone is more than `384/2 − ARROW_EDGE_INSET` = 164 u away. The disc
+> that opens the wheel lies strictly inside the rect that hides the arrow, on all
+> four viewports. The measurements below are correct about the model and describe
+> a screen that has never been drawn; they are left standing because the argument
+> that produced them is the reason the instrument now derives its states rather
+> than composing them (`tests/adversarial/layout-reachable.ts`,
+> `tests/reports/a0-128-reachable.md`).
 
 | | |
 |---|---|
@@ -349,11 +374,14 @@ guesses, said out loud.
 npx vitest run tests/adversarial/layout-overlap.test.ts
 ```
 
-1,896 frames in about 90 ms, in the standing suite — cheap enough to be a gate
+1,612 frames (1,896 before a0-128) in about 100 ms, in the standing suite —
+cheap enough to be a gate
 rather than an evidence script somebody remembers to run, which is the whole
 difference between this and the six hand measurements it replaces.
 
 To add a state: one entry in `STATES`, built from that screen's own layout
-function. To add a viewport: one row in `VIEWPORTS`. To accept a finding: delete
-its line from `KNOWN_COVERS` **and** add a row to `LAYOUT_ALLOWANCES` with the
-argument — the gate will not let you do only one of those.
+function **and a `Stage` saying how the game reaches it** (a0-128 — the gate fails
+a frame whose painted list disagrees with what its stage would draw). To add a
+viewport: one row in `VIEWPORTS`. To accept a finding: delete its line from
+`KNOWN_COVERS` **and** add a row to `LAYOUT_ALLOWANCES` with the argument — the
+gate will not let you do only one of those.
