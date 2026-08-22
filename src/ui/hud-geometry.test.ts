@@ -199,6 +199,23 @@ import type { ControlScheme } from './settings';
 import { WAVE_NAMES } from './wave-clock';
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
+// a0-134's sightline invariant is a claim about the CAMERA, so it is asserted
+// through the camera's own arithmetic and the cull's own inverse — the two
+// modules that already own "how much world is on screen" — against the reach the
+// sim publishes. Nothing about "visible" is re-derived in this file.
+import { cameraOffset } from '@platform/camera';
+import { cullBox, writeVisibleWorld } from '@render/cull';
+import { SHIP_RADIUS, WEAPON_RANGE } from '../sim/constants';
+import {
+  DEFAULT_VIEW_ZOOM,
+  VIEW_ZOOM_STEPS,
+  cameraScale,
+  minViewZoom,
+  nextViewZoom,
+  parseViewZoom,
+  seatViewZoom,
+  viewZoomSteps,
+} from './viewport';
 
 // ---------------------------------------------------------------------------
 // The device matrix — QA's playwright.config.ts profiles, both orientations,
@@ -3879,5 +3896,184 @@ describe('the build stamp on every screen it is drawn over (a0-129)', () => {
     // that stops this rule from re-laying out screens it has nothing to say about.
     const clear: Rect = { x: 10, y: 10, width: 100, height: 40 };
     expect(clearBuildStamp(clear, buildStampRow(desktop))).toBe(clear);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE SIGHTLINE (a0-134) — something that can shoot you must be drawn for you
+// ---------------------------------------------------------------------------
+//
+// a0-131 put two real clients in one match and failed on it: *"at the shipped
+// VIEW 1× the phone player is being shot by an attacker its screen does not
+// draw."* The desktop, on the same match at the same instant, drew both ships.
+//
+// This is not the comfort report a0-74 answered with the zoom control ("on pc we
+// have a larger screen, do we have any way on mobile to zoom out"). It is a
+// FAIRNESS defect: at the shipped default the two players are not playing the
+// same game, because one of them can see the fight and the other is being hit
+// from off-screen with nothing on the glass but a directionless vignette.
+//
+// THE PROPERTY, stated once: the disc of everything that can reach you must fit
+// inside the world your camera draws. Its radius is read from the sim rather
+// than typed here —
+//
+//   WEAPON_RANGE (260) : the acquisition radius auto-aim engages within
+//                        (`src/sim/step.ts`, `bestD2 = WEAPON_RANGE²`). Every
+//                        turret tier is strictly UNDER it by design rail
+//                        (Mk III = 250, `constants.ts` "the range rail is a
+//                        design invariant"), so 260 is the governing reach of
+//                        anything in the game that can shoot a ship.
+//   SHIP_RADIUS  (16)  : so what arrives on screen is the shooter's HULL and not
+//                        its last pixel column. A ship whose centre is exactly on
+//                        the edge is half-drawn, which is not "visible to you".
+//
+// so a fair view is one that shows at least 2 × 276 = 552 world units on its
+// SHORT axis. The short axis is the whole of it: a landscape phone's width was
+// never the problem (798 px is ±399 world units, comfortably past 276) and its
+// HEIGHT is (384 px is ±192).
+//
+// Measured against the shipped camera — one world unit is one CSS pixel, so the
+// half-extent is half the glass — every touch profile in the matrix fails and
+// only the desktop passes:
+//
+//   iphone/portrait   390×844  →  195     pixel/landscape   915×412  →  206
+//   iphone/landscape  844×390  →  195     desktop          1280×800  →  400  ✓
+//   qa-phone/landscape 798×384 →  192     iphone-se/portrait 375×667 →  187
+//   pixel/portrait    412×915  →  206     small/*           320×568  →  160
+//
+// It is asserted through the REAL camera path — `cameraOffset` writes the offset
+// the renderer writes, `writeVisibleWorld` inverts it exactly as the cull does —
+// rather than by re-deriving "the visible world" here, because a second notion of
+// on-screen is the bug this is about (see the header over `@render/cull`).
+describe('the sightline (a0-134)', () => {
+  /** How far from the camera target the world must be drawn, world units. */
+  const SIGHTLINE = WEAPON_RANGE + SHIP_RADIUS;
+
+  /** Somewhere unremarkable in the arena — the property is about the extent the
+   *  camera draws AROUND its target, so the target's own coordinates are free. */
+  const SHIP = { x: 1200, y: 1200 };
+
+  it('a shooter in range is never off the player screen', () => {
+    const failures: string[] = [];
+    for (const { name, vp } of PROFILES) {
+      const camera = { ...vp, originX: 0, originY: 0 };
+      // Every rung the device can actually be on, not only the one it boots at:
+      // a property a tap can put the player back outside is not a property. The
+      // ladder is the device's own (`viewZoomSteps`), which is where the fix
+      // lives — the rungs that cannot keep the sightline are not offered.
+      for (const step of viewZoomSteps(vp)) {
+        const scale = cameraScale(step, vp);
+        const seen = writeVisibleWorld(cullBox(), cameraOffset(SHIP, camera, scale), camera, scale);
+        const reach = {
+          left: SHIP.x - seen.left,
+          right: seen.right - SHIP.x,
+          up: SHIP.y - seen.top,
+          down: seen.bottom - SHIP.y,
+        };
+        const worst = Math.min(reach.left, reach.right, reach.up, reach.down);
+        if (worst < SIGHTLINE) {
+          failures.push(
+            `${name} @ VIEW ${step}×: the camera draws only ${worst.toFixed(1)} world units ` +
+              `toward its nearest edge, so a shooter as much as ${(SIGHTLINE - worst).toFixed(1)} ` +
+              `units INSIDE its own firing range is off the glass (needs ${SIGHTLINE}; sees ` +
+              `${(seen.right - seen.left).toFixed(0)}×${(seen.bottom - seen.top).toFixed(0)} ` +
+              `world units)`,
+          );
+        }
+      }
+    }
+    expect(failures, `a shooter in range is off the screen on:\n  ${failures.join('\n  ')}`).toEqual(
+      [],
+    );
+  });
+
+  // The brief's other end: *"if range is tied to the viewport, a 32:9 player sees
+  // further and shoots from outside a phone's world."* It is not tied to the
+  // viewport and this is where that is pinned — the fix moved the CAMERA, and
+  // `WEAPON_RANGE` is the same absolute number on every screen in the game.
+  it('does not let a wider screen reach further than a narrower one', () => {
+    const phone: Viewport = { width: 798, height: 384 };
+    const ultra21: Viewport = { width: 2560, height: 1080 };
+    const ultra32: Viewport = { width: 3840, height: 1080 };
+
+    // One reach, read from the sim, for every screen. If this were a fraction of
+    // the visible world it would differ per row, and the 32:9 row would out-range
+    // the phone by 4.8× — which is a0-134 pointed the other way.
+    for (const vp of [phone, ultra21, ultra32]) {
+      expect(SIGHTLINE, `${vp.width}×${vp.height}`).toBe(WEAPON_RANGE + SHIP_RADIUS);
+    }
+
+    // And the ultrawides are left exactly where a0-74 put them: their short axis
+    // (1080) already clears 552 with room to spare, so the floor withholds
+    // nothing and every shipped rung survives, `1×` included.
+    for (const vp of [ultra21, ultra32]) {
+      expect(minViewZoom(vp), `${vp.width}×${vp.height} floor`).toBeLessThan(1);
+      expect(viewZoomSteps(vp)).toEqual(VIEW_ZOOM_STEPS);
+      expect(cameraScale(DEFAULT_VIEW_ZOOM, vp)).toBe(1);
+    }
+    // Same for the desktop the a0-131 pair was shot on — the client that could
+    // already see both ships is not moved a pixel by the fix for the one that
+    // could not.
+    expect(viewZoomSteps({ width: 1280, height: 800 })).toEqual(VIEW_ZOOM_STEPS);
+    expect(cameraScale(DEFAULT_VIEW_ZOOM, { width: 1280, height: 800 })).toBe(1);
+  });
+
+  // What the fix costs, per screen, so it is read as a number rather than
+  // discovered as a feeling: the phone is widened by the SMALLEST rung that
+  // works, never more.
+  it('spends the smallest widening that works, and names where that is the last rung', () => {
+    const seated = PROFILES.map(({ name, vp }) => [name, viewZoomSteps(vp)[0]] as const);
+    expect(Object.fromEntries(seated)).toEqual({
+      'iphone/portrait': 1.5,
+      'iphone/landscape': 1.5,
+      'qa-phone/landscape': 1.5,
+      'pixel/portrait': 1.5,
+      'pixel/landscape': 1.5,
+      // The client that already drew both ships in a0-131, unchanged.
+      desktop: 1,
+      'iphone-se/portrait': 1.5,
+      // …and the smallest screens the game claims to run on (GDD §4.3) need the
+      // ladder's LAST rung. Stated here because it is the cost of the fix: on a
+      // 320 px screen there is exactly one fair view, so §2's cycle has nothing
+      // left to cycle and the control holds rather than offers.
+      'small/portrait': 2,
+      'small/landscape': 2,
+    });
+    for (const { name, vp } of PROFILES) {
+      const ladder = viewZoomSteps(vp);
+      // Never a rung the shipped ladder does not have — no new labels, no new
+      // dialect on the VIEW readout.
+      expect(ladder.every((s) => VIEW_ZOOM_STEPS.includes(s)), name).toBe(true);
+      // …and never wider than it has to be: the rung below the seated one is
+      // always one the sightline actually rejects.
+      const below = VIEW_ZOOM_STEPS.filter((s) => s < (ladder[0] as number));
+      for (const s of below) expect(s, `${name} @ ${s}×`).toBeLessThan(minViewZoom(vp));
+    }
+    expect(viewZoomSteps({ width: 320, height: 568 })).toEqual([2]);
+    expect(nextViewZoom(2, viewZoomSteps({ width: 320, height: 568 }))).toBe(2);
+  });
+
+  // A screen can stop being fair without the player touching anything: a desktop
+  // window dragged short crosses the floor, and desktop has no zoom control to
+  // climb back out with. `seatViewZoom` is the host's re-seat on every relayout.
+  it('re-seats a rung the screen has stopped being able to keep', () => {
+    const tall: Viewport = { width: 1280, height: 800 };
+    const short: Viewport = { width: 1280, height: 400 };
+    expect(seatViewZoom(1, tall)).toBe(1); // roomy: the player's choice stands
+    expect(seatViewZoom(1, short)).toBe(1.5); // short: widened, unasked
+    expect(seatViewZoom(2, short)).toBe(2); // already wider than needed: untouched
+    // A stored rung from before the floor existed is clamped UP, never folded to
+    // a default that is exactly the view the floor exists to withhold.
+    expect(parseViewZoom('1', { width: 798, height: 384 })).toBe(1.5);
+    expect(parseViewZoom('1', tall)).toBe(1);
+    expect(parseViewZoom(null, { width: 798, height: 384 })).toBe(1.5);
+    // …and a viewport nobody enumerated, too short for any shipped rung, gets the
+    // floor itself rather than a silent failure of the property.
+    const tiny: Viewport = { width: 900, height: 240 };
+    expect(viewZoomSteps(tiny)).toEqual([(2 * SIGHTLINE) / 240]);
+    const camera = { ...tiny, originX: 0, originY: 0 };
+    const scale = cameraScale(viewZoomSteps(tiny)[0] as number, tiny);
+    const seen = writeVisibleWorld(cullBox(), cameraOffset(SHIP, camera, scale), camera, scale);
+    expect(SHIP.y - seen.top).toBeCloseTo(SIGHTLINE, 6);
   });
 });

@@ -344,6 +344,10 @@ import {
   storedViewZoom,
   cameraScale,
   VIEW_ZOOM_STORAGE,
+  // a0-134 — the sightline floor: which of those rungs THIS screen is allowed to
+  // be on, so a shooter within firing range is never off the player's glass.
+  seatViewZoom,
+  viewZoomSteps,
   showStickFurniture,
   // a0-76 — who is still flying: one presence state per seat, fed from the
   // server's own drop / reclaim / roster broadcasts, and the one function that
@@ -1788,16 +1792,28 @@ async function boot(): Promise<void> {
   // zoom-out control turns this rung; the same storage seam as the fire mode and
   // the control scheme remembers it, so a view survives the match and the reload
   // ("remembered across matches").
-  let viewZoom = parseViewZoom(platform.storage.get(VIEW_ZOOM_STORAGE));
-  renderer.setCameraScale(cameraScale(viewZoom));
+  let viewZoom = parseViewZoom(platform.storage.get(VIEW_ZOOM_STORAGE), viewport);
+  /**
+   * The rungs THIS screen is allowed to be on (a0-134) — cached rather than
+   * recomputed, because `feedHud` hands it to the HUD every frame and
+   * `viewZoomSteps` allocates (GDD §4.3: nothing allocates per frame). It is a
+   * function of the viewport alone, so `relayout` is the only thing that can
+   * change it, and `relayout` is where it is rewritten.
+   */
+  let viewZoomLadder: readonly number[] = viewZoomSteps(viewport);
+  renderer.setCameraScale(cameraScale(viewZoom, viewport));
 
   /** Seat a zoom rung: the camera, the store, and nothing else. The HUD reads the
    *  value back off `hudFrame` on the next frame, so there is one authority for
    *  what the view is and the control cannot drift from the camera. */
   function setViewZoom(step: number): void {
-    viewZoom = step;
-    renderer.setCameraScale(cameraScale(step));
-    platform.storage.set(VIEW_ZOOM_STORAGE, storedViewZoom(step));
+    // Seated on the live screen's ladder on the way in, so neither a debug seam
+    // nor a stale rung can put the camera on a view the sightline floor withheld
+    // (a0-134). The control only ever offers fair rungs; this is the guard that
+    // holds for every other caller.
+    viewZoom = seatViewZoom(step, viewport);
+    renderer.setCameraScale(cameraScale(viewZoom, viewport));
+    platform.storage.set(VIEW_ZOOM_STORAGE, storedViewZoom(viewZoom, viewport));
   }
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
@@ -3771,7 +3787,7 @@ async function boot(): Promise<void> {
     // one place owns the inverse, so it cannot be got backwards in a second one.
     // (It allocates a Vec2, which is fine — this is the pointer path, one call per
     // press, not the frame loop.)
-    const scale = cameraScale(viewZoom);
+    const scale = cameraScale(viewZoom, viewport);
     writeCameraOffset(camOffsetScratch, camTargetScratch, viewport, scale);
     const inWorld = screenToWorld(logical, camOffsetScratch, scale);
     out.x = inWorld.x;
@@ -3790,7 +3806,7 @@ async function boot(): Promise<void> {
     const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
     camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
     camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
-    const scale = cameraScale(viewZoom); // the live zoom, same as the inverse above
+    const scale = cameraScale(viewZoom, viewport); // the live zoom, same as the inverse above
     writeCameraOffset(camOffsetScratch, camTargetScratch, viewport, scale);
     return { x: wx * scale + camOffsetScratch.x, y: wy * scale + camOffsetScratch.y };
   }
@@ -3999,6 +4015,10 @@ async function boot(): Promise<void> {
     // actually on (a0-74). Fed like the fire mode and the scheme — read back from
     // the one authority rather than latched inside the HUD.
     hudFrame.viewZoom = viewZoom;
+    // …and the rungs this screen may be on, so a press on the control cycles the
+    // ladder the camera can actually be seated at (a0-134). The cached list, not
+    // a fresh one: this runs every frame.
+    hudFrame.viewZoomSteps = viewZoomLadder;
     // Re-read every frame beside the fire mode, because both are changeable
     // mid-match from settings and the pause menu (GDD §2.4) and the prompt on
     // screen has to describe the scheme the player is in NOW (a0-33).
@@ -4980,7 +5000,7 @@ async function boot(): Promise<void> {
       },
       /** Seat a rung through the real path — camera, storage, everything. */
       setZoom(step: number): number {
-        setViewZoom(parseViewZoom(String(step)));
+        setViewZoom(parseViewZoom(String(step), viewport));
         return viewZoom;
       },
     };
@@ -7144,6 +7164,14 @@ async function boot(): Promise<void> {
     // `readViewport`: it is measured against the value just written.
     hudInsets = viewportInsets();
     renderer.setViewport(viewport);
+    // The sightline ladder is a function of the screen, so a resize, a rotation
+    // or a fullscreen flip can withdraw the rung the player is on — and a DESKTOP
+    // window dragged short crosses the floor with no zoom control to climb back
+    // out (a0-134). Re-seat before anything reads the rung: `seatViewZoom` only
+    // ever widens, so a screen that regains its room keeps the player's choice.
+    viewZoomLadder = viewZoomSteps(viewport);
+    viewZoom = seatViewZoom(viewZoom, viewport);
+    renderer.setCameraScale(cameraScale(viewZoom, viewport));
     touch.setScreenWidth(w);
     hud.resize(w, h);
     endOverlay.resize(w, h, isTouch);

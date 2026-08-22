@@ -43,3 +43,12 @@ dist-a0-31/
 # against another lane's preview. Same story as dist-a0-14 and dist-a0-31.
 dist-a079-after/
 dist-a079-before/
+
+# a0-134: the before/after bundles the sightline evidence is photographed off —
+# `origin/main` and this branch, each pointed at a local fleet, on private ports.
+# Same story as every entry above, plus one more: `dist-a088/` was left untracked
+# in this workspace by an earlier lane and a `git add -A` swept it into a commit,
+# which is exactly the accident these lines exist to stop.
+dist-a088/
+dist-a0134-before/
+dist-a0134-after/
