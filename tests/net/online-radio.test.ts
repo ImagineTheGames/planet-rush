@@ -143,8 +143,38 @@ const CONTROL_SECONDS = 60;
  * read `radio === null` at t0 and a minute in, and `send` on a null channel still
  * draws no random number. New value measured twice, stable. Same rule as above:
  * any *other* red still means revert.
+ *
+ * **`9b587b0c` → `0c4ea31f`, 2026-08-22, a0-135 (Bot lane — flagged for the
+ * Netcode Engineer).** The second entry here that is a change to the BOT TREES,
+ * so it answers rule 3 head-on rather than pointing at another lane. The rule:
+ * *a threatened home outranks self-preservation, at any hull fraction* — ratified
+ * off the developer's *"protection of their base is essential to the game a
+ * player would defend at all costs"* (brief a0-135; report in
+ * `tests/reports/a0-135-home-defence.md`). `wantsRetreat`
+ * (`src/bots/behaviors.ts`) now asks `ownHomeThreatened(ctx)` before it reads the
+ * tier's nerve, and stands down when it holds. Every seat in the control match
+ * owns a station and four stations sit inside one 2400-unit world, so the reading
+ * flips for seats that used to run and the field diverges from the first
+ * doorstep contact onward.
+ *
+ * **Why this is not the thing rule 3 forbids.** Rule 3 catches a *team-aware path
+ * reachable in FFA*, and the honest worry here is real, because the two call
+ * sites next door — `behaviors.ts:1213` and `:1427` — genuinely are team-aware:
+ * they are the ALLY-defence paths, and they are untouched by this branch. What
+ * this branch added is `:1829`, and it calls `ownHomeThreatened`, which reads
+ * `ctx.self.station` — *this* bot's own doorstep, the seat's own alarm — and then
+ * `homeIntruder`, which is `intruderNear` around that one point and branches on
+ * the single `hostile` stamp, true for every ship on an FFA board. Sides, radios
+ * and ally lists appear nowhere in it. It is also, by construction, not a NEW
+ * path: `ownHomeThreatened` is the identical expression the trees' `defend` test
+ * already used and has been reachable in FFA all along — this branch changed
+ * which leaf wins above it, not whether the predicate can be evaluated with one
+ * seat per side. What this literal actually guards is untouched and still
+ * asserted: the three seats still read `radio === null` at t0 and a minute in,
+ * and `send` on a null channel still draws no random number. New value measured
+ * twice, stable. Same rule as above: any *other* red still means revert.
  */
-const FFA_GOLDEN = '9b587b0c';
+const FFA_GOLDEN = '0c4ea31f';
 
 /** A socket the room can write to. This file asserts on the room's own state and
  *  on its bots, never on what a client was told, so nothing is kept. */

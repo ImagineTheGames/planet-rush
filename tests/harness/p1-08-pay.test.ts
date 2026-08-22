@@ -327,12 +327,32 @@ describe('p1-08 — the report’s arithmetic', () => {
     // 114.1s -> 148.5s and the seeds clearing the 120s window go 12/24 -> 7/24.
     // Seed 9 is one that stopped clearing it — 72.3s -> 200.4s.
     //
-    // Seed 8 is chosen because it clears on BOTH builds — 37.7s before, 46.9s
-    // after, the largest margin either way — so this is not a seed picked for
+    // Seed 8 was chosen because it cleared on BOTH builds — 37.7s before, 46.9s
+    // after, the largest margin either way — so it was not a seed picked for
     // passing on the new code. Measurement:
     // `evidence/a0-81-fleeing-fire/elimination-probe.ts`. Nothing else in the
-    // file moves: the other cases hold at seed 9, and are left there.
-    const run = { ...runPayMatch(setup({ seed: 8 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
+    // file moved: the other cases hold at seed 9, and are left there.
+    //
+    // SEED 8 -> 95, 2026-08-22 (a0-135), same case, same reason, and a0-81's
+    // standard held to rather than relaxed. a0-135 (a threatened home outranks
+    // self-preservation, at any hull fraction) makes every bot hold its own
+    // doorstep instead of running, so on this 8-slot scarce board the first CORE
+    // takes longer to fall — the opposite sign to a0-135's effect on a 4-hull
+    // class contest, and the reason this file gets re-seeded rather than the
+    // window widened. Re-running a0-81's own probe over its own seeds 1–24: the
+    // window is cleared 7/24 before and 3/24 after, and the two sets are
+    // DISJOINT. Seed 8 itself went 85.9s -> none by 360s.
+    //
+    // No seed under 25 satisfies a0-81's standard any more, so the RANGE widened
+    // and the standard did not: `evidence/a0-135-home-defence/elimination-rescan.ts`
+    // is a0-81's loop verbatim over seeds 1–96 (outputs in that directory's
+    // `elimination-{before,after}.txt`). 22 seeds clear before, 12 after, and
+    // exactly ONE clears on both — seed 95, at 75.2s before and 100.3s after.
+    // It is therefore not a choice between candidates but the only seed in the
+    // range that is not picked for passing on the new code, and its worst-case
+    // margin is 19.7s. The arithmetic assertion below is untouched; the file
+    // still pins no pay NUMBER, by its own design.
+    const run = { ...runPayMatch(setup({ seed: 95 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
     const firstOut = playerMatches([run]).filter((p) => p.firstOut);
     expect(firstOut.length).toBeGreaterThan(0);
     for (const p of firstOut) expect(rowCount(p, 'placement')).toBe(0);

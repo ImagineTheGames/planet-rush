@@ -1,0 +1,33 @@
+
+seed  20001   771s  collapse    750s  waves 5  winner excavator    oreLeft 246  finished yes
+  pooled: fleeing=0 retreat=38225 last-stand=147649 turn-and-fight=336 cornered-fight=3135 defend=22347 attack=68440 mine=33933
+    seat 0 vanguard    deaths   8 ELIMINATED  last-stand:39617 defend:2487 dead:2109
+    seat 1 excavator   deaths  18 ELIMINATED  last-stand:20294 attack:9177 dead:5121
+    seat 2 hauler      deaths  21 ELIMINATED  attack:16383 last-stand:12791 dead:6021
+    seat 3 interceptor deaths  15 ELIMINATED  retreat:31334 dead:4218 attack:3585
+    seat 4 vanguard    deaths   6 ELIMINATED  last-stand:41042 defend:1965 dead:1500
+    seat 5 excavator   deaths  20 survived    attack:15446 haul:9972 mine:9756
+    seat 6 hauler      deaths  11 ELIMINATED  last-stand:33389 attack:4251 dead:3015
+    seat 7 interceptor deaths  37 ELIMINATED  attack:18542 dead:10836 mine:9423
+
+seed  32003   822s  collapse    750s  waves 5  winner vanguard     oreLeft 262  finished yes
+  pooled: fleeing=0 retreat=7731 last-stand=77401 turn-and-fight=378 cornered-fight=2001 defend=25068 attack=71475 mine=31380
+    seat 0 hauler      deaths   7 ELIMINATED  last-stand:39671 attack:2772 defend:2529
+    seat 1 interceptor deaths  10 ELIMINATED  dead:42971 attack:2358 defend:2313
+    seat 2 vanguard    deaths  33 survived    attack:17925 dead:9713 mine:7410
+    seat 3 excavator   deaths  12 ELIMINATED  last-stand:36458 attack:3759 dead:3315
+    seat 4 hauler      deaths  27 ELIMINATED  attack:22410 dead:9899 mine:8529
+    seat 5 interceptor deaths   5 ELIMINATED  dead:45728 defend:1956 mine:624
+    seat 6 vanguard    deaths  11 ELIMINATED  dead:36269 attack:4692 mine:3045
+    seat 7 excavator   deaths  27 ELIMINATED  attack:17559 haul:8817 mine:8028
+
+seed  20000   822s  collapse    750s  waves 5  winner hauler       oreLeft 225  finished yes
+  pooled: fleeing=0 retreat=7893 last-stand=30405 turn-and-fight=711 cornered-fight=2487 defend=24606 attack=78057 mine=38673
+    seat 0 interceptor deaths   7 ELIMINATED  dead:44730 defend:2223 retreat:858
+    seat 1 vanguard    deaths  13 ELIMINATED  dead:36150 attack:5367 defend:3024
+    seat 2 excavator   deaths  18 ELIMINATED  last-stand:28752 attack:7701 dead:5112
+    seat 3 hauler      deaths  28 ELIMINATED  attack:17637 mine:11484 dead:8139
+    seat 4 interceptor deaths   6 ELIMINATED  dead:44517 defend:1323 attack:1194
+    seat 5 vanguard    deaths  34 ELIMINATED  attack:20934 dead:9945 mine:9066
+    seat 6 excavator   deaths  12 ELIMINATED  dead:37848 attack:6765 defend:1956
+    seat 7 hauler      deaths  25 survived    attack:17790 mine:10878 dead:7524
