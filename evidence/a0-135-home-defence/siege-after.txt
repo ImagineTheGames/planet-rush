@@ -1,0 +1,46 @@
+a0-135 — latch holds under QA's antagonists, longest unbroken run in ticks (0.016666666666666666s per tick)
+ceiling 40s = 2400 ticks   † = still open at the ceiling
+
+siege-home — holds the subject's own core under attack at 0.2, never finishing it
+character  tier     fleeing  turned to     defend  last-stand  standoff
+---------- ------- -------- ------------ -------- ----------- ---------
+rusty      easy           0 —                   0       2400†         0
+bolt       easy           0 —                   0       2400†         0
+foreman    medium         0 —                   0       2400†         0
+patch      medium         0 —                   0       2400†         0
+sable      hard           0 —                   0       2400†         0
+vulture    hard           0 —                   0       2400†         0
+warden     hard           0 —                   0       2400†         0
+
+park@200 — sits 200u off the subject's station, on the lane to the field, and does nothing — inside THREAT_RANGE: in contact, every exit live
+character  tier     fleeing  turned to     defend  last-stand  standoff
+---------- ------- -------- ------------ -------- ----------- ---------
+rusty      easy           0 —                 910           0         0
+bolt       easy           0 —                1220           0         0
+foreman    medium         0 —                 335           0         0
+patch      medium         0 —                 335           0         0
+sable      hard           0 —                 378           0         0
+vulture    hard           0 —                 345           0         0
+warden     hard           0 —                 378           0         0
+
+park@580 — sits 580u off the subject's station, on the lane to the field, and does nothing — between THREAT_RANGE and RETREAT_CLEAR_RANGE
+character  tier     fleeing  turned to     defend  last-stand  standoff
+---------- ------- -------- ------------ -------- ----------- ---------
+rusty      easy         630 turn-and-fight        0           0       240
+bolt       easy         340 turn-and-fight        0           0       240
+foreman    medium       200 turn-and-fight        0           0       240
+patch      medium       415 turn-and-fight        0           0       240
+sable      hard         240 turn-and-fight        0           0       240
+vulture    hard         141 turn-and-fight        0           0       240
+warden     hard         183 turn-and-fight        0           0       240
+
+park@840 — sits 840u off the subject's station, on the lane to the field, and does nothing — outside RETREAT_CLEAR_RANGE: escape is readable
+character  tier     fleeing  turned to     defend  last-stand  standoff
+---------- ------- -------- ------------ -------- ----------- ---------
+rusty      easy         150 mine                0           0         0
+bolt       easy         150 mine                0           0         0
+foreman    medium       145 mine                0           0         0
+patch      medium       145 mine                0           0         0
+sable      hard         141 mine                0           0         0
+vulture    hard         141 mine                0           0         0
+warden     hard         141 mine                0           0         0
