@@ -1,0 +1,44 @@
+{
+  "host": {
+    "overlay": {
+      "mounted": false
+    },
+    "presence": null,
+    "link": {
+      "phase": "live",
+      "state": "open",
+      "closeReason": null
+    }
+  },
+  "joiner": {
+    "overlay": {
+      "mounted": true,
+      "shown": true,
+      "html": 2096,
+      "title": "RECONNECTING…",
+      "detail": "the socket closed — no server data for 2s — reclaiming your seat, your seat is held for as long as the match runs.",
+      "buttons": [
+        {
+          "id": "pr-link-loss-reconnect",
+          "label": "RECONNECT NOW"
+        },
+        {
+          "id": "pr-link-loss-abandon",
+          "label": "ABANDON MATCH"
+        }
+      ],
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      }
+    },
+    "presence": null,
+    "link": {
+      "phase": "live",
+      "state": "open",
+      "closeReason": null
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "emulated": true,
+  "note": "roster frames on the HOST socket, ms after the cut",
+  "frames": [
+    {
+      "type": "playerSubstituted",
+      "atMs": null,
+      "payload": "{\"type\":\"playerSubstituted\",\"player\":1,\"graceSeconds\":0,\"heldForMatch\":true}"
+    },
+    {
+      "type": "playerReclaimed",
+      "atMs": null,
+      "payload": "{\"type\":\"playerReclaimed\",\"player\":1}"
+    },
+    {
+      "type": "playerSubstituted",
+      "atMs": 5337,
+      "payload": "{\"type\":\"playerSubstituted\",\"player\":1,\"graceSeconds\":0,\"heldForMatch\":true}"
+    }
+  ]
+}

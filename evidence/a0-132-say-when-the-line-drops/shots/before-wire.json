@@ -1,0 +1,11 @@
+{
+  "emulated": true,
+  "note": "roster frames on the HOST socket, ms after the cut",
+  "frames": [
+    {
+      "type": "playerSubstituted",
+      "atMs": 24044,
+      "payload": "{\"type\":\"playerSubstituted\",\"player\":1,\"graceSeconds\":0,\"heldForMatch\":true}"
+    }
+  ]
+}
