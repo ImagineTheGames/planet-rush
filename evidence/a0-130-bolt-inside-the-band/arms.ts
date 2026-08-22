@@ -29,8 +29,30 @@ import { WIN_RATE_CEILING, lengthOf, pct } from '../../harness/mirrors';
 import type { MatchRow, SectionRun } from '../../harness/mirrors';
 import { poolWins } from '../../harness/tuning';
 import { binomTailGE, clopper, designEffect, wilson } from '../a0-126-the-last-two-points/stats';
-import { verdictOf } from '../a0-126-the-last-two-points/targets';
-import type { Verdict } from '../a0-126-the-last-two-points/targets';
+
+/**
+ * a0-126's three-state verdict, restated here rather than imported.
+ *
+ * The rule is theirs and is not being changed: read the verdict off the
+ * **exact** (Clopper–Pearson) interval, because declaring a ceiling violation is
+ * what sends a lane to nerf something, so the conservative interval is the one
+ * that gets to declare it — and, symmetrically, the one that gets to declare a
+ * target safely INSIDE. `UNRESOLVED` is not a hedge; it is the verdict a
+ * screening arm honestly earns, and the answer to it is a number of matches
+ * rather than a change to a weight.
+ *
+ * It is restated because `targets.ts` runs a CLI `main()` at module scope, so
+ * importing the function prints a0-126's own report into the middle of this
+ * one. `tests/harness/a0-130-verdict.test.ts` pins this copy against a0-126's
+ * so the two cannot drift.
+ */
+export type Verdict = 'INSIDE' | 'OVER' | 'UNRESOLVED';
+
+export function verdictOf(lo: number, hi: number, ceiling = WIN_RATE_CEILING): Verdict {
+  if (hi <= ceiling) return 'INSIDE';
+  if (lo > ceiling) return 'OVER';
+  return 'UNRESOLVED';
+}
 
 const ROOT = resolve(import.meta.dirname, '../..');
 
@@ -49,6 +71,8 @@ export interface ArmReading {
   readonly p1: number;
   readonly verdict: Verdict;
   readonly medianSeconds: number;
+  readonly minSeconds: number;
+  readonly maxSeconds: number;
   readonly inTarget: number;
   readonly seeds: readonly number[];
   readonly rows: readonly MatchRow[];
@@ -92,7 +116,9 @@ export function readArm(
     p1: binomTailGE(w.wins, w.decided, WIN_RATE_CEILING),
     verdict: verdictOf(cp.lo, cp.hi),
     medianSeconds: len.median,
-    inTarget: len.inTarget,
+    minSeconds: len.min,
+    maxSeconds: len.max,
+    inTarget: len.insideFraction,
     seeds: run.seeds,
     rows,
   };

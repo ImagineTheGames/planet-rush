@@ -2,7 +2,12 @@
  * evidence/a0-130-bolt-inside-the-band/autopsy.ts — what actually decides an
  * Easy-pool match. OWNER: Bot Engineer (brief a0-130).
  *
- *   npx vite-node evidence/.../autopsy.ts [seeds] [rotations] > autopsy.txt
+ *   npx vite-node evidence/.../autopsy-run.ts [seeds] > autopsy.txt
+ *
+ * Library only: the CLI lives in `./autopsy-run.ts` because
+ * `tests/harness/a0-130-easy-pool.test.ts` imports {@link autopsy} to pin the
+ * mechanism, and a module that runs 128 matches at import time would spend
+ * seven minutes collecting a test file that needs four.
  *
  * a0-126 §4.5 filed Bolt at 67.4% of the Easy pool and flagged, without being
  * able to explain it, that **81.4% of that pool draws**. A win rate over a
@@ -160,8 +165,7 @@ export function autopsy(seed: number, slots: readonly BotSlot[]): Autopsy {
 
 // ---------------------------------------------------------------------------
 
-function main(): void {
-  const seedCount = Number(process.argv[2] ?? 64);
+export function report(seedCount: number): void {
   const pool = rosterAt(Difficulty.Easy);
   const rows: Autopsy[] = [];
   for (let seed = 1; seed <= seedCount; seed++) {
@@ -246,5 +250,3 @@ function main(): void {
     console.log(`  ${who.padEnd(6)}: ${wins}/${decided.length} decided (${pct(wins / Math.max(decided.length, 1))})`);
   }
 }
-
-main();
