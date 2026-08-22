@@ -1,0 +1,27 @@
+--- the Easy pool: a0-126's 512 matches (seeds 1…256), lifted back out of this brief's own 1…4096 run ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 512
+  rows differing: 0
+  IDENTICAL.
+--- the caution arm: its screen (1…256) lifted back out of its deep run (1…1024) ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 512
+  rows differing: 0
+  IDENTICAL.
+--- the endgame arm: its screen (1…256) lifted back out of its deep run (1…1024) ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 512
+  rows differing: 0
+  IDENTICAL.
+--- Warden's cast contest: a0-126's roster rows, re-run on this branch ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 896
+  rows differing: 0
+  IDENTICAL.
+--- the excavator's ship-class contest: a0-126's class rows, re-run on this branch ---
+  same seeds (a0-117 assertSameSeeds): PASS
+  rows compared: 512
+  rows differing: 0
+  IDENTICAL.
+
+Every comparison in this report is the same draw.

@@ -1,0 +1,25 @@
+=== Easy-pool autopsy: 256 matches (128 seeds x 2 rotations) ===
+decided 43  drawn 213 (83.2%)
+
+--- 1. does anything reach a core before the collapse? ---
+  rusty : 1024 seats, core never touched in 218 (21.3%), mean core at collapse 96.1%, mean floor before collapse 96.1%
+  bolt  : 1024 seats, core never touched in 419 (40.9%), mean core at collapse 97.9%, mean floor before collapse 98.0%
+
+--- 1b. who does the chipping? ---
+  rusty : dealt 24.5 HP/match to enemy stations; its own home was last hit by { bolt: 90.2%, rusty: 9.8% }
+  bolt  : dealt 379.4 HP/match to enemy stations; its own home was last hit by { bolt: 43.0%, rusty: 57.0% }
+
+--- 1c. what did each character buy? (standing at collapse) ---
+  rusty : mean 2.96 turrets, 1.00 shields standing when the field closed
+  bolt  : mean 3.00 turrets, 0.90 shields standing when the field closed
+
+--- 2. the margin: how far apart are the top two cores at collapse? ---
+  decided: median 1.7% of a core  max 3.5%
+  drawn  : median 0.0% of a core  max 0.0%
+
+--- 3. does the winner own the highest core at collapse? ---
+  winner held the (uniquely) highest core at collapse in 43/43 (100.0%), shared the top in a further 0
+
+--- 4. the pool, one row per character ---
+  rusty : 11/43 decided (25.6%)
+  bolt  : 32/43 decided (74.4%)

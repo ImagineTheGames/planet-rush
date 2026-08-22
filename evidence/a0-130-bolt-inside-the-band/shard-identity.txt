@@ -1,0 +1,7 @@
+=== shard identity: 16 seeds of the Easy pool, one process vs four ===
+--- block 1: one process, seeds 1..16 ---
+/tmp/a0130-id/whole/tier.json: 32 matches, 7 decided, seeds 1…16, 2 lineups
+--- block 2: four shards of four seeds each ---
+merged 4 shards → /tmp/a0130-id/merged/tier.json: 32 matches, 7 decided, 0 hangs, seeds 1…16
+--- block 3: do they agree, byte for byte? ---
+IDENTICAL — the merged shards are the whole run, byte for byte.
