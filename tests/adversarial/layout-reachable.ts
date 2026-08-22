@@ -178,10 +178,12 @@ export interface StagedFrame extends Frame {
  * centre to centre (`src/sim/buildings.ts`), which is the same call
  * `src/main.ts:3879` makes before it hands the HUD its frame.
  *
- * The two casts are the same compromise the census makes for
- * `nameplateClusterClearance`: `isDocked` reads three fields of a `Ship` and one
- * of a `MiningStation`, and building the other forty would be modelling the sim
- * rather than asking it.
+ * The three casts are the same compromise the census already makes for
+ * `nameplateClusterClearance`. `isDocked` reads two fields of a `Ship` (`alive`,
+ * `pos`) and one of a `MiningStation` (`pos`); `canOpenWheel` reads four of a
+ * `BuildWheelSignals`. Building the rest of a world to satisfy the type would be
+ * modelling the sim rather than asking it, and the fields that are supplied are
+ * exactly the ones the two predicates read.
  */
 export function wheelIsOpen(sit: MatchSituation): boolean {
   const ship = { alive: sit.shipAlive, pos: { x: 0, y: 0 } } as unknown as Ship;
