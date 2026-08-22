@@ -344,11 +344,13 @@ export function storedViewZoom(step: number, viewport?: Viewport): string {
  * is not on the ladder.
  */
 export function parseViewZoom(stored: string | null | undefined, viewport?: Viewport): number {
-  const ladder = viewZoomSteps(viewport);
-  if (typeof stored !== 'string') return ladder[0] as number;
+  // A player with nothing stored — and one whose stored value is not a number at
+  // all — gets the rung their SCREEN boots at, which since a0-134 is not
+  // necessarily the shipped `1×`.
+  if (typeof stored !== 'string') return defaultViewZoom(viewport);
   const n = Number(stored);
-  if (!Number.isFinite(n)) return ladder[0] as number;
-  return snapTo(n, ladder);
+  if (!Number.isFinite(n)) return defaultViewZoom(viewport);
+  return snapTo(n, viewZoomSteps(viewport));
 }
 
 /** Snap an arbitrary number onto this screen's ladder — the guard every function
