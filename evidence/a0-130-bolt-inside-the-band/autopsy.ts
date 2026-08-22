@@ -53,6 +53,13 @@ interface Seat {
   /** The character of the last seat to land damage on anything this seat owns
    *  (`world.credit.lastHitBy`), or null while nobody ever has. */
   lastHitBy: string | null;
+  /** Characters that ever landed damage on anything this seat owns, from
+   *  `world.credit.lastDamageAt[victim][attacker]` — the contact matrix. */
+  chippedBy: string[];
+  /** Turrets and shield generators standing when collapse opened — what this
+   *  character actually bought with its match. */
+  turretsAtCollapse: number;
+  shieldsAtCollapse: number;
 }
 
 export interface Autopsy {
@@ -62,8 +69,9 @@ export interface Autopsy {
   readonly seconds: number;
   readonly collapseTime: number;
   readonly seats: readonly Seat[];
-  /** Seconds between the last core to die and the second-last. `0` is the
-   *  same-tick wipe that a0-113 rules a draw. */
+  /** Core-HP fraction between the highest core at collapse and the second
+   *  highest. `0` is the same-tick wipe a0-113 rules a draw — and it is the
+   *  *only* thing a draw is, because collapse decays every core at one rate. */
   readonly margin: number;
 }
 
@@ -81,6 +89,9 @@ export function autopsy(seed: number, slots: readonly BotSlot[]): Autopsy {
     alive: true,
     dealtToStations: 0,
     lastHitBy: null,
+    chippedBy: [],
+    turretsAtCollapse: 0,
+    shieldsAtCollapse: 0,
   }));
   const stationOf = new Map<number, number>();
   world.stations.forEach((st, i) => {
@@ -100,7 +111,11 @@ export function autopsy(seed: number, slots: readonly BotSlot[]): Autopsy {
       const st = world.stations[idx]!;
       const frac = st.maxCoreHp > 0 ? st.coreHp / st.maxCoreHp : 0;
       if (!nowCollapsed) seat.minBeforeCollapse = Math.min(seat.minBeforeCollapse, frac);
-      if (nowCollapsed && !collapsed) seat.atCollapse = frac;
+      if (nowCollapsed && !collapsed) {
+        seat.atCollapse = frac;
+        seat.turretsAtCollapse = st.turrets.filter((t) => t.hp > 0).length;
+        seat.shieldsAtCollapse = st.shields.filter((sh) => sh.hp > 0).length;
+      }
       if (seat.alive && !st.alive) {
         seat.alive = false;
         seat.died = st.deathTime;
@@ -118,10 +133,19 @@ export function autopsy(seed: number, slots: readonly BotSlot[]): Autopsy {
       seat.dealtToStations = credit.dealtToStations[seat.id] ?? 0;
       const by = credit.lastHitBy[seat.id];
       seat.lastHitBy = by === null || by === undefined ? null : (slots.find((s) => s.id === by)?.personality ?? null);
+      const when = credit.lastDamageAt[seat.id] ?? [];
+      const who = new Set<string>();
+      when.forEach((t, attacker) => {
+        if (t >= 0) {
+          const p = slots.find((s) => s.id === attacker)?.personality;
+          if (p) who.add(p);
+        }
+      });
+      seat.chippedBy = [...who];
     }
   }
 
-  const deaths = seats.map((s) => s.died).sort((a, b) => b - a);
+  const tops = seats.map((s) => s.atCollapse).sort((a, b) => b - a);
   const winnerSlot = world.match.winner;
   return {
     seed,
@@ -130,7 +154,7 @@ export function autopsy(seed: number, slots: readonly BotSlot[]): Autopsy {
     seconds: world.time,
     collapseTime: world.match.collapseTime,
     seats,
-    margin: deaths.length > 1 ? deaths[0]! - deaths[1]! : 0,
+    margin: tops.length > 1 ? tops[0]! - tops[1]! : 0,
   };
 }
 
@@ -181,11 +205,21 @@ function main(): void {
   }
   console.log('');
 
-  console.log('--- 2. the margin: how far apart are the last two cores? ---');
+  console.log('--- 1c. what did each character buy? (standing at collapse) ---');
+  for (const who of pool) {
+    const s = rows.flatMap((r) => r.seats.filter((x) => x.personality === who));
+    console.log(
+      `  ${who.padEnd(6)}: mean ${(mean(s.map((x) => x.turretsAtCollapse))).toFixed(2)} turrets, ` +
+        `${(mean(s.map((x) => x.shieldsAtCollapse))).toFixed(2)} shields standing when the field closed`,
+    );
+  }
+  console.log('');
+
+  console.log('--- 2. the margin: how far apart are the top two cores at collapse? ---');
   const margins = (rs: readonly Autopsy[]): string => {
     const xs = rs.map((r) => r.margin).sort((a, b) => a - b);
     if (!xs.length) return 'n/a';
-    return `median ${xs[Math.floor(xs.length / 2)]!.toFixed(2)}s  max ${xs[xs.length - 1]!.toFixed(2)}s`;
+    return `median ${pct(xs[Math.floor(xs.length / 2)]!)} of a core  max ${pct(xs[xs.length - 1]!)}`;
   };
   console.log(`  decided: ${margins(decided)}`);
   console.log(`  drawn  : ${margins(drawn)}`);

@@ -12,7 +12,11 @@
 #   --ref     run the arm against `src/bots/` as of REF — this is how the
 #             *shipped* baseline is measured after the candidate has been
 #             committed, on the same seeds, from the same script.
-#   sed-expr  applied to src/bots/personalities.ts, for weight-only arms.
+#   sed-expr  applied to src/bots/personalities.ts, for weight-only arms. Prefix
+#             it `file@@expr` to patch a different file under src/bots/ — the
+#             dials this brief has to separate do not all live in one file
+#             (`caution` scales the retreat, the repair ration and the standoff
+#             patience, and only the first of those is in personalities.ts).
 #
 # Sequential across labels by construction — the cast IS the experiment, so two
 # labels may never overlap — but parallel *within* a label, because a shard reads
@@ -35,7 +39,12 @@ if ! git diff --quiet -- src/bots || ! git diff --cached --quiet -- src/bots; th
 fi
 trap 'git checkout -q HEAD -- src/bots' EXIT
 [[ -n "$REF" ]] && git checkout -q "$REF" -- src/bots
-for e in "$@"; do sed -i "$e" src/bots/personalities.ts; done
+for e in "$@"; do
+  case "$e" in
+    *@@*) sed -i "${e#*@@}" "src/bots/${e%%@@*}" ;;
+    *)    sed -i "$e" src/bots/personalities.ts ;;
+  esac
+done
 echo "--- $LABEL · pools $POOLS · seeds 1..$SEEDS · $SHARDS shards${REF:+ · src/bots @ $REF} ---"
 git diff --stat -- src/bots | tail -1
 rm -rf "$TMP"; mkdir -p "$TMP" "$OUT"
