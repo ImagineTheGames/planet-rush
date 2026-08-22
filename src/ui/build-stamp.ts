@@ -178,11 +178,52 @@ export function buildStampEntry(viewport: Viewport, lift = 0): LayoutEntry {
 }
 
 /**
- * `rect` lifted just clear of the stamp's row, growing **upward** — the fix, in
- * one function, for every plate a menu bolts to a footer beam.
+ * How far a beam's row of plates must rise so that **none of them** is drawn on
+ * the stamp's row — 0 when none of them is on it.
  *
- * Upward and not sideways is fact 1 in the header. It never resizes the plate:
- * a control that got smaller to make room for a stamp would be the m10-14 lesson
+ * A row and not a plate, because a footer beam can carry three (the doors' BACK,
+ * ERASE and JOIN) and a row whose plates sit at two heights is not a row. So the
+ * lift is the largest any one of them needs and every one of them takes it.
+ *
+ * **Intersection, not just depth.** A plate qualifies only if it really shares
+ * pixels with the row — the stamp's zone ends at the screen's midline
+ * (`badgeAvailableWidth`), so a 300px DONE right-aligned in a 1192px beam is
+ * nowhere near it and is not moved for a tag it could never cover. That is the
+ * difference between a fix and a re-layout: on a desktop this moves the five
+ * screens that bolt a plate to the LEADING end of their beam and no others.
+ */
+export function stampRowLift(plates: readonly Rect[], stampRow: Rect): number {
+  let lift = 0;
+  for (const p of plates) {
+    if (p.width <= 0 || p.height <= 0) continue;
+    if (p.x >= stampRow.x + stampRow.width || p.x + p.width <= stampRow.x) continue;
+    if (p.y >= stampRow.y + stampRow.height || p.y + p.height <= stampRow.y) continue;
+    lift = Math.max(lift, p.y + p.height - stampRow.y);
+  }
+  return lift;
+}
+
+/**
+ * `rect` raised by `lift`, never off the top of the frame — the other half of
+ * {@link stampRowLift}, applied to each plate in the row.
+ *
+ * The clamp at 0 is there so the pair is total. On a viewport too short to hold a
+ * control and a stamp at once there is no placement that satisfies both, and a
+ * plate pushed above y=0 is a control the player cannot reach — a worse answer
+ * than a stamp that is hard to read. Unreachable on every profile in the matrix
+ * (the shortest is 320px against a 21px row).
+ */
+export function raisePlate(rect: Rect, lift: number): Rect {
+  if (lift <= 0 || rect.width <= 0 || rect.height <= 0) return rect;
+  return { ...rect, y: Math.max(0, rect.y - lift) };
+}
+
+/**
+ * The one-plate case, spelled once: `rect` lifted clear of the stamp's row,
+ * growing **upward**.
+ *
+ * Upward and not sideways is fact 1 in the header. It never resizes the plate: a
+ * control that got smaller to make room for a stamp would be the m10-14 lesson
  * (*"nothing may cover a control"*) obeyed by breaking the control instead, and
  * the thumb floor is not this module's to spend. A plate that already clears the
  * row is returned untouched, so this costs nothing on the screens and viewports
@@ -193,13 +234,5 @@ export function buildStampEntry(viewport: Viewport, lift = 0): LayoutEntry {
  * cannot resolve a second one that disagrees with it.
  */
 export function clearBuildStamp(rect: Rect, stampRow: Rect): Rect {
-  if (rect.width <= 0 || rect.height <= 0) return rect;
-  if (rect.y + rect.height <= stampRow.y) return rect;
-  // Never off the top of the frame. On a viewport too short to hold a control
-  // and a stamp at once there is no placement that satisfies both, and a plate
-  // pushed above y=0 is a control the player cannot reach — which is a worse
-  // answer than a stamp that is hard to read. Unreachable on every profile in
-  // the matrix (the shortest is 320px against a 21px row); it is here so the
-  // function is total, like `promptBounds`'s own clamp.
-  return { ...rect, y: Math.max(0, stampRow.y - rect.height) };
+  return raisePlate(rect, stampRowLift([rect], stampRow));
 }

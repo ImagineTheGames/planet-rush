@@ -109,7 +109,7 @@ import {
 } from '../art/materials';
 import type { FrameMetrics, PlateScale } from '../art/materials';
 import { bandOverflow, beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
-import { clearBuildStamp } from './build-stamp';
+import { raisePlate, stampRowLift } from './build-stamp';
 import { contentTopBelow, refusalStrip } from './refusal-strip';
 
 // ---------------------------------------------------------------------------
@@ -1162,18 +1162,19 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // screen as it does every other. BACK is the plate that was sitting on it.
   const footerStrip = beamContent(frame.footer, metrics, 'footer');
   const footerBottom = frame.footer.y + frame.footer.height;
-  const actionRow = clearBuildStamp(
-    {
-      x: footerStrip.x,
-      y: Math.min(
-        footerStrip.y + (footerStrip.height - actionHeight) / 2,
-        footerBottom - actionHeight,
-      ),
-      width: footerStrip.width,
-      height: actionHeight,
-    },
-    frame.stamp,
-  );
+  const actionSpan: Rect = {
+    x: footerStrip.x,
+    y: Math.min(
+      footerStrip.y + (footerStrip.height - actionHeight) / 2,
+      footerBottom - actionHeight,
+    ),
+    width: footerStrip.width,
+    height: actionHeight,
+  };
+  // BACK is the plate that lands on the stamp; RUSH! rises with it, because the
+  // two are one row in one beam. The span is what is tested, so a beam whose
+  // leading end is clear keeps its row exactly where it was.
+  const actionRow = raisePlate(actionSpan, stampRowLift([actionSpan], frame.stamp));
   const actionY = actionRow.y;
   const actionOverflow = bandOverflow(frame, actionRow);
   const band: Rect = {
@@ -1893,24 +1894,28 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const squeeze = wanted > 0 ? Math.min(1, room / wanted) : 0;
   const plateW = (reference: number): number =>
     Math.max(0, Math.min(Math.floor(reference * m.plateScale * squeeze), footerStrip.width));
-  // All three lifted clear of the build stamp's row together (a0-129,
+  // All three lifted clear of the build stamp's row TOGETHER (a0-129,
   // `./build-stamp`). Together and not just BACK: they are one row of plates in
-  // one beam, and a row whose three plates sit at two heights is not a row. On a
-  // narrow portrait phone the stamp's zone reaches past ERASE, so the two that
-  // move for their own sake would have moved anyway.
-  const lift = (r: Rect): Rect => clearBuildStamp(r, frame.stamp);
-  const back = lift(beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH)));
-  const submit = lift(beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH)));
-  const erase = lift(
+  // one beam, and a row whose three plates sit at two heights is not a row. The
+  // lift is `stampRowLift`'s, so it is zero unless one of the three really is on
+  // the stamp — which BACK is on every viewport, being bolted to the leading end
+  // of the beam the stamp is drawn on.
+  const seated = [
+    beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH)),
+    beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH)),
+  ];
+  seated.push(
     beamPlate(
       footerStrip,
       m,
       'trailing',
       plateW(ENTRY_ERASE_WIDTH),
       'compact',
-      submit.width + footerGutter,
+      seated[1]!.width + footerGutter,
     ),
   );
+  const footerLift = stampRowLift(seated, frame.stamp);
+  const [back, submit, erase] = seated.map((r) => raisePlate(r, footerLift)) as [Rect, Rect, Rect];
   /** The y the band's content may not pass: the top of the lifted footer row.
    *  Equal to the band's own bottom edge on every viewport whose beam already
    *  held its plates — every desktop — so it costs those screens nothing. */
