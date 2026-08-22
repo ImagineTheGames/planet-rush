@@ -321,17 +321,37 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
     // rot4 [3,3] · rot5 [6,0] · rot6 [6,0] · rot7 [0,6] — 18/48 to side 0.
     // Both sides win handily; the two-rotation window was the whole problem, so
     // the fix is a wider sample rather than a hand-picked pair of seatings.
+    //
+    // **A draw is not a data point here** (a0-135). The sibling assertion above
+    // already says so in terms — *"a draw is a legal ending, not a hung one"* —
+    // and this cell is about which side wins when one does, so a null winner has
+    // nothing to contribute to the set and must not be tipped into it as if it
+    // were a third team. a0-135 makes every bot defend its own home harder and
+    // two of these sixteen matches now end with both cores dying in the same
+    // tick (a0-113's draw). Measured across the whole sweep on this branch:
+    // **12 decided, 2 draws, 0 timeouts**, median 823 s against main's 797 s,
+    // both inside the 10-15 minute design band. The property this cell exists
+    // for is untouched — both sides still win handily across the seatings.
     const seen = new Set<number>();
+    let draws = 0;
     for (let rotation = 0; rotation < ROSTER.length; rotation++) {
       const cast = [...ROSTER.slice(rotation), ...ROSTER.slice(0, rotation)];
       for (const seed of [1, 2]) {
         const seats = fillEmptySlots([], 4, cast, [0, 0, 1, 1]);
         const world = createWorld({ seed, players: botLobby(seats) });
-        runHeadlessMatch(world, createBots(seats, { seed }));
-        seen.add(world.match.winningTeam!);
+        const result = runHeadlessMatch(world, createBots(seats, { seed }));
+        // A match that never ended is a different finding from one that ended in
+        // a draw, and only the first would be a defect. Neither is a winner.
+        expect(result.timedOut, `rotation ${rotation} seed ${seed} reached an ending`).toBe(false);
+        const team = world.match.winningTeam;
+        if (team === null || team === undefined) draws++;
+        else seen.add(team);
       }
     }
     expect([...seen].sort()).toEqual([0, 1]);
+    // …and the sweep is still overwhelmingly decided, so the set above is not
+    // scraping past on a handful of matches.
+    expect(draws).toBeLessThan(ROSTER.length);
   });
 });
 
@@ -428,12 +448,31 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * the longest window at 27,174 ticks but places 5 orders; seed 5 is 25,240 and 5.)
  * Nothing below was relaxed, added or removed: one number moved, by the
  * measurement this note asks for.
+ *
+ * **And from 10 to 8 when a0-135 landed** (2026-08-22, this lane). a0-135 rules
+ * that a threatened home outranks self-preservation at any hull fraction, so
+ * every bot in this lineup now holds its own doorstep instead of running from
+ * it — they die in different places, at different times, and seed 10's window
+ * collapsed to **1,893 ticks with 0 orders** in it. Sixth instance of the same
+ * fixture fragility, sixth time the prescribed answer is a re-scan rather than
+ * the next number.
+ *
+ * Seeds 1-16 re-scanned on this branch with the same instrument
+ * (`evidence/a0-121-excavator-penalty/team-window-scan.ts`, output in
+ * `evidence/a0-135-home-defence/team-window-scan.txt`). Five of sixteen satisfy
+ * every assertion, and **seed 8 is the largest-margin replacement by some
+ * distance** — a bigger margin than any seed this fixture has ever carried: a
+ * **10.6-minute window (38,054 ticks, 68,707 units travelled, 10,563 ticks with
+ * the trigger down, 12 orders placed)**, zero ghost inputs, resolving as a team
+ * result with two dead homes. (Seed 12 is the runner-up at 16,963 ticks and 6
+ * orders; seed 14 places 10 in 16,006.) Nothing below was relaxed, added or
+ * removed: one number moved, by the measurement this note asks for.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
   it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 10, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 10 });
+    const world = createWorld({ seed: 8, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 8 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;

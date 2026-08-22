@@ -18,6 +18,24 @@
  *  4. the priority exception — a core under final assault — still interrupts a
  *     committed retreat; and determinism holds across identical runs.
  *
+ * ── One thing in here was overturned, and by the same developer (a0-135) ───
+ *
+ * v0.2.2's photograph was a low-HP Warden *beside its own station with an
+ * attacker sitting on that station*, and the ruling taken from it was that home
+ * is then the danger, so the bot breaks contact rather than running into the
+ * siege. a0-135 (2026-08-22) rules the other way on that exact board: *"protection
+ * of their base is essential to the game a player would defend at all costs"* —
+ * a threatened home outranks self-preservation, at any hull fraction, and the
+ * bot stays and fights.
+ *
+ * What v0.2.2 established is untouched by that and is still asserted below: the
+ * flee/fight pair does not flap, and a committed retreat **goes somewhere**
+ * rather than twitching in place. Only the board it is asserted on moved off the
+ * doorstep — because on the doorstep there is no longer a retreat to measure, and
+ * `HOME_ALARM_RANGE` (520) being wider than `THREAT_RANGE` (416) means there
+ * never can be again. The flight vector that v0.2.2 asked for is still pinned
+ * where it still exists, on `retreat`'s own output.
+ *
  * And, since p15, the invariant is extended with the **blockade recipe** the
  * developer's second screenshot names: a damaged bot, an enemy held stationary
  * on the line between it and its own station. That geometry is the one the
@@ -163,9 +181,18 @@ describe('the flee band holds — a committed retreat does not flap', () => {
     const world = board();
     for (const s of world.ships) if (s.id !== 0 && s.id !== 1) s.alive = false;
     const brain = brainFor('warden');
-    // Enter a retreat...
+    // Enter a retreat, out in the field. The arena centre, and not the spawn
+    // point the ships start on, because a bot standing at its own station cannot
+    // be frightened off it any more (a0-135): `HOME_ALARM_RANGE` (520) is wider
+    // than `THREAT_RANGE` (416), so a hostile close enough to trigger the flee
+    // latch there is already an intruder in its own home's alarm ring, and
+    // `defend` takes the tick. This cell is about collapse, so it stages the
+    // retreat where a retreat exists — the same place `decideAt` above does.
+    world.ships[0]!.pos = { x: 2000, y: 2000 };
+    world.ships[0]!.vel = { x: 0, y: 0 };
     world.ships[0]!.hull = world.ships[0]!.maxHull * 0.1;
     world.ships[1]!.pos = { x: world.ships[0]!.pos.x + 120, y: world.ships[0]!.pos.y };
+    world.ships[1]!.vel = { x: 0, y: 0 };
     expect(wantsRetreat(context(perceive(world, 0), brain))).toBe(true);
     // ...then the field runs dry: no hold worth saving, respawn is free.
     world.match.collapseTime = world.time; // isCollapsed ⇔ collapseTime >= 0
@@ -177,33 +204,68 @@ describe('the flee band holds — a committed retreat does not flap', () => {
 
 describe('a committed retreat goes somewhere (the screenshot scenario)', () => {
   /**
-   * The photograph, staged: a low-HP Warden beside its own station with an
-   * attacker sitting on that station — home is the danger, so the bot must break
-   * contact rather than run into the siege. Its core is whole, so this is
-   * self-preservation, not the last stand.
+   * The photograph, staged: a low-HP Warden with an attacker at knife range and
+   * a station in the picture. `mine` picks whose station, and that one parameter
+   * is the whole of a0-135 expressed as a fixture.
+   *
+   * On **its own** doorstep this is no longer a retreat board at all — a
+   * threatened home outranks self-preservation, at any hull, and `defend` takes
+   * the tick. So v0.2.2's *goes somewhere* claim is staged out in the field
+   * instead, where a retreat still exists, with the attacker on the far side of
+   * the bot from home: a tail, which is the geometry the field report actually
+   * photographed and the one `./cornered` does not own.
    */
-  function siegedAtHome(seed = 8): { world: World; me: number; threat: number } {
+  function stagedChase(seed = 8): World {
     const world = board(seed);
     const myHome = world.stations.find((p) => p.owner === 0)!;
     const me = world.ships[0]!;
     const threat = world.ships[1]!;
-    // Beside the station; the attacker on its far side.
-    me.pos = { x: myHome.pos.x - 40, y: myHome.pos.y };
+    // Out in the field, well clear of its own alarm ring.
+    me.pos = { x: 2000, y: 2000 };
     me.vel = { x: 0, y: 0 };
     me.hull = me.maxHull * 0.15; // low-health, past every nerve
+    // On its tail: the far side from home, so the way out and the way home are
+    // the same direction and a working retreat opens the gap every tick.
+    const dx = me.pos.x - myHome.pos.x;
+    const dy = me.pos.y - myHome.pos.y;
+    const d = Math.hypot(dx, dy) || 1;
+    // 80 units: the separation v0.2.2's own staging held these two at.
+    threat.pos = { x: me.pos.x + (dx / d) * 80, y: me.pos.y + (dy / d) * 80 };
+    threat.vel = { x: 0, y: 0 };
+    for (const s of world.ships) if (s.id !== 0 && s.id !== 1) s.alive = false;
+    return world;
+  }
+
+  /** The same picture with the station under the attacker being the bot's own —
+   *  v0.2.2's literal staging, which a0-135 rules the other way. */
+  function siegedAtOwnHome(seed = 8): World {
+    const world = board(seed);
+    const myHome = world.stations.find((p) => p.owner === 0)!;
+    const me = world.ships[0]!;
+    const threat = world.ships[1]!;
+    me.pos = { x: myHome.pos.x - 40, y: myHome.pos.y };
+    me.vel = { x: 0, y: 0 };
+    me.hull = me.maxHull * 0.15;
     threat.pos = { x: myHome.pos.x + 40, y: myHome.pos.y };
     threat.vel = { x: 0, y: 0 };
     for (const s of world.ships) if (s.id !== 0 && s.id !== 1) s.alive = false;
-    return { world, me: 0, threat: 1 };
+    return world;
   }
 
   it('increases distance from the threat monotonically, and commits to the flee', () => {
-    const { world } = siegedAtHome();
+    const world = stagedChase();
     const warden = createBot({ id: 0, personality: 'warden' }, { seed: 7 });
 
     let prev = dist(world.ships[0]!.pos, world.ships[1]!.pos);
     const start = prev;
-    for (let tick = 0; tick < 45; tick++) {
+    // One second, where v0.2.2's cell ran 45 ticks (0.75 s). Both numbers are
+    // the same distance: a hull starting from rest clears 100 units of gap in
+    // just under a second, and the old board bought the difference by having the
+    // bot beside a station it could push off the far side of. Measured on this
+    // branch, opened 18.9u by t=15, 83.9u by t=45, **117.8u by t=60**, and 389.8u
+    // by t=180, monotone at every one of those ticks. The assertion below is
+    // unchanged; only the window it is given moved.
+    for (let tick = 0; tick < 60; tick++) {
       step(world, botInputs(world, [warden]), TICK_DT);
       const d = dist(world.ships[0]!.pos, world.ships[1]!.pos);
       // Every single tick opens the gap — no twitch, no going nowhere.
@@ -215,6 +277,29 @@ describe('a committed retreat goes somewhere (the screenshot scenario)', () => {
     // It broke off, and committed to it (still fleeing, still inside the band).
     expect(warden.brain.lastBehavior).toBe('retreat');
     expect(committed(warden.brain.fleeing)).toBe(true);
+  });
+
+  it('but stands and fights when the station in the way is its own (a0-135)', () => {
+    // v0.2.2's literal board, ruled the other way by the same developer. On
+    // 2026-08-17 the reading was "home is the danger, break contact"; on
+    // 2026-08-22 it is *"protection of their base is essential to the game a
+    // player would defend at all costs"*. The bot does not break contact, never
+    // commits to a flee, and does not leave.
+    const world = siegedAtOwnHome();
+    const warden = createBot({ id: 0, personality: 'warden' }, { seed: 7 });
+    const home = world.stations.find((p) => p.owner === 0)!;
+    const start = dist(world.ships[0]!.pos, home.pos);
+
+    for (let tick = 0; tick < 45; tick++) {
+      step(world, botInputs(world, [warden]), TICK_DT);
+      expect(warden.brain.lastBehavior, `tick ${tick}`).not.toBe('retreat');
+      expect(committed(warden.brain.fleeing), `tick ${tick}`).toBe(false);
+    }
+    expect(warden.brain.lastBehavior).toBe('defend');
+    // …and it is still on its doorstep, not 100 units further off like the cell
+    // above. "A player would defend at all costs" is a claim about where the
+    // ship ends up, so that is what is measured.
+    expect(dist(world.ships[0]!.pos, home.pos) - start).toBeLessThan(100);
   });
 
   it('keeps the flip count bounded over 30 s of live pursuit', () => {
@@ -339,10 +424,18 @@ describe('the priority exception interrupts a committed retreat', () => {
     const myHome = world.stations.find((p) => p.owner === 0)!;
     const me = world.ships[0]!;
     const threat = world.ships[1]!;
-    me.pos = { x: myHome.pos.x - 200, y: myHome.pos.y };
+    // Out in the field, clear of its own alarm ring: a bot inside that ring has
+    // no retreat to interrupt any more (a0-135), and this cell is about what
+    // interrupts one. `coreUnderFinalAssault` reads the bot's own station view,
+    // which is legible from anywhere on the map, so the distance costs the cell
+    // nothing.
+    me.pos = { x: 2000, y: 2000 };
+    me.vel = { x: 0, y: 0 };
     me.hull = me.maxHull * 0.15;
-    threat.pos = { x: myHome.pos.x - 320, y: myHome.pos.y };
+    threat.pos = { x: me.pos.x - 120, y: me.pos.y };
+    threat.vel = { x: 0, y: 0 };
     for (const s of world.ships) if (s.id !== 0 && s.id !== 1) s.alive = false;
+    expect(dist(me.pos, myHome.pos), 'staged clear of its own alarm ring').toBeGreaterThan(520);
 
     const warden = createBot({ id: 0, personality: 'warden' }, { seed: 4 });
 
