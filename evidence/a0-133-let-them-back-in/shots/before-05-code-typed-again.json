@@ -1,0 +1,20 @@
+{
+  "code": "AB9Y",
+  "seatMemory": null,
+  "joiner": {
+    "screen": "online",
+    "matchStarted": false,
+    "online": {
+      "screen": "join",
+      "title": "ENTER THE ROOM CODE",
+      "status": "idle",
+      "error": ""
+    },
+    "lobby": null,
+    "badge": {
+      "text": "3f6cf82*",
+      "visible": true,
+      "server": null
+    }
+  }
+}

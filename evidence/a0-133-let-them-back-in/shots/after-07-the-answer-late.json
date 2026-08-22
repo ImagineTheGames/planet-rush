@@ -1,0 +1,57 @@
+{
+  "measuredAtMs": 50196,
+  "seatMemory": {
+    "room": "SNQH",
+    "seat": 1,
+    "tokenChars": 24,
+    "v": 1
+  },
+  "host": {
+    "screen": "online",
+    "matchStarted": true,
+    "online": {
+      "screen": "home",
+      "title": "JOINED · SEAT 1",
+      "status": "connecting",
+      "error": ""
+    },
+    "lobby": {
+      "visible": false,
+      "room": "SNQH",
+      "you": 0,
+      "humanCount": 2
+    },
+    "badge": {
+      "text": "d081e3f* · 4d891e33 (iad) · 388ms",
+      "visible": true,
+      "server": {
+        "machine": "4d891e33b27a95",
+        "region": "iad"
+      }
+    }
+  },
+  "joiner": {
+    "screen": "online",
+    "matchStarted": true,
+    "online": {
+      "screen": "join",
+      "title": "JOINED · SEAT 2",
+      "status": "connecting",
+      "error": ""
+    },
+    "lobby": {
+      "visible": false,
+      "room": "SNQH",
+      "you": 1,
+      "humanCount": 2
+    },
+    "badge": {
+      "text": "d081e3f* · 4d891e33 (iad) · 776ms",
+      "visible": true,
+      "server": {
+        "machine": "4d891e33b27a95",
+        "region": "iad"
+      }
+    }
+  }
+}

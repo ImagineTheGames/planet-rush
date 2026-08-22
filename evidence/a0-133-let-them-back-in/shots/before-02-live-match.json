@@ -1,0 +1,53 @@
+{
+  "code": "AB9Y",
+  "seat": 1,
+  "seatMemory": null,
+  "host": {
+    "screen": "online",
+    "matchStarted": true,
+    "online": {
+      "screen": "home",
+      "title": "JOINED · SEAT 1",
+      "status": "connecting",
+      "error": ""
+    },
+    "lobby": {
+      "visible": false,
+      "room": "AB9Y",
+      "you": 0,
+      "humanCount": 2
+    },
+    "badge": {
+      "text": "3f6cf82* · 0800d5b6 (iad) · 518ms",
+      "visible": true,
+      "server": {
+        "machine": "0800d5b6f1e208",
+        "region": "iad"
+      }
+    }
+  },
+  "joiner": {
+    "screen": "online",
+    "matchStarted": true,
+    "online": {
+      "screen": "join",
+      "title": "JOINED · SEAT 2",
+      "status": "connecting",
+      "error": ""
+    },
+    "lobby": {
+      "visible": false,
+      "room": "AB9Y",
+      "you": 1,
+      "humanCount": 2
+    },
+    "badge": {
+      "text": "3f6cf82* · 0800d5b6 (iad) · 997ms",
+      "visible": true,
+      "server": {
+        "machine": "0800d5b6f1e208",
+        "region": "iad"
+      }
+    }
+  }
+}
