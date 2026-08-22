@@ -108,7 +108,8 @@ import {
   valueChipHeight,
 } from '../art/materials';
 import type { FrameMetrics, PlateScale } from '../art/materials';
-import { beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
+import { bandOverflow, beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
+import { raisePlate, stampRowLift } from './build-stamp';
 import { contentTopBelow, refusalStrip } from './refusal-strip';
 
 // ---------------------------------------------------------------------------
@@ -1155,7 +1156,27 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       frame.footer.height + metrics.gutter + frame.band.height,
     ),
   );
-  const actionOverflow = Math.max(0, actionHeight - (frame.footer.height + metrics.gutter));
+  // Where that row actually lands: centred in the beam, bottom-aligned where the
+  // beam is shorter than the plate — and then lifted clear of the build stamp's
+  // row (a0-129, `./build-stamp`), which owns the bottom-left corner of this
+  // screen as it does every other. BACK is the plate that was sitting on it.
+  const footerStrip = beamContent(frame.footer, metrics, 'footer');
+  const footerBottom = frame.footer.y + frame.footer.height;
+  const actionSpan: Rect = {
+    x: footerStrip.x,
+    y: Math.min(
+      footerStrip.y + (footerStrip.height - actionHeight) / 2,
+      footerBottom - actionHeight,
+    ),
+    width: footerStrip.width,
+    height: actionHeight,
+  };
+  // BACK is the plate that lands on the stamp; RUSH! rises with it, because the
+  // two are one row in one beam. The span is what is tested, so a beam whose
+  // leading end is clear keeps its row exactly where it was.
+  const actionRow = raisePlate(actionSpan, stampRowLift([actionSpan], frame.stamp));
+  const actionY = actionRow.y;
+  const actionOverflow = bandOverflow(frame, actionRow);
   const band: Rect = {
     ...frame.band,
     height: Math.max(0, frame.band.height - actionOverflow),
@@ -1185,12 +1206,6 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // centred in it is bottom-aligned instead and grows upward — never past the
   // safe-area edge below it, and never into the band, which gave up exactly that
   // many pixels above.
-  const footerStrip = beamContent(frame.footer, metrics, 'footer');
-  const footerBottom = frame.footer.y + frame.footer.height;
-  const actionY = Math.min(
-    footerStrip.y + (footerStrip.height - actionHeight) / 2,
-    footerBottom - actionHeight,
-  );
   const backWidth = Math.max(0, Math.min(scaled(LOBBY_BACK_WIDTH, metrics), footerStrip.width));
   const leave: Rect = { x: footerStrip.x, y: actionY, width: backWidth, height: actionHeight };
   const rushWidth = Math.max(
@@ -1879,48 +1894,94 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const squeeze = wanted > 0 ? Math.min(1, room / wanted) : 0;
   const plateW = (reference: number): number =>
     Math.max(0, Math.min(Math.floor(reference * m.plateScale * squeeze), footerStrip.width));
-  const back = beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH));
-  const submit = beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH));
-  const erase = beamPlate(
-    footerStrip,
-    m,
-    'trailing',
-    plateW(ENTRY_ERASE_WIDTH),
-    'compact',
-    submit.width + footerGutter,
+  // All three lifted clear of the build stamp's row TOGETHER (a0-129,
+  // `./build-stamp`). Together and not just BACK: they are one row of plates in
+  // one beam, and a row whose three plates sit at two heights is not a row. The
+  // lift is `stampRowLift`'s, so it is zero unless one of the three really is on
+  // the stamp — which BACK is on every viewport, being bolted to the leading end
+  // of the beam the stamp is drawn on.
+  const seated = [
+    beamPlate(footerStrip, m, 'leading', plateW(ENTRY_BACK_WIDTH)),
+    beamPlate(footerStrip, m, 'trailing', plateW(ENTRY_SUBMIT_WIDTH)),
+  ];
+  seated.push(
+    beamPlate(
+      footerStrip,
+      m,
+      'trailing',
+      plateW(ENTRY_ERASE_WIDTH),
+      'compact',
+      seated[1]!.width + footerGutter,
+    ),
+  );
+  const footerLift = stampRowLift(seated, frame.stamp);
+  const [back, submit, erase] = seated.map((r) => raisePlate(r, footerLift)) as [Rect, Rect, Rect];
+  /** The y the band's content may not pass: the top of the lifted footer row.
+   *  Equal to the band's own bottom edge on every viewport whose beam already
+   *  held its plates — every desktop — so it costs those screens nothing. */
+  const contentFloor = Math.min(
+    frame.band.y + frame.band.height,
+    back.width > 0 ? back.y : Infinity,
+    erase.width > 0 ? erase.y : Infinity,
+    submit.width > 0 ? submit.y : Infinity,
   );
 
   // --- The band both screens divide ----------------------------------------
+  const band = frame.band;
   const messageHeight = Math.min(
-    frame.band.height,
+    band.height,
     Math.max(0, Math.round(ENTRY_MESSAGE_HEIGHT * m.scale)),
   );
   const message: Rect = {
-    x: frame.band.x,
-    y: frame.band.y,
-    width: frame.band.width,
+    x: band.x,
+    y: band.y,
+    width: band.width,
     height: messageHeight,
   };
   // a0-114: a refusal's own buttons are a fixed DOM surface that lands between the
   // message and the doors, and until this line the doors were laid out straight
   // through it. The strip is claimed FIRST and the band resumes below it, so the
   // plate a thumb is aimed at is the plate it hits.
-  const refusal = refusalStrip({ message, band: frame.band, gutter: m.gutter, height: refusalHeight });
+  const refusal = refusalStrip({ message, band, gutter: m.gutter, height: refusalHeight });
   const middleY = contentTopBelow(message, refusal, m.gutter);
   const middle: Rect = {
-    x: frame.band.x,
+    x: band.x,
     y: middleY,
-    width: frame.band.width,
-    height: Math.max(0, frame.band.y + frame.band.height - middleY),
+    width: band.width,
+    height: Math.max(0, band.y + band.height - middleY),
+  };
+  /** …and the same band cut off at the footer row (a0-129). */
+  const middleAboveFooter: Rect = {
+    ...middle,
+    height: Math.max(0, Math.min(middle.y + middle.height, contentFloor) - middle.y),
   };
 
+  // **The band gives it up to the content that actually reaches it** (a0-129) —
+  // the same "reserved when it is there and not otherwise" ruling `./minimap`'s
+  // FIRE column keeps, and here it decides whether four plates move.
+  //
+  // The doors are a CENTRED stack (`placeDoors`) and on almost every screen they
+  // have slack: charging them for a lift they never touch would re-centre the
+  // front door of the game for a plate 40px below them. So they are placed in the
+  // whole band and re-placed in the short one only where the stack really does
+  // run into the footer row — a refusal panel up on a short phone, which is the
+  // one case a0-114 measured them filling it.
   const doors: Rect[] = [];
-  const doorShape = placeDoors(doors, middle, m);
+  let doorShape = placeDoors(doors, middle, m);
+  if (doors.some((d) => d.y + d.height > contentFloor + 1e-6)) {
+    doors.length = 0;
+    doorShape = placeDoors(doors, middleAboveFooter, m);
+  }
 
   // The JOIN screen's two modes share one band: the switch leads its top strip in
   // both, the code cells take the rest of that strip in CODE mode, and the list
   // takes everything under it in BROWSE mode. Both are laid out every time.
-  const join = placeJoinModes(middle, m);
+  //
+  // These two FILL their band rather than centring in it — the bottom key row and
+  // the browse list both end on its edge — so they take the short one every time.
+  // Measured without it: 5px of `key29`..`key31` under ERASE and 5px of the list
+  // under all three plates, on the 798x384 handset a0-127 photographed.
+  const join = placeJoinModes(middleAboveFooter, m);
 
   return {
     content: frame.content,
@@ -1932,7 +1993,8 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     refusal,
     doors,
     doorShape,
-    ...placeCodeEntry(middle, join.cellsRow),
+    // The keypad fills its band like the list above it, so it takes the short one.
+    ...placeCodeEntry(middleAboveFooter, join.cellsRow),
     segments: join.segments,
     segmentShape: join.shape,
     browseRows: join.rows,

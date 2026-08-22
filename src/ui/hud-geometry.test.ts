@@ -37,7 +37,41 @@ import type { Combatant } from './healthbar';
 import { stationHpModel } from './station-hp';
 import { zoomControlBounds } from './zoom-control';
 import { affordanceRects, buildButtonRect } from '@platform/touch-visuals';
-import { writeBadgeRect } from '../render/build-badge';
+import {
+  BADGE_ANCHOR,
+  BADGE_FONT_SIZE,
+  BADGE_ID,
+  BADGE_MARGIN,
+  badgeAvailableWidth,
+  writeBadgeRect,
+} from '../render/build-badge';
+import {
+  BUILD_STAMP_ANCHOR,
+  BUILD_STAMP_ID,
+  BUILD_STAMP_LINE,
+  BUILD_STAMP_MARGIN,
+  buildStampEntry,
+  buildStampRow,
+  clearBuildStamp,
+} from './build-stamp';
+import {
+  FOOTER_PLATE_LEADING_ANCHOR,
+  FOOTER_PLATE_TRAILING_ANCHOR,
+  beamActionPlate,
+  beamContent,
+  gantryFrame,
+} from './gantry';
+import { MAP_SELECT_BACK_ID, mapSelectLayout } from './map-select';
+import { SHIP_SELECT_BACK_ID, shipSelectLayout } from './ship-select';
+import { CODEX_BACK_ID, codexLayout } from './codex';
+import { HANGAR_BACK_ID, hangarLayout } from './hangar';
+import { SETTINGS_DONE_ID, settingsLayout } from './settings';
+import { LOBBY_LEAVE_ID, LOBBY_RUSH_ID } from './lobby-view';
+import { ENTRY_BACK_ID, ENTRY_ERASE_ID, ENTRY_SUBMIT_ID } from './lobby-entry-view';
+import { entryLayout, lobbyLayout } from './lobby-geometry';
+import { mainMenuLayout } from './main-menu';
+import { endButtons, endOfMatchLayout } from './end-of-match';
+import type { MatchOutcome } from './end-of-match';
 import { writePingRect } from '../net/ping-badge';
 import {
   FS_AFFORDANCE_MARGIN,
@@ -106,8 +140,13 @@ import {
 } from './hud-geometry';
 import type { AnnularSector, OreCounterLayout } from './hud-geometry';
 import { contentBox } from './viewport';
-import { pauseButtonRect } from './pause-menu';
-import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
+import { pauseButtonRect, pauseButtons, pauseLayout } from './pause-menu';
+import {
+  BUILD_STAMP_EXCLUSIONS,
+  MENU_FOOTER_PLATE_IDS,
+  exclusionViolations,
+  LAYOUT_EXCLUSIONS,
+} from './layout-exclusions';
 // a0-115's keep-out: the rule that a world-anchored label is never drawn inside a
 // fixed readout's rect, stated in the registry's own vocabulary next door.
 import {
@@ -3565,5 +3604,280 @@ describe('the arrow home clears everything fixed on the glass (a0-125)', () => {
     // old arrow really did land on these rects, and the new one really does move.
     expect(covered).toBeGreaterThan(0);
     expect(cleared).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The build stamp and the menus it is drawn over (a0-129)
+// ---------------------------------------------------------------------------
+//
+// ## What was measured, and why nothing could have caught it
+//
+// a0-127, photographing three unrelated changes, looked at MAP SELECT on a
+// phone at 4x and found the BACK plate drawn across the build stamp — the corner
+// mark M10 ratified as *"shown on every single page"*, at `{8,363 43.5x13}`,
+// with the plate's angled lower-left corner over its right-hand half and the
+// plate's white accent bar on the final character. Then the line that made this
+// a brief rather than a fix:
+//
+//   > MEASURED off these pixels rather than off a registry — there is no
+//   > registry to read here.
+//
+// a0-122's sweep compares registered rects, so it is exactly as complete as the
+// registry it reads, and on a menu screen the registry was EMPTY: `main.ts`
+// `refreshLayout` is the client's one registration path, it runs on match
+// frames, and the badge registers there and nowhere else. An element on every
+// page, registered on one of them.
+//
+// ## What this case is
+//
+// The census below is every screen the stamp is drawn over, as `LayoutEntry`s —
+// the same ids, anchors and rects the screens' own `describeLayout` hands the
+// registry, built here from the same pure layout functions the views draw from.
+// The verdict is `./layout-exclusions` `exclusionViolations`: the shipped rule
+// engine, reading the shipped table, with `BUILD_STAMP_EXCLUSIONS`'s one row per
+// menu footer plate. Nothing here re-states a rule in test-local arithmetic —
+// this is the a0-100 shape, one screen family over.
+describe('the build stamp on every screen it is drawn over (a0-129)', () => {
+  /** The mirrors in `./build-stamp` against the module that actually draws it.
+   *  Pixi lives in `@render`; `./build-stamp` is Pixi-free like the rest of the
+   *  geometry layer, so the numbers are copied and pinned here — the discipline
+   *  `./anchor-reach` uses for `BADGE_STRIP_LIFT`. */
+  it('the mirrored badge numbers still match `@render/build-badge`', () => {
+    expect(BUILD_STAMP_ID).toBe(BADGE_ID);
+    expect(BUILD_STAMP_MARGIN).toBe(BADGE_MARGIN);
+    expect(BUILD_STAMP_ANCHOR).toEqual(BADGE_ANCHOR);
+    // The line box is the one number that is a measurement rather than a mirror
+    // (the stamp is set in the platform's mono stack, which `./font-metrics` has
+    // no advances for). Two things pin it: it cannot be under the type size, and
+    // it is what a0-127's client reported drawing.
+    expect(BUILD_STAMP_LINE).toBeGreaterThanOrEqual(BADGE_FONT_SIZE);
+    expect(BUILD_STAMP_LINE).toBe(13);
+
+    // …and the row really is the badge's own corner, not a second opinion about
+    // it: same x, same bottom edge, and the width `badgeAvailableWidth` allows.
+    for (const { name, vp } of PROFILES) {
+      const row = buildStampRow(vp);
+      const drawn = writeBadgeRect(row.width, row.height, vp.width, vp.height, {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+      });
+      expect(row.x, name).toBe(drawn.x);
+      expect(row.y, name).toBe(drawn.y);
+      expect(row.width, name).toBe(badgeAvailableWidth(vp.width));
+    }
+  });
+
+  /** The list the exclusion rows are generated from, against the ids the screens
+   *  actually register. A row about an id no screen registers is a row that can
+   *  never fire, and this is what stops one appearing by a typo. */
+  it('every menu footer plate on the keep-out list is an id a screen registers', () => {
+    expect([...MENU_FOOTER_PLATE_IDS].sort()).toEqual(
+      [
+        MAP_SELECT_BACK_ID,
+        SHIP_SELECT_BACK_ID,
+        CODEX_BACK_ID,
+        HANGAR_BACK_ID,
+        SETTINGS_DONE_ID,
+        LOBBY_LEAVE_ID,
+        LOBBY_RUSH_ID,
+        ENTRY_BACK_ID,
+        ENTRY_ERASE_ID,
+        ENTRY_SUBMIT_ID,
+      ].sort(),
+    );
+    expect(BUILD_STAMP_EXCLUSIONS).toHaveLength(MENU_FOOTER_PLATE_IDS.length);
+    for (const rule of BUILD_STAMP_EXCLUSIONS) expect(rule.a).toBe(BUILD_STAMP_ID);
+  });
+
+  /**
+   * Every screen the badge layer draws over, as its registry entries.
+   *
+   * The stamp entry is `buildStampEntry`'s, exactly as each view now hands it to
+   * the registry, and each plate entry is that screen's own id, anchor and rect
+   * off its own layout function. A screen with no plate in the corner still
+   * appears, with its stamp: the case has to be able to say a screen is CLEAR,
+   * not merely that the ones it looked at are.
+   */
+  const screensOf = (vp: Viewport, isTouch: boolean): { screen: string; entries: LayoutEntry[] }[] => {
+    const o = { isTouch };
+    const stamp = buildStampEntry(vp);
+    const lead = FOOTER_PLATE_LEADING_ANCHOR;
+    const trail = FOOTER_PLATE_TRAILING_ANCHOR;
+    const mapSelect = mapSelectLayout(vp, o);
+    const shipSelect = shipSelectLayout(vp, o);
+    const codex = codexLayout(vp, CODEX_CENSUS_ENTRIES, o);
+    const hangar = hangarLayout(vp, o);
+    const settings = settingsLayout(vp, o);
+    const lobby = lobbyLayout(vp, o);
+    const entry = entryLayout(vp, o);
+    const menu = mainMenuLayout(vp, o);
+    const pause = pauseLayout(vp, PAUSE_CENSUS_BUTTONS, o);
+    const end = endOfMatchLayout(vp, END_CENSUS_BUTTONS, o);
+    return [
+      {
+        screen: 'map-select',
+        entries: [stamp, { id: MAP_SELECT_BACK_ID, anchor: lead, bounds: mapSelect.back }],
+      },
+      {
+        screen: 'ship-select',
+        entries: [stamp, { id: SHIP_SELECT_BACK_ID, anchor: lead, bounds: shipSelect.back }],
+      },
+      { screen: 'codex', entries: [stamp, { id: CODEX_BACK_ID, anchor: lead, bounds: codex.back }] },
+      { screen: 'hangar', entries: [stamp, { id: HANGAR_BACK_ID, anchor: trail, bounds: hangar.back }] },
+      {
+        screen: 'settings',
+        entries: [stamp, { id: SETTINGS_DONE_ID, anchor: trail, bounds: settings.back }],
+      },
+      {
+        screen: 'lobby',
+        entries: [
+          stamp,
+          { id: LOBBY_LEAVE_ID, anchor: lead, bounds: lobby.leave },
+          { id: LOBBY_RUSH_ID, anchor: trail, bounds: lobby.rushButton },
+        ],
+      },
+      {
+        screen: 'lobby-entry',
+        entries: [
+          stamp,
+          { id: ENTRY_BACK_ID, anchor: lead, bounds: entry.back },
+          { id: ENTRY_ERASE_ID, anchor: trail, bounds: entry.erase },
+          { id: ENTRY_SUBMIT_ID, anchor: trail, bounds: entry.submit },
+        ],
+      },
+      // Three screens with nothing bolted to the footer beam. They carry no
+      // plate id, so the table has nothing to say about them — which is the
+      // answer, and it is worth sweeping for exactly that reason: the main menu
+      // is the screen this defect never happened on, and the reason is that its
+      // actions are centred in the band and its footer beam is left to be the
+      // stamp's ground (`./main-menu` `MainMenuLayout.footer`).
+      { screen: 'main-menu', entries: [stamp, ...bandButtons('main-menu-button', menu.buttons)] },
+      { screen: 'pause-menu', entries: [stamp, ...bandButtons('pause-button', pause.buttons)] },
+      { screen: 'end-of-match', entries: [stamp, ...bandButtons('end-button', end.buttons)] },
+    ];
+  };
+
+  /** A stack of plates centred in the band, registered under throwaway ids so the
+   *  sweep below can be told they are clear rather than left to assume it. They
+   *  are NOT on `MENU_FOOTER_PLATE_IDS` — the table would say nothing about them
+   *  — so this case measures them directly, against the same row. */
+  const bandButtons = (prefix: string, rects: readonly Rect[]): LayoutEntry[] =>
+    rects.map((bounds, i) => ({ id: `${prefix}-${i}`, anchor: FULL, bounds }));
+
+  const CODEX_CENSUS_ENTRIES = 6;
+  /** The deepest stack either overlay draws — the pause menu's three plates, and
+   *  the two the result screen carries once the match is over. */
+  const PAUSE_CENSUS_BUTTONS = pauseButtons('menu');
+  const END_CENSUS_BUTTONS = endButtons({ matchOver: true } as MatchOutcome);
+
+  it('the build stamp is readable on every screen that draws it', () => {
+    // THE assertion. Two halves, and both are the same rule:
+    //
+    //  1. the shipped table, through the shipped engine, over every screen's
+    //     registered entries — the menu footer plates;
+    //  2. the same row against everything ELSE those screens put on the glass,
+    //     because a rule that only looks at the ten ids it already knows about
+    //     cannot report the eleventh. The stamp's row must be clear of every
+    //     plate on the screen, whether or not it has a row of its own.
+    //
+    // Every profile in the matrix, both control schemes. The stamp is on every
+    // page, so "every screen" is the whole of the front of the game.
+    const violations: string[] = [];
+    for (const { name, vp, isTouch } of PROFILES) {
+      const row = buildStampRow(vp);
+      for (const { screen, entries } of screensOf(vp, isTouch)) {
+        for (const v of exclusionViolations(entries)) {
+          violations.push(
+            `${name} / ${screen}: ${v.a} ${fmt(v.boundsA)} ∩ ${v.b} ${fmt(v.boundsB)} = ` +
+              `${fmt(v.overlap)} — ${v.why}`,
+          );
+        }
+        for (const e of entries) {
+          if (e.id === BUILD_STAMP_ID) continue;
+          const shared = rectOverlap(row, e.bounds);
+          if (shared) {
+            violations.push(
+              `${name} / ${screen}: "${e.id}" ${fmt(e.bounds)} is in the stamp's row ` +
+                `${fmt(row)} — they share ${fmt(shared)}`,
+            );
+          }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('a0-129s own frame: the plate that was on the stamp, before and after', () => {
+    // The screen QA photographed, to the logical pixel, so this case stays
+    // checkable against the report rather than against a recomputation of it.
+    const vp: Viewport = { width: 798, height: 384 };
+    const stamp = { x: 8, y: 363, width: 43.5, height: 13 };
+
+    // The rect a0-127 read off the client, reproduced by the shipped placement:
+    // same corner, same bottom edge, same line.
+    const row = buildStampRow(vp);
+    expect(row.x).toBe(stamp.x);
+    expect(row.y).toBe(stamp.y);
+    expect(row.height).toBe(stamp.height);
+
+    // BEFORE — BACK centred in the footer beam, which is where every gantry
+    // screen put its leading plate until this brief. 28.5 of the stamp's 43.5
+    // logical px under the plate: QA's "55% of the stamp's registered rect sits
+    // over the plate's body", measured against the body rather than the rect,
+    // since `drawPlate` cuts the plate's lower-left corner away.
+    const beam = gantryFrame(vp).footer;
+    const strip = beamContent(beam, gantryFrame(vp).metrics, 'footer');
+    const height = 48;
+    const before = {
+      x: strip.x,
+      y: Math.min(strip.y + (strip.height - height) / 2, beam.y + beam.height - height),
+      width: 103,
+      height,
+    };
+    const was = rectOverlap(before, stamp)!;
+    expect(was, 'the plate really was on the stamp').not.toBeNull();
+    expect(was.width).toBeCloseTo(28.5, 1);
+    expect(was.height).toBeCloseTo(13, 6);
+
+    // AFTER — the shipped layout. Clear, and clear by having gone UP: the plate
+    // is the same size, in the same corner, at the same x.
+    const after = mapSelectLayout(vp, { isTouch: true }).back;
+    expect(rectOverlap(after, stamp)).toBeNull();
+    expect(after.x).toBe(before.x);
+    expect(after.width).toBe(before.width);
+    expect(after.height).toBe(before.height);
+    expect(after.y).toBeLessThan(before.y);
+    // …and it stops exactly at the stamp's row rather than somewhere above it:
+    // the fix spends the smallest movement that works, so the band pays the least.
+    expect(after.y + after.height).toBe(row.y);
+  });
+
+  it('spends the smallest movement that works, and none where none is needed', () => {
+    // The cost, stated rather than discovered. A footer beam runs to the bottom
+    // of the frame by construction (`./gantry`: *"a beam is structure — it is the
+    // edge of the screen, so it runs to the edge of the screen"*), so a plate
+    // centred in one is always within a few px of the stamp's row, and the
+    // handoff's own 92px beam leaves 18 under a 56px plate against a row 21 deep.
+    // On a DESKTOP the whole fix is therefore three pixels — a number worth
+    // writing down, because "the menus were re-laid out" is what it must not be.
+    const desktop: Viewport = { width: 1280, height: 800 };
+    const frame = gantryFrame(desktop);
+    const strip = beamContent(frame.footer, frame.metrics, 'footer');
+    const plate = beamActionPlate(frame, frame.metrics, 120);
+    const centred = strip.y + (strip.height - plate.rect.height) / 2;
+    expect(centred - plate.rect.y).toBe(3);
+    // Still inside its beam, so nothing is charged to the band and no screen
+    // above it moves at all.
+    expect(plate.rect.y).toBeGreaterThanOrEqual(frame.footer.y);
+    expect(plate.overflow).toBe(0);
+    expect(rectOverlap(plate.rect, buildStampRow(desktop))).toBeNull();
+
+    // And where a plate is already clear it is returned untouched — the identity
+    // that stops this rule from re-laying out screens it has nothing to say about.
+    const clear: Rect = { x: 10, y: 10, width: 100, height: 40 };
+    expect(clearBuildStamp(clear, buildStampRow(desktop))).toBe(clear);
   });
 });

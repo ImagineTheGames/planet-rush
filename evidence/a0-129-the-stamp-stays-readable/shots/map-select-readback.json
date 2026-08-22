@@ -1,0 +1,65 @@
+{
+  "corner": {
+    "x": 0,
+    "y": 344,
+    "w": 200,
+    "h": 40
+  },
+  "profile": {
+    "id": "phone-798x384",
+    "width": 798,
+    "height": 384,
+    "dpr": 2,
+    "touch": true
+  },
+  "frames": [
+    {
+      "name": "map-select-before",
+      "bundle": "before",
+      "profile": "phone-798x384",
+      "stamp": {
+        "text": "85c173d*",
+        "visible": true,
+        "withinAnchor": true
+      },
+      "stampRect": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      },
+      "behindTheStamp": {
+        "max": 255,
+        "mean": 67.3,
+        "pixels": 2262
+      },
+      "plateTopInStampColumns": 335.5,
+      "stampRowTop": 363,
+      "registryReadback": null
+    },
+    {
+      "name": "map-select-after",
+      "bundle": "after",
+      "profile": "phone-798x384",
+      "stamp": {
+        "text": "4bc7ee5*",
+        "visible": true,
+        "withinAnchor": true
+      },
+      "stampRect": {
+        "x": 8,
+        "y": 363,
+        "width": 43.5,
+        "height": 13
+      },
+      "behindTheStamp": {
+        "max": 81.9,
+        "mean": 26.5,
+        "pixels": 2262
+      },
+      "plateTopInStampColumns": 315,
+      "stampRowTop": 363,
+      "registryReadback": null
+    }
+  ]
+}

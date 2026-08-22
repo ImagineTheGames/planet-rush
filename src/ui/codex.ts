@@ -35,7 +35,8 @@
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, beamPlate, gantryFrame, menuColumnBand } from './gantry';
+import { bandOverflow, beamContent, beamPlate, gantryFrame, menuColumnBand } from './gantry';
+import { clearBuildStamp } from './build-stamp';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
@@ -531,12 +532,23 @@ export function codexLayout(
   // is a utility screen and its heading is what names it, not a wordmark.
   const title = beamContent(frame.header, m);
   const footerStrip = beamContent(frame.footer, m, 'footer');
-  const back = beamPlate(
-    footerStrip,
-    m,
-    'leading',
-    Math.max(0, Math.min(Math.round(CODEX_BACK_WIDTH * m.plateScale), footerStrip.width)),
+  // Lifted clear of the build stamp's row (a0-129, `./build-stamp`): BACK is
+  // bolted to the leading end of the footer beam, which is the corner the stamp
+  // has been drawn in on every page since M10. The band below gives up whatever
+  // the lift costs it, the same way the two picker screens' BACK is paid for.
+  const back = clearBuildStamp(
+    beamPlate(
+      footerStrip,
+      m,
+      'leading',
+      Math.max(0, Math.min(Math.round(CODEX_BACK_WIDTH * m.plateScale), footerStrip.width)),
+    ),
+    frame.stamp,
   );
+  const bandBox: Rect = {
+    ...frame.band,
+    height: Math.max(0, frame.band.height - bandOverflow(frame, back)),
+  };
 
   // The tab row, off the top of the band. A value chip's height, which is floored
   // at the thumb minimum on every device — the brief's one hard number here.
@@ -555,7 +567,7 @@ export function codexLayout(
   // "fits the band" to "cut mid-sentence". Field is not worth a paragraph, so on
   // a phone this screen keeps its band and the ceiling does its work where there
   // is room to spare.
-  const band = menuColumnBand(frame.band, COLUMN.title + COLUMN.settings * 0.5, m, 2);
+  const band = menuColumnBand(bandBox, COLUMN.title + COLUMN.settings * 0.5, m, 2);
   const tabHeight = Math.max(0, Math.min(valueChipHeight(m), band.height));
   const tabs = tabStrip({ x: band.x, y: band.y, width: band.width, height: tabHeight }, m);
 
@@ -691,6 +703,10 @@ export function codexTargetKey(target: CodexTarget | null): string | null {
 
 /** The codex's layout-registry id and anchor: it owns the screen. */
 export const CODEX_ID = 'codex';
+
+/** BACK's own registry id (a0-129) — this screen's one footer plate, in the
+ *  corner the build stamp owns. */
+export const CODEX_BACK_ID = 'codex-back';
 
 // ---------------------------------------------------------------------------
 // Lobby reuse (GDD §2.10 point 2) — the same data, where the lobby answers a

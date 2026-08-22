@@ -100,6 +100,8 @@ import {
   lobbyLayout,
 } from './lobby-geometry';
 import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
+import { FOOTER_PLATE_LEADING_ANCHOR, FOOTER_PLATE_TRAILING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 import { FONT_BODY, FONT_HEADING } from './typography';
 import { MapPickerView } from './map-picker-view';
 import type { MapPickerLayout } from './map-picker';
@@ -158,6 +160,12 @@ const PICK_LABEL_PAD = 6;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
+
+/** The two footer plates' registry ids (a0-129): BACK at the leading end — the
+ *  corner the build stamp owns — and RUSH! at the trailing end, which reaches
+ *  the same corner on a portrait handset. */
+export const LOBBY_LEAVE_ID = 'lobby-leave';
+export const LOBBY_RUSH_ID = 'lobby-rush';
 export const LOBBY_ANCHOR: AnchorSpec = { region: 'full' };
 
 // ---------------------------------------------------------------------------
@@ -342,9 +350,18 @@ export class LobbyView extends Container {
 
   /** The layout-registry seam (`LayoutContributor`): the lobby owns the screen,
    *  so it declares `full` and reports the content box it actually drew in. */
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: LOBBY_ID, anchor: LOBBY_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: LOBBY_ID, anchor: LOBBY_ANCHOR, bounds: { ...this.layout.content } },
+      { id: LOBBY_LEAVE_ID, anchor: FOOTER_PLATE_LEADING_ANCHOR, bounds: { ...this.layout.leave } },
+      { id: LOBBY_RUSH_ID, anchor: FOOTER_PLATE_TRAILING_ANCHOR, bounds: { ...this.layout.rushButton } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   /**

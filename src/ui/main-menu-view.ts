@@ -60,6 +60,7 @@ import type {
 } from './main-menu';
 import type { Insets } from './menu-geometry';
 import { ScreenCache } from './screen-cache';
+import { buildStampEntry } from './build-stamp';
 
 export const MAIN_MENU_ANCHOR: AnchorSpec = { region: 'full' };
 
@@ -148,9 +149,20 @@ export class MainMenuView extends Container {
     return mainMenuHitTest(this.layout, x, y);
   }
 
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: MAIN_MENU_ID, anchor: MAIN_MENU_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: MAIN_MENU_ID, anchor: MAIN_MENU_ANCHOR, bounds: { ...this.layout.content } },
+      // No footer plate to register: this screen's actions are centred in the
+      // band, and its own layout has always said the footer beam is what the
+      // stamp sits on (`./main-menu` `MainMenuLayout.footer`). It is the screen
+      // that never had a0-129's defect, and the one the fix is modelled on.
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   update(model: MainMenuModel): void {

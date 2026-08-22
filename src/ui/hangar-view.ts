@@ -50,7 +50,9 @@ import { shipSprite } from '../art/ships';
 import { drawSprite } from '../art/textures';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_BODY, FONT_HEADING } from './typography';
-import { HANGAR_BAY_PLATE, HANGAR_ID, hangarHitTest, hangarLayout } from './hangar';
+import { HANGAR_BACK_ID, HANGAR_BAY_PLATE, HANGAR_ID, hangarHitTest, hangarLayout } from './hangar';
+import { FOOTER_PLATE_TRAILING_ANCHOR } from './gantry';
+import { buildStampEntry } from './build-stamp';
 import type { HangarLayout, HangarModel, HangarRowView, HangarTarget } from './hangar';
 import type { Insets } from './menu-geometry';
 import { ScreenCache } from './screen-cache';
@@ -185,9 +187,17 @@ export class HangarView extends Container {
     return hangarHitTest(this.layout, x, y);
   }
 
-  describeLayout(_viewport: Viewport): LayoutEntry[] {
+  describeLayout(viewport: Viewport): LayoutEntry[] {
     if (!this.visible) return [];
-    return [{ id: HANGAR_ID, anchor: HANGAR_ANCHOR, bounds: { ...this.layout.content } }];
+    return [
+      { id: HANGAR_ID, anchor: HANGAR_ANCHOR, bounds: { ...this.layout.content } },
+      { id: HANGAR_BACK_ID, anchor: FOOTER_PLATE_TRAILING_ANCHOR, bounds: { ...this.layout.back } },
+      // The build stamp, drawn over this screen by the boot path's badge layer
+      // and registered here so the overlap sweep can see it (a0-129). It is not
+      // this screen's element and this screen does not draw it — but it is ON
+      // this screen, and a rect nothing registers is a rect no gate arbitrates.
+      buildStampEntry(viewport),
+    ];
   }
 
   update(model: HangarModel): void {

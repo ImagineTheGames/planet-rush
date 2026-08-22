@@ -1,0 +1,303 @@
+{
+  "base": "origin/main",
+  "report": [
+    {
+      "golden": "desktop-codex-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 5965,
+      "ratio": "0.583%",
+      "bbox": {
+        "x": 8,
+        "y": 39,
+        "width": 1063,
+        "height": 751
+      },
+      "fromBottom": 10,
+      "fromTop": 39,
+      "buckets": 112,
+      "heaviest": [
+        "[96,736]:683",
+        "[96,704]:598",
+        "[64,704]:583",
+        "[64,736]:527"
+      ]
+    },
+    {
+      "golden": "desktop-doors-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 6044,
+      "ratio": "0.590%",
+      "bbox": {
+        "x": 8,
+        "y": 32,
+        "width": 1003,
+        "height": 758
+      },
+      "fromBottom": 10,
+      "fromTop": 32,
+      "buckets": 51,
+      "heaviest": [
+        "[96,736]:683",
+        "[96,704]:598",
+        "[64,704]:583",
+        "[64,736]:527"
+      ]
+    },
+    {
+      "golden": "desktop-lobby-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 13339,
+      "ratio": "1.303%",
+      "bbox": {
+        "x": 8,
+        "y": 314,
+        "width": 1228,
+        "height": 476
+      },
+      "fromBottom": 10,
+      "fromTop": 314,
+      "buckets": 54,
+      "heaviest": [
+        "[1120,736]:706",
+        "[96,736]:612",
+        "[1088,736]:578",
+        "[1152,736]:562"
+      ]
+    },
+    {
+      "golden": "desktop-lobby-teams-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 12986,
+      "ratio": "1.268%",
+      "bbox": {
+        "x": 8,
+        "y": 314,
+        "width": 1228,
+        "height": 476
+      },
+      "fromBottom": 10,
+      "fromTop": 314,
+      "buckets": 51,
+      "heaviest": [
+        "[1120,736]:706",
+        "[96,736]:612",
+        "[1088,736]:578",
+        "[1152,736]:562"
+      ]
+    },
+    {
+      "golden": "desktop-map-select-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 27862,
+      "ratio": "2.721%",
+      "bbox": {
+        "x": 8,
+        "y": 302,
+        "width": 1220,
+        "height": 488
+      },
+      "fromBottom": 10,
+      "fromTop": 302,
+      "buckets": 161,
+      "heaviest": [
+        "[96,736]:641",
+        "[704,384]:610",
+        "[128,736]:598",
+        "[64,736]:555"
+      ]
+    },
+    {
+      "golden": "desktop-ship-select-desktop-linux.png",
+      "size": "1280x800",
+      "changed": 4804,
+      "ratio": "0.469%",
+      "bbox": {
+        "x": 8,
+        "y": 337,
+        "width": 864,
+        "height": 453
+      },
+      "fromBottom": 10,
+      "fromTop": 337,
+      "buckets": 21,
+      "heaviest": [
+        "[96,736]:641",
+        "[128,736]:598",
+        "[64,736]:555",
+        "[96,704]:480"
+      ]
+    },
+    {
+      "golden": "phone-landscape-codex-iphone-linux.png",
+      "size": "844x390",
+      "changed": 8988,
+      "ratio": "2.731%",
+      "bbox": {
+        "x": 9,
+        "y": 22,
+        "width": 494,
+        "height": 367
+      },
+      "fromBottom": 1,
+      "fromTop": 22,
+      "buckets": 60,
+      "heaviest": [
+        "[32,320]:1024",
+        "[64,320]:1024",
+        "[96,320]:1024",
+        "[128,320]:889"
+      ]
+    },
+    {
+      "golden": "phone-landscape-doors-iphone-linux.png",
+      "size": "844x390",
+      "changed": 9284,
+      "ratio": "2.821%",
+      "bbox": {
+        "x": 9,
+        "y": 309,
+        "width": 155,
+        "height": 80
+      },
+      "fromBottom": 1,
+      "fromTop": 309,
+      "buckets": 20,
+      "heaviest": [
+        "[32,320]:1024",
+        "[64,320]:1024",
+        "[96,320]:1024",
+        "[128,320]:931"
+      ]
+    },
+    {
+      "golden": "phone-landscape-lobby-iphone-linux.png",
+      "size": "844x390",
+      "changed": 75136,
+      "ratio": "22.827%",
+      "bbox": {
+        "x": 9,
+        "y": 85,
+        "width": 823,
+        "height": 304
+      },
+      "fromBottom": 1,
+      "fromTop": 85,
+      "buckets": 226,
+      "heaviest": [
+        "[32,320]:1024",
+        "[64,320]:1024",
+        "[640,320]:1024",
+        "[672,320]:1024"
+      ]
+    },
+    {
+      "golden": "phone-landscape-lobby-level-badge-iphone-linux.png",
+      "error": "size 54x52 vs 54x51"
+    },
+    {
+      "golden": "phone-landscape-lobby-teams-iphone-linux.png",
+      "size": "844x390",
+      "changed": 74082,
+      "ratio": "22.506%",
+      "bbox": {
+        "x": 9,
+        "y": 85,
+        "width": 823,
+        "height": 304
+      },
+      "fromBottom": 1,
+      "fromTop": 85,
+      "buckets": 223,
+      "heaviest": [
+        "[32,320]:1024",
+        "[64,320]:1024",
+        "[640,320]:1024",
+        "[672,320]:1024"
+      ]
+    },
+    {
+      "golden": "phone-landscape-map-select-iphone-linux.png",
+      "size": "844x390",
+      "changed": 70717,
+      "ratio": "21.484%",
+      "bbox": {
+        "x": 9,
+        "y": 92,
+        "width": 783,
+        "height": 297
+      },
+      "fromBottom": 1,
+      "fromTop": 92,
+      "buckets": 176,
+      "heaviest": [
+        "[64,320]:1024",
+        "[32,320]:1002",
+        "[160,256]:997",
+        "[192,256]:994"
+      ]
+    },
+    {
+      "golden": "phone-landscape-ship-select-iphone-linux.png",
+      "size": "844x390",
+      "changed": 47720,
+      "ratio": "14.498%",
+      "bbox": {
+        "x": 9,
+        "y": 97,
+        "width": 811,
+        "height": 292
+      },
+      "fromBottom": 1,
+      "fromTop": 97,
+      "buckets": 168,
+      "heaviest": [
+        "[64,320]:1024",
+        "[32,320]:1022",
+        "[64,352]:929",
+        "[32,352]:923"
+      ]
+    },
+    {
+      "golden": "phone-portrait-codex-iphone-linux.png",
+      "size": "390x844",
+      "changed": 8988,
+      "ratio": "2.731%",
+      "bbox": {
+        "x": 1,
+        "y": 9,
+        "width": 367,
+        "height": 494
+      },
+      "fromBottom": 341,
+      "fromTop": 9,
+      "buckets": 57,
+      "heaviest": [
+        "[32,64]:1024",
+        "[32,96]:1024",
+        "[32,32]:1012",
+        "[32,128]:876"
+      ]
+    },
+    {
+      "golden": "phone-portrait-lobby-iphone-linux.png",
+      "size": "390x844",
+      "changed": 75136,
+      "ratio": "22.827%",
+      "bbox": {
+        "x": 1,
+        "y": 9,
+        "width": 304,
+        "height": 823
+      },
+      "fromBottom": 12,
+      "fromTop": 9,
+      "buckets": 206,
+      "heaviest": [
+        "[32,64]:1024",
+        "[32,672]:1024",
+        "[32,704]:1024",
+        "[32,736]:1024"
+      ]
+    }
+  ]
+}
