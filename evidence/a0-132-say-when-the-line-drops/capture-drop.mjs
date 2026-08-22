@@ -78,17 +78,40 @@ cutAt = Date.now();
 await joiner.__ctx.setOffline(true);
 log('joiner offline at t0');
 await both(host, joiner, '02-at-cut');
-note('02-at-cut', { emulated: true, atMs: Date.now() - cutAt, host: await state(host), joiner: await state(joiner) });
+note('02-at-cut', { emulated: true, measuredAtMs: Date.now() - cutAt, host: await state(host), joiner: await state(joiner) });
 
-// 08s: past the room's own silence window, so the substitution has landed and the
-// host's banner is still inside its five-second telling. 30s: a0-131's instant.
-for (const at of [8, 30]) {
-  while (Date.now() - cutAt < at * 1000) await sleep(host, 200);
-  const label = `${String(at).padStart(2, '0')}s`;
-  await both(host, joiner, `03-${label}`);
-  const snap = { emulated: true, atMs: Date.now() - cutAt, wire: [...wire], host: await state(host), joiner: await state(joiner) };
-  note(`03-${label}`, snap);
-  log(`t+${at}s joiner.overlay.shown=${snap.joiner.overlay?.shown} title=${JSON.stringify(snap.joiner.overlay?.title)} | wire=${JSON.stringify(wire)}`);
+// **Dense through the room's verdict, then a0-131's instant.**
+//
+// Two things this loop has to respect, both learned the hard way here. (1) The
+// host's telling is a TRANSIENT — `src/ui/peer-presence` PRESENCE_TELL_SECONDS is
+// 5 — so a sparse capture can miss it entirely and photograph the wrong answer.
+// (2) A screenshot of this renderer costs seconds in this lane (a0-131 measured the
+// client at 2.7-2.8 rAF fps), so a loop taking a full pair plus three seam reads per
+// sample drifts to ~5.4 s an iteration, and then every label on it is a lie: the
+// first version of this file wrote a frame called `30s` that was taken at 59.4 s.
+//
+// So the dense window takes the HOST alone and nothing else, and **every file is
+// named with the time that was measured when the shutter opened**, never with the
+// time it was aiming for.
+const stamp = (ms) => `t${String(Math.round(ms / 100) * 100).padStart(5, '0')}ms`;
+let target = 4000;
+while (target <= 16_000) {
+  while (Date.now() - cutAt < target) await sleep(host, 100);
+  const at = Date.now() - cutAt;
+  await shot(host, `03-dense-${stamp(at)}-host`);
+  // Never claim a cadence this lane did not keep: the next target is one second
+  // after the shutter actually opened, not one second after where we wanted it.
+  target = Math.max(target + 1000, Date.now() - cutAt + 200);
+}
+
+while (Date.now() - cutAt < 30_000) await sleep(host, 200);
+{
+  const at = Date.now() - cutAt;
+  await both(host, joiner, '04-30s');
+  const snap = { emulated: true, measuredAtMs: at, wire: [...wire], host: await state(host), joiner: await state(joiner) };
+  note('04-30s', snap);
+  log(`+30s (measured ${at}ms) joiner.overlay.shown=${snap.joiner.overlay?.shown} title=${JSON.stringify(snap.joiner.overlay?.title)}`);
+  log(`wire: ${JSON.stringify(wire)}`);
 }
 
 note('wire', { emulated: true, note: 'roster frames on the HOST socket, ms after the cut', frames: wire });

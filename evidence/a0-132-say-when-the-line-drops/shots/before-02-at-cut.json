@@ -1,5 +1,6 @@
 {
-  "atMs": 17985,
+  "emulated": true,
+  "measuredAtMs": 3394,
   "host": {
     "overlay": {
       "mounted": false
@@ -15,9 +16,9 @@
     "overlay": {
       "mounted": true,
       "shown": true,
-      "html": 2077,
+      "html": 2076,
       "title": "RECONNECTING…",
-      "detail": "no server data for 18s — reclaiming your seat, your seat is held for as long as the match runs.",
+      "detail": "no server data for 4s — reclaiming your seat, your seat is held for as long as the match runs.",
       "buttons": [
         {
           "id": "pr-link-loss-reconnect",

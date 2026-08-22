@@ -1,5 +1,23 @@
 {
-  "atMs": 3185,
+  "emulated": true,
+  "measuredAtMs": 30005,
+  "wire": [
+    {
+      "type": "playerSubstituted",
+      "atMs": null,
+      "payload": "{\"type\":\"playerSubstituted\",\"player\":1,\"graceSeconds\":0,\"heldForMatch\":true}"
+    },
+    {
+      "type": "playerReclaimed",
+      "atMs": null,
+      "payload": "{\"type\":\"playerReclaimed\",\"player\":1}"
+    },
+    {
+      "type": "playerSubstituted",
+      "atMs": 5337,
+      "payload": "{\"type\":\"playerSubstituted\",\"player\":1,\"graceSeconds\":0,\"heldForMatch\":true}"
+    }
+  ],
   "host": {
     "overlay": {
       "mounted": false
@@ -15,9 +33,9 @@
     "overlay": {
       "mounted": true,
       "shown": true,
-      "html": 2076,
+      "html": 2077,
       "title": "RECONNECTING…",
-      "detail": "no server data for 3s — reclaiming your seat, your seat is held for as long as the match runs.",
+      "detail": "no server data for 34s — reclaiming your seat, your seat is held for as long as the match runs.",
       "buttons": [
         {
           "id": "pr-link-loss-reconnect",

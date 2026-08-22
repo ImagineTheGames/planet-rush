@@ -1,5 +1,4 @@
 {
-  "atMs": 8014,
   "host": {
     "overlay": {
       "mounted": false
@@ -15,9 +14,9 @@
     "overlay": {
       "mounted": true,
       "shown": true,
-      "html": 2076,
+      "html": 2096,
       "title": "RECONNECTING…",
-      "detail": "no server data for 8s — reclaiming your seat, your seat is held for as long as the match runs.",
+      "detail": "the socket closed — no server data for 2s — reclaiming your seat, your seat is held for as long as the match runs.",
       "buttons": [
         {
           "id": "pr-link-loss-reconnect",
@@ -31,14 +30,14 @@
       "rect": {
         "x": 0,
         "y": 0,
-        "w": 798,
-        "h": 384
+        "w": 0,
+        "h": 0
       }
     },
     "presence": null,
     "link": {
-      "phase": "redialing",
-      "state": "reconnecting",
+      "phase": "live",
+      "state": "open",
       "closeReason": null
     }
   }
